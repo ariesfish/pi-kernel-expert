@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.3.0] - 2026-11-07
+
+### Added
+
+- `kernel_init`: creates `docs/draft.md`, `docs/plan.md`, `profile/`, `runs/`,
+  `candidates.jsonl`, and `.kernel/` without overwriting anything, and names
+  the draft/plan sections that still need real content.
+- `kernel_contract`: validates the draft/plan gate, then generates
+  `kernel.contract.json`, `goal.sh`, `goal.checks.sh`, and
+  `kernel-freeze.json`. The benchmark records a baseline on first run
+  (`geomean_speedup=1`), then reports per-cell medians, a geomean over the
+  matrix, and fails on a per-cell regression beyond the guard. The checks run
+  every cell twice and name the cell (and boundary status) on failure. Both
+  scripts refuse to run when `kernel.contract.json` no longer matches the
+  embedded hash.
+- Freeze payload with exactly one blocking metric criterion
+  (`geomean_speedup`, higher) and one command criterion (`goal.checks.sh`).
+
+### Notes
+
+- The task supplies the per-cell check and benchmark commands; the generator
+  supplies the matrix, aggregation, guard, and evidence envelopes. See ADR 0004.
+- `evidence_check.sh` moved to T-005, which owns the profile-summary format.
+
+
 ## [0.2.0] - 2026-11-07
 
 ### Added

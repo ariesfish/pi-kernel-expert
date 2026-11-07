@@ -4,6 +4,31 @@ Append-only. Every entry states what ran, where, and what it does not cover.
 Hardware claims name the GPU, clock state, and versions; without those they are
 written as unverified.
 
+## 2026-11-07 — contract layer (0.3.0)
+
+Host: same dev box, bash 5.x, Node 26.5.0. No GPU, no ncu, no pi-goal install.
+
+| Check | Command | Result |
+|---|---|---|
+| Unit + integration | `npm test` | 66 pass, 0 fail |
+| Draft/plan gate | generated templates | every section flagged as a placeholder; a filled draft passes; a missing or empty section is named |
+| Baseline run | `bash goal.sh` on a two-cell fixture | exit 0; `METRIC latency_us_a=10`, `latency_us_b=20`, `geomean_speedup=1`; `.kernel/baseline.tsv` written |
+| Improvement | 2× faster fixture | exit 0; `geomean_speedup=2` |
+| Regression guard | one cell 2× slower | exit 1; `guard: cell b regressed` |
+| Contract integrity | one byte appended to `kernel.contract.json` | both scripts exit 2 with the expected/actual hash |
+| Matrix env | cell vars `M=7,N=6` | benchmark saw `KERNEL_M`/`KERNEL_N` and printed 42 |
+| Two-pass checks | failing cell | exit 1, `FAIL cell b (boundary cell) pass 1` |
+| Flaky check | fails only on second call | exit 1, `FAIL cell a pass 2` |
+
+### Not covered
+
+- The generated criteria were not handed to a live `pi-goal` gate: pi-goal is
+  not installed in this environment (status reports `not installed`). The
+  payload shape follows its documented criterion schema; an end-to-end gate run
+  is T-008.
+- `kernel_init` detected "not a git repository" via a stubbed host in the tool
+  test; the real git path is exercised only by the fixture scripts.
+
 ## 2026-11-07 — knowledge layer (0.2.0)
 
 Host: same dev box, Node 26.5.0, python3 3.14.6, **no PyYAML installed**.

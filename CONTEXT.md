@@ -16,6 +16,10 @@ _Avoid_: goal, spec.
 The set of input shapes and dtypes a candidate must be correct on, plus the tolerance per dtype. Generated, not remembered.
 _Avoid_: test cases, workload.
 
+**Cell**:
+One row of the Shape Matrix: an id, a dtype, the variables exported to the task's commands, and a boundary flag.
+_Avoid_: case, config, shape (the shape is the cell's variables, not the cell).
+
 **Reference Oracle**:
 The command or artifact that defines expected output for the shape matrix. A candidate is compared against it, never against its own previous output.
 _Avoid_: baseline when correctness is meant; baseline is the performance comparison point.

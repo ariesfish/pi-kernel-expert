@@ -4,11 +4,11 @@ import test from "node:test";
 import kernelExpertExtension from "../../extensions/pi-kernel-expert/index.ts";
 import { fakeCommandContext, fakePi } from "../helpers/fake-host.mjs";
 
-test("extension registers the command, both tools, and the discovery handler", () => {
+test("extension registers the command, the tools, and the discovery handler", () => {
   const pi = fakePi();
   kernelExpertExtension(pi);
   assert.deepEqual([...pi.commands.keys()], ["kernel-expert"]);
-  assert.deepEqual([...pi.tools.keys()].sort(), ["kernel_bootstrap", "kernel_wiki"]);
+  assert.deepEqual([...pi.tools.keys()].sort(), ["kernel_bootstrap", "kernel_contract", "kernel_init", "kernel_wiki"]);
   assert.equal(pi.handlers.get("resources_discover")?.length, 1);
 });
 

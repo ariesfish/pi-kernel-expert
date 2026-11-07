@@ -12,6 +12,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { planKernelWikiRegistration } from "./knowledge/registration.ts";
 import { agentLayout } from "./support/paths.ts";
 import { registerBootstrapTool } from "./tools/bootstrap.ts";
+import { registerContractTool } from "./tools/contract.ts";
+import { registerInitTool } from "./tools/init.ts";
 import { registerStatusCommand } from "./tools/status.ts";
 import { registerWikiTool } from "./tools/wiki.ts";
 
@@ -19,6 +21,8 @@ export default function kernelExpertExtension(pi: ExtensionAPI): void {
   registerStatusCommand(pi);
   registerBootstrapTool(pi);
   registerWikiTool(pi);
+  registerInitTool(pi);
+  registerContractTool(pi);
 
   pi.on("resources_discover", async (event, ctx) => {
     const plan = planKernelWikiRegistration({ cwd: event.cwd, layout: agentLayout() });

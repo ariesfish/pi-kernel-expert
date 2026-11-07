@@ -22,6 +22,9 @@ export function fakePi() {
       existing.push(handler);
       handlers.set(event, existing);
     },
+    async exec() {
+      return { code: 1, stdout: "", stderr: "not a git repository", killed: false, truncated: false };
+    },
   };
 }
 

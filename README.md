@@ -2,7 +2,7 @@
 
 *CUDA kernel optimization for pi: the KDA flow on pi-goal's frozen-contract loop, with KernelWiki knowledge and Nsight Compute evidence.*
 
-Status: **0.2.0 — knowledge wired.** The package loads, ships the vendored ncu profiling skill, fetches and sanitizes the KernelWiki corpus at a recorded revision, and answers wiki queries. The kernel contract generator, evidence layer, and workflow skill are the next tickets (see `.dev/feature-pi-kernel-expert/plan.md`).
+Status: **0.3.0 — contract wired.** The package loads, ships the vendored ncu profiling skill, fetches and sanitizes the KernelWiki corpus, and freezes a kernel task into executable criteria. The evidence layer and workflow skill are the next tickets (see `.dev/feature-pi-kernel-expert/plan.md`).
 
 ## Why this exists
 
@@ -51,6 +51,38 @@ kernel_wiki({ query: "fuse gate-up dual GEMM on Blackwell" })
 kernel_wiki({ page: "kernel-flash-attention-4", follow_sources: true })
 ```
 
+## Freeze a kernel contract
+
+```text
+kernel_init({})                       # workspace + draft/plan templates
+# fill docs/draft.md and docs/plan.md — the generator refuses placeholders
+kernel_contract({
+  objective: "cut attention decode latency",
+  check_command: "python check.py --cell $KERNEL_CELL",
+  benchmark_command: "python bench.py --cell $KERNEL_CELL",
+  cells: [
+    { id: "s1024", dtype: "bf16", vars: { SEQ: "1024" } },
+    { id: "s8192", dtype: "bf16", vars: { SEQ: "8192" }, boundary: true },
+  ],
+  rtol: 1e-2, atol: 1e-3,
+})
+```
+
+It writes `goal.sh`, `goal.checks.sh`, `kernel.contract.json`, and
+`kernel-freeze.json`. The commands get `KERNEL_CELL`, `KERNEL_DTYPE`,
+`KERNEL_RTOL`, `KERNEL_ATOL`, the cell's vars, and `KERNEL_BOUNDARY`; the check
+command exits non-zero on a mismatch, the benchmark prints one number.
+
+- First `bash goal.sh` records `.kernel/baseline.tsv` and reports
+  `METRIC geomean_speedup=1`.
+- Later runs report `METRIC <metric>_<cell>=<median>` per cell and a geomean;
+  a cell that regresses beyond `guard_pct` fails the run.
+- `bash goal.checks.sh` runs every cell twice — a first-pass-only success is
+  reported as pass 2.
+- Both scripts verify the contract hash and refuse to run after a hand edit.
+- Pass `kernel-freeze.json` to `freeze_criteria`; use `geomean_speedup` /
+  `higher` for the experiment.
+
 ## Check what is wired
 
 ```text
@@ -73,8 +105,10 @@ No GPU, ncu, or nvcc exists on the build machine, so nothing hardware-dependent 
 ## Layout
 
 ```text
-extensions/pi-kernel-expert/   composition root, status, bootstrap + wiki tools, (next: contract, evidence)
+extensions/pi-kernel-expert/   composition root, status, bootstrap + wiki + init + contract tools
   knowledge/                   fetch, sanitize, conflict scan, registration plan
+  kernel/                      contract model, script + freeze-payload renderers
+  workspace/                   task workspace layout, draft/plan gate
 skills/ncu-report-skill/       vendored upstream skill, revision in VENDORED.yaml
 skills/KernelWiki/             fetched at runtime into the pi agent directory, never bundled
 third_party_licenses/          verbatim upstream license texts
