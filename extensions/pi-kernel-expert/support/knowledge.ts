@@ -112,10 +112,10 @@ export function formatKnowledgeReport(report: KnowledgeReport): string {
 
   const wiki = report.kernelWiki.present
     ? `cached at ${report.kernelWiki.path}`
-    : `not cached — pin ${report.kernelWiki.pin.slice(0, 12)} (fetch lands in T-003)`;
+    : `not cached — pin ${report.kernelWiki.pin.slice(0, 12)}, run kernel_bootstrap`;
 
   return [
-    `pi-kernel-expert ${report.version} — scaffold`,
+    `pi-kernel-expert ${report.version}`,
     `  loop engine   pi-goal ${loopEngine}`,
     `  ncu skill     ${ncu}`,
     `  KernelWiki    ${wiki}`,

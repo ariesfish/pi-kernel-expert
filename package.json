@@ -1,6 +1,6 @@
 {
   "name": "@ariesfish/pi-kernel-expert",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "CUDA kernel optimization for pi: the KDA flow on pi-goal's frozen-contract loop, with KernelWiki knowledge and Nsight Compute evidence.",
   "keywords": [

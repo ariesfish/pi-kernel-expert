@@ -6,11 +6,15 @@ export const KERNEL_WIKI_SKILL = "KernelWiki";
 export const NCU_SKILL = "ncu-report-skill";
 
 /**
- * kda's sanitized KernelWiki revision. Upstream HEAD and this revision differ:
- * the distributed tree omits 19 NVIDIA-proprietary CuTe DSL files. Fetching
- * anything else would both break the pin and change the license boundary.
+ * KernelWiki revision this package fetches.
+ *
+ * Chosen for the bundled pure-Python YAML fallback (upstream commit 7073fac),
+ * so the query tools run without host PyYAML. The revision still carries 19
+ * files marked LicenseRef-NvidiaProprietary — the same count as kda's older
+ * pin — so the fetch prunes them and records the removal in SANITIZED.yaml.
+ * Updating this pin means updating THIRD_PARTY_NOTICES.md and the changelog.
  */
-export const KERNEL_WIKI_PIN = "76d27b56f804e7e7295d4c570e1e5d7eef4b0a75";
+export const KERNEL_WIKI_PIN = "b6b4301f15e8ce6955a56776690643ce5db369e6";
 
 export interface AgentLayout {
   /** Pi's agent directory; `PI_CODING_AGENT_DIR` overrides the default. */

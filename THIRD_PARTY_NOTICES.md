@@ -22,17 +22,22 @@ is upstream-owned: fix bugs upstream, then re-sync, rather than editing it here.
 ### KernelWiki
 
 - Source: <https://github.com/mit-han-lab/KernelWiki>
-- Pinned revision: `76d27b56f804e7e7295d4c570e1e5d7eef4b0a75` — the sanitized tree
-  recorded by kda's gitlink; 19 NVIDIA-proprietary CuTe DSL files are omitted
-  upstream of this revision.
+- Fetched revision: `b6b4301f15e8ce6955a56776690643ce5db369e6` (upstream HEAD when
+  adopted; bundles the pure-Python YAML fallback).
+- Sanitization: the upstream tree at this revision carries 19 files marked
+  `LicenseRef-NvidiaProprietary`. The fetcher deletes every `artifacts/` file
+  whose body carries that marker and records the paths in the cache's
+  `SANITIZED.yaml`. kda's older pin carries the same 19 files; the omission is
+  not upstream.
 - License: MIT for original KernelWiki material (Copyright (c) 2026 hanlab);
   verbatim artifact bundles under `artifacts/` retain their upstream terms.
 - License text: `third_party_licenses/MIT-hanlab.txt`
 
 This package does not ship KernelWiki content. The bootstrap fetch clones the
-pinned revision into the user's pi agent directory; the terms that apply to the
-fetched tree are the upstream ones, including per-bundle `PROVENANCE.yaml`
-records under `artifacts/`.
+recorded revision into the user's pi agent directory and prunes the restricted
+files before installing it. The terms that apply to the remaining tree are the
+upstream ones, including per-bundle `PROVENANCE.yaml` records under
+`artifacts/`.
 
 ## Cited, not distributed
 

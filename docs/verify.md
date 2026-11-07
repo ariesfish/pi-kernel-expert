@@ -4,6 +4,29 @@ Append-only. Every entry states what ran, where, and what it does not cover.
 Hardware claims name the GPU, clock state, and versions; without those they are
 written as unverified.
 
+## 2026-11-07 — knowledge layer (0.2.0)
+
+Host: same dev box, Node 26.5.0, python3 3.14.6, **no PyYAML installed**.
+
+| Check | Command | Result |
+|---|---|---|
+| Real fetch | `kernel_bootstrap` against `github.com/mit-han-lab/KernelWiki` | installed in 5.7 s at `b6b4301f15e8…`, `rev-parse HEAD` matches, 1589 files |
+| Sanitization | fetch + `grep -rl LicenseRef-NvidiaProprietary` | 19 files pruned under `artifacts/`; 0 remain; paths in `SANITIZED.yaml` |
+| Refusal paths | unit tests with a local git fixture | wrong pin, wrong existing revision, missing SKILL.md, malformed pin, clone failure each refuse and leave no temp dir |
+| Idempotence | second `kernel_bootstrap` | `already`, 0.1 s, no re-clone; a reintroduced restricted file is pruned and appended to the record |
+| Query without PyYAML | `python3 scripts/query.py "fuse gate-up dual GEMM on Blackwell" --compact` | 10 results with page ids and paths, exit 0 |
+| Page fetch | `python3 scripts/get_page.py kernel-flash-attention-4 --body-only` | FlashAttention-4 body printed, exit 0 |
+| Corpus status | `python3 scripts/repo_status.py` | 1041 indexed pages / 944 PR pages / 52 wiki pages |
+| Pin discovery | old pin `76d27b5` queried | `ModuleNotFoundError: No module named 'yaml'` — it predates the bundled fallback; pin changed, old cache removed |
+
+### Not covered
+
+- Registration through `resources_discover` was exercised in unit tests
+  (plan + conflict scan), not in a live TUI; `/reload` behavior on this host is
+  unverified.
+- The fetched `SKILL.md` name is not Agent Skills compliant; pi's loader warns
+  and still loads it (inspected in `dist/core/skills.js`), unverified live.
+
 ## 2026-11-07 — scaffold (0.1.0)
 
 Host: Linux dev box, Node 26.5.0, npm 11.x.

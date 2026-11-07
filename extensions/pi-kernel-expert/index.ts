@@ -9,8 +9,25 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
+import { planKernelWikiRegistration } from "./knowledge/registration.ts";
+import { agentLayout } from "./support/paths.ts";
+import { registerBootstrapTool } from "./tools/bootstrap.ts";
 import { registerStatusCommand } from "./tools/status.ts";
+import { registerWikiTool } from "./tools/wiki.ts";
 
 export default function kernelExpertExtension(pi: ExtensionAPI): void {
   registerStatusCommand(pi);
+  registerBootstrapTool(pi);
+  registerWikiTool(pi);
+
+  pi.on("resources_discover", async (event, ctx) => {
+    const plan = planKernelWikiRegistration({ cwd: event.cwd, layout: agentLayout() });
+    if (plan.conflict && ctx.hasUI) {
+      ctx.ui.notify(
+        `KernelWiki is already installed at ${plan.conflict.path} (${plan.conflict.label}); pi-kernel-expert will not register its cached copy.`,
+        "warning",
+      );
+    }
+    return plan.skillPaths.length > 0 ? { skillPaths: plan.skillPaths } : {};
+  });
 }

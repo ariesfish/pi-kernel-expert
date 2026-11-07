@@ -2,7 +2,7 @@
 
 *CUDA kernel optimization for pi: the KDA flow on pi-goal's frozen-contract loop, with KernelWiki knowledge and Nsight Compute evidence.*
 
-Status: **0.1.0 scaffold.** The package loads, ships the vendored ncu profiling skill, and reports its knowledge state. The kernel contract generator, evidence layer, and workflow skill are the next tickets (see `.dev/feature-pi-kernel-expert/plan.md`).
+Status: **0.2.0 — knowledge wired.** The package loads, ships the vendored ncu profiling skill, fetches and sanitizes the KernelWiki corpus at a recorded revision, and answers wiki queries. The kernel contract generator, evidence layer, and workflow skill are the next tickets (see `.dev/feature-pi-kernel-expert/plan.md`).
 
 ## Why this exists
 
@@ -22,7 +22,7 @@ This package connects them. Kernel rules ride in data pi-goal already accepts �
 |---|---|---|
 | pi | >= 1.5.0 (`resources_discover`, `agent_before_settle`) | everything |
 | `@ariesfish/pi-goal` | >= 0.5.3 | the loop, contract, gate |
-| python3 | >= 3.11 | ncu report helpers |
+| python3 | >= 3.11 | ncu helpers and KernelWiki queries (no PyYAML needed) |
 | CUDA toolkit + Nsight Compute | 13.2 + 2026.3.1 documented target | profiling |
 | NVIDIA GPU | sm_90 verified in v1 | measuring anything |
 
@@ -33,6 +33,24 @@ pi install npm:@ariesfish/pi-goal
 pi install npm:@ariesfish/pi-kernel-expert
 ```
 
+## Start here
+
+```text
+/kernel-expert            # what is wired
+```
+
+Not cached yet? Ask the agent to run `kernel_bootstrap`, then `/reload`. It
+clones the recorded KernelWiki revision, verifies it, removes the 19 files
+marked `LicenseRef-NvidiaProprietary`, and writes `SANITIZED.yaml` next to the
+corpus. A tree at another revision is refused, never overwritten.
+
+Then query it:
+
+```text
+kernel_wiki({ query: "fuse gate-up dual GEMM on Blackwell" })
+kernel_wiki({ page: "kernel-flash-attention-4", follow_sources: true })
+```
+
 ## Check what is wired
 
 ```text
@@ -40,13 +58,13 @@ pi install npm:@ariesfish/pi-kernel-expert
 ```
 
 ```text
-pi-kernel-expert 0.1.0 — scaffold
+pi-kernel-expert 0.2.0
   loop engine   pi-goal installed
   ncu skill     vendored @c7980a43cb88 at .../skills/ncu-report-skill
-  KernelWiki    not cached — pin 76d27b56f804 (fetch lands in T-003)
+  KernelWiki    cached at ~/.pi/agent/kernel-expert/cache/KernelWiki@b6b4301f15e8
 ```
 
-The ncu skill is vendored and works offline. KernelWiki is fetched at the pinned sanitized revision, never bundled: it is 37 MB and its artifacts carry upstream terms.
+The ncu skill is vendored and works offline. KernelWiki is fetched at a recorded revision, never bundled: it is ~37 MB, its artifacts carry upstream terms, and the restricted files are pruned at fetch time rather than trusted to be absent.
 
 ## What runs where
 
@@ -55,11 +73,12 @@ No GPU, ncu, or nvcc exists on the build machine, so nothing hardware-dependent 
 ## Layout
 
 ```text
-extensions/pi-kernel-expert/   composition root, status command, (next: knowledge, contract, evidence)
+extensions/pi-kernel-expert/   composition root, status, bootstrap + wiki tools, (next: contract, evidence)
+  knowledge/                   fetch, sanitize, conflict scan, registration plan
 skills/ncu-report-skill/       vendored upstream skill, revision in VENDORED.yaml
 skills/KernelWiki/             fetched at runtime into the pi agent directory, never bundled
 third_party_licenses/          verbatim upstream license texts
-docs/adr/                      why the loop engine is reused, why the packaging split
+docs/adr/                      why the loop engine is reused, why the packaging split, why sm_90 first
 ```
 
 ## License

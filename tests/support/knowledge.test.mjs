@@ -11,7 +11,7 @@ import {
   readPackageVersion,
   readVendoredRevision,
 } from "../../extensions/pi-kernel-expert/support/knowledge.ts";
-import { agentLayout, packageRootFrom, skillDir } from "../../extensions/pi-kernel-expert/support/paths.ts";
+import { KERNEL_WIKI_PIN, agentLayout, packageRootFrom, skillDir } from "../../extensions/pi-kernel-expert/support/paths.ts";
 
 const PACKAGE_ROOT = packageRootFrom(new URL("../../extensions/pi-kernel-expert/support/knowledge.ts", import.meta.url).href);
 
@@ -73,8 +73,8 @@ test("report states the vendored skill and the missing corpus", () => {
   assert.equal(report.loopEngine.state, "installed");
 
   const text = formatKnowledgeReport(report);
-  assert.match(text, /pi-kernel-expert \d+\.\d+\.\d+ — scaffold/);
+  assert.match(text, /pi-kernel-expert \d+\.\d+\.\d+/);
   assert.match(text, /ncu skill {5}vendored @c7980a43cb88/);
-  assert.match(text, /KernelWiki {4}not cached/);
+  assert.match(text, new RegExp(`KernelWiki {4}not cached — pin ${KERNEL_WIKI_PIN.slice(0, 12)}, run kernel_bootstrap`));
   assert.match(text, /loop engine {3}pi-goal installed/);
 });
