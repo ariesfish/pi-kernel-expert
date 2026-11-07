@@ -55,6 +55,13 @@ kda's Hugging Face export script is not copied into this package. If the
 export feature is built (T-010, not in v1), its script and tests would be
 vendored with this notice updated.
 
+### pi-dev-mode benchmark checklist
+
+- Source: the `benchmark-checklist` skill in this author's `pi-dev-mode` package.
+- Use: `skills/kernel-flow/references/benchmark-checklist.md` adapts its seven
+  questions to GPU kernels, with attribution in the file.
+- License: MIT.
+
 ### Nsight Compute and CUDA
 
 The profiling workflow invokes NVIDIA's `ncu` binary and its `ncu_report`

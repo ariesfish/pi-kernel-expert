@@ -2,7 +2,7 @@
 
 *CUDA kernel optimization for pi: the KDA flow on pi-goal's frozen-contract loop, with KernelWiki knowledge and Nsight Compute evidence.*
 
-Status: **0.3.0 — contract wired.** The package loads, ships the vendored ncu profiling skill, fetches and sanitizes the KernelWiki corpus, and freezes a kernel task into executable criteria. The evidence layer and workflow skill are the next tickets (see `.dev/feature-pi-kernel-expert/plan.md`).
+Status: **0.4.0 — loop complete.** Contract, baseline, profiling evidence, candidate lineage, and the `kernel-flow` skill all ship. GPU verification is deferred until a machine exists (`docs/verify.md`).
 
 ## Why this exists
 
@@ -83,6 +83,40 @@ command exits non-zero on a mismatch, the benchmark prints one number.
 - Pass `kernel-freeze.json` to `freeze_criteria`; use `geomean_speedup` /
   `higher` for the experiment.
 
+## Evidence and promotion
+
+```text
+kernel_profile({ command: "python bench.py", kernel: "fmha" })
+# or attach a report produced on the GPU machine:
+kernel_profile({ report: "profile/run1/reports/full.ncu-rep", reuse_analysis: true })
+
+kernel_candidate({
+  decision: "keep",
+  description: "fuse the epilogue into the second GEMM",
+  metrics: { geomean_speedup: 1.18, latency_us_s1024: 41.2, latency_us_s8192: 612.0 },
+  profile_run: "run1",
+  bottleneck_claim: "latency-bound on L1",
+  bottleneck_metric: "l1tex__throughput.avg.pct_of_peak_sustained_elapsed",
+})
+```
+
+- The summary records only metrics present in the report; absent key metrics are
+  listed, never zeroed.
+- The profile is bound to the contract hash and the diff hash. Editing code
+  after profiling makes it stale and `kernel_candidate` refuses it.
+- A keep below the contract's `noiseFloorPct` needs `force_with_reason`, and the
+  reason is recorded. A rejection needs a reason.
+- `profile/` and `runs/` are excluded from the diff fingerprint, so evidence
+  files never invalidate each other.
+- Every recorded candidate refreshes `benchmark.csv` from the ledger: it is a
+  derived view, never hand-edited.
+
+## The skill
+
+`/skill:kernel-flow` carries the loop: contract → draft → plan → freeze →
+baseline → candidate → profile → record, plus the hard rules, the failure
+table, and a GPU benchmark checklist.
+
 ## Check what is wired
 
 ```text
@@ -105,10 +139,12 @@ No GPU, ncu, or nvcc exists on the build machine, so nothing hardware-dependent 
 ## Layout
 
 ```text
-extensions/pi-kernel-expert/   composition root, status, bootstrap + wiki + init + contract tools
+extensions/pi-kernel-expert/   composition root, status, and the six tools
   knowledge/                   fetch, sanitize, conflict scan, registration plan
-  kernel/                      contract model, script + freeze-payload renderers
+  kernel/                      contract, scripts, diff fingerprint, profile summary, candidate gate
   workspace/                   task workspace layout, draft/plan gate
+skills/kernel-flow/            the loop, the failure table, the benchmark checklist
+skills/ncu-report-skill/       vendored upstream profiling skill
 skills/ncu-report-skill/       vendored upstream skill, revision in VENDORED.yaml
 skills/KernelWiki/             fetched at runtime into the pi agent directory, never bundled
 third_party_licenses/          verbatim upstream license texts

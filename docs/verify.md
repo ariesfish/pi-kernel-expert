@@ -4,6 +4,38 @@ Append-only. Every entry states what ran, where, and what it does not cover.
 Hardware claims name the GPU, clock state, and versions; without those they are
 written as unverified.
 
+## 2026-11-07 — evidence + skill layer (0.4.0)
+
+Host: same dev box. No GPU, no ncu, no `ncu_report`, no pi-goal install.
+
+| Check | Command | Result |
+|---|---|---|
+| Unit + integration | `npm test` | 99 pass, 0 fail |
+| Summary parsing | fixture `metrics_key_full.json` | only numeric metrics kept; two absent metrics listed, not zeroed |
+| Rules ranking | fixture `rules_full.txt` | sorted by estimated speedup; a rule without one sorts last |
+| Stall attribution | fixture `stall_hotspots_full.txt` | kernel-line table preferred over inlined frames; totalLines and top rows parsed |
+| Summary writing | `buildProfileSummary` | `summary.json` carries contract hash, diff hash, GPU, clocks, ncu version, warnings |
+| Missing analysis | no `metrics_key` | refuses with the exact missing path, no invented metrics |
+| Attach mode | `reuse_analysis: true` + fake report | summary written; second run on the same dir refused |
+| Collect without ncu | fake exec `spawn ncu ENOENT` | names the missing dependency and the attach path |
+| Helper without ncu_report | fake exec | error names `ncu_report` and PYTHONPATH |
+| Diff fingerprint | real git fixture | tracked edits, untracked content, and scope globs change it; `profile/`, `.kernel/`, `candidates.jsonl` do not |
+| Candidate gate | real git + contract + profile fixtures | keep ok; noise floor, missing cell, stale profile, foreign contract, absent bottleneck metric, missing reason, path traversal each refused |
+| Ledger lineage | two records | `C1`/`baseline`, `C2`/`C1`, one JSON line each |
+| Derived CSV | two records | `benchmark.csv` header includes every metric column; free text quoted; empty ledger refused |
+| Skill tool names | `tests/skills/kernel-flow.test.mjs` | every named tool exists in this package or pi-goal's documented set |
+
+### Not covered
+
+- A real `.ncu-rep` was never parsed: no GPU, no `ncu`, no `ncu_report`. The
+  parser is exercised against helper-format fixtures only; the collection path is
+  unit-tested for its failure modes.
+- `kernel_candidate` never ran against a live pi-goal journal: pi-goal is not
+  installed here. Ordering (profile → record → `log_goal`) follows its
+  documented behavior, unverified end to end (T-008).
+- Skill routing was linted (description triggers, exclusions), not evaluated
+  against a model. A mutating trigger regression is a later `eval` concern.
+
 ## 2026-11-07 — contract layer (0.3.0)
 
 Host: same dev box, bash 5.x, Node 26.5.0. No GPU, no ncu, no pi-goal install.

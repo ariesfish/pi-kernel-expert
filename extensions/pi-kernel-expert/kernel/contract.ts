@@ -22,6 +22,7 @@ export interface ContractInput {
   repeats?: number;
   warmup?: number;
   guardPct?: number;
+  noiseFloorPct?: number;
   checksTimeoutSeconds?: number;
   scopeGlobs?: string[];
   testGlobs?: string[];
@@ -45,6 +46,7 @@ export interface KernelContract {
   repeats: number;
   warmup: number;
   guardPct: number;
+  noiseFloorPct: number;
   checksTimeoutSeconds: number;
   scopeGlobs: string[];
   testGlobs: string[];
@@ -90,6 +92,10 @@ export function normalizeContract(input: ContractInput): NormalizeResult {
   const guardPct = input.guardPct ?? 5;
   if (!Number.isFinite(guardPct) || guardPct < 0 || guardPct > 100) {
     errors.push("guardPct must be between 0 and 100");
+  }
+  const noiseFloorPct = input.noiseFloorPct ?? 2;
+  if (!Number.isFinite(noiseFloorPct) || noiseFloorPct < 0 || noiseFloorPct > 50) {
+    errors.push("noiseFloorPct must be between 0 and 50");
   }
   const checksTimeoutSeconds = input.checksTimeoutSeconds ?? 900;
   if (!Number.isInteger(checksTimeoutSeconds) || checksTimeoutSeconds < 1) {
@@ -164,6 +170,7 @@ export function normalizeContract(input: ContractInput): NormalizeResult {
       repeats,
       warmup,
       guardPct,
+      noiseFloorPct,
       checksTimeoutSeconds,
       scopeGlobs,
       testGlobs,

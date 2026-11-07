@@ -67,6 +67,9 @@ export function registerContractTool(pi: ExtensionAPI): void {
       guard_pct: Type.Optional(
         Type.Number({ description: "Fail the benchmark when a cell regresses by more than this percent. Default: 5." }),
       ),
+      noise_floor_pct: Type.Optional(
+        Type.Number({ description: "A keep below this geomean improvement is refused. Default: 2." }),
+      ),
       checks_timeout_seconds: Type.Optional(Type.Number({ description: "Timeout for the check criterion. Default: 900." })),
       scope_globs: Type.Optional(Type.Array(Type.String())),
       test_globs: Type.Optional(Type.Array(Type.String())),
@@ -110,6 +113,7 @@ export function registerContractTool(pi: ExtensionAPI): void {
         repeats: params.repeats,
         warmup: params.warmup,
         guardPct: params.guard_pct,
+        noiseFloorPct: params.noise_floor_pct,
         checksTimeoutSeconds: params.checks_timeout_seconds,
         scopeGlobs: params.scope_globs,
         testGlobs: params.test_globs,

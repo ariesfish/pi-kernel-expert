@@ -5,7 +5,7 @@ export interface HostExec {
   exec(
     command: string,
     args: string[],
-    options?: { cwd?: string; timeout?: number; signal?: AbortSignal },
+    options?: { cwd?: string; timeout?: number; signal?: AbortSignal; maxBuffer?: number },
   ): Promise<ExecResult>;
 }
 

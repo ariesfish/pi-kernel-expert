@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.4.0] - 2026-11-07
+
+### Added
+
+- `kernel_profile`: collect (`ncu --set full`, with the command and versions
+  recorded) or attach a report, run the vendored helpers, and write
+  `profile/<run>/summary.json`. The summary binds the contract hash and the
+  diff hash, records GPU identity, clocks and ncu version, keeps only metrics
+  the report actually has (absent ones listed), and ranks rules and stall lines.
+  `reuse_analysis` consumes an `analysis/` produced on the profiling machine.
+- `kernel_candidate`: append-only `candidates.jsonl` with parent lineage, diff
+  and contract hashes, per-cell metrics, profile pointer, bottleneck claim,
+  decision and reason. Refuses a keep below the contract's `noiseFloorPct`, a
+  keep missing any matrix cell, a stale profile, a profile from another
+  contract, and a bottleneck metric absent from the report.
+- `noiseFloorPct` in the contract (default 2).
+- `kernel-flow` skill: the KDA loop on pi-goal, an artifact table, hard rules,
+  a failure table, escalation triggers, and a GPU benchmark checklist.
+
+### Changed
+
+- Evidence freshness is enforced by `kernel_candidate` instead of a generated
+  `evidence_check.sh`: one enforcement point, and the ledger format can evolve
+  without regenerating every task's scripts. See ADR 0005.
+
+
 ## [0.3.0] - 2026-11-07
 
 ### Added

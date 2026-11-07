@@ -42,6 +42,7 @@ test("a minimal contract normalizes with defaults", () => {
   assert.equal(contract.direction, "lower");
   assert.equal(contract.guardPct, 5);
   assert.equal(contract.checksTimeoutSeconds, 900);
+  assert.equal(contract.noiseFloorPct, 2);
   assert.deepEqual(contract.tolerance, { rtol: 1e-2, atol: 1e-3 });
   assert.equal(contract.cells[0].vars.M, "1024");
   assert.equal(contract.cells[1].boundary, true);
