@@ -1,0 +1,41 @@
+/** Minimal extension host: enough ExtensionAPI/ExtensionCommandContext for unit tests. */
+
+export function fakePi() {
+  const commands = new Map();
+  const tools = new Map();
+  const handlers = new Map();
+
+  return {
+    commands,
+    tools,
+    handlers,
+    registerCommand(name, definition) {
+      commands.set(name, definition);
+      return definition;
+    },
+    registerTool(definition) {
+      tools.set(definition.name, definition);
+      return definition;
+    },
+    on(event, handler) {
+      const existing = handlers.get(event) ?? [];
+      existing.push(handler);
+      handlers.set(event, existing);
+    },
+  };
+}
+
+export function fakeCommandContext({ cwd = process.cwd() } = {}) {
+  const notifications = [];
+  return {
+    notifications,
+    ctx: {
+      cwd,
+      ui: {
+        notify(message, level) {
+          notifications.push({ message, level });
+        },
+      },
+    },
+  };
+}

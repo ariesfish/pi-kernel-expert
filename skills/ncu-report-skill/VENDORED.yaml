@@ -1,0 +1,10 @@
+# Provenance record for this vendored skill. Rewritten by scripts/sync-vendored-skill.sh.
+source: https://github.com/mit-han-lab/ncu-report-skill.git
+revision: c7980a43cb88a8734d113b22b57ff66746cf5719
+revision_date: 2026-10-14
+license: MIT
+sync: scripts/sync-vendored-skill.sh
+notes: >-
+  Vendored verbatim from upstream HEAD except this file. The upstream README
+  describes a Claude Code install; in pi the skill loads from this package's
+  skills directory.

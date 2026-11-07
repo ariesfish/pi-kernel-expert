@@ -1,0 +1,69 @@
+{
+  "name": "@ariesfish/pi-kernel-expert",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CUDA kernel optimization for pi: the KDA flow on pi-goal's frozen-contract loop, with KernelWiki knowledge and Nsight Compute evidence.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "cuda",
+    "kernel",
+    "ncu",
+    "nsight-compute",
+    "blackwell",
+    "hopper",
+    "coding-agent"
+  ],
+  "license": "MIT",
+  "author": "ariesfish<zzlyldy@gmail.com>",
+  "homepage": "https://github.com/ariesfish/pi-kernel-expert#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ariesfish/pi-kernel-expert.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ariesfish/pi-kernel-expert/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "files": [
+    "extensions",
+    "skills",
+    "docs",
+    "THIRD_PARTY_NOTICES.md",
+    "third_party_licenses",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"tests/**/*.test.mjs\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@ariesfish/pi-goal": ">=0.5.3",
+    "@earendil-works/pi-ai": ">=1.5.0",
+    "@earendil-works/pi-coding-agent": ">=1.5.0",
+    "@earendil-works/pi-tui": ">=1.5.0",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^1.5.0",
+    "@earendil-works/pi-coding-agent": "^1.5.0",
+    "@earendil-works/pi-tui": "^1.5.0",
+    "@types/node": "^25.9.1",
+    "typebox": "^1.1.38",
+    "typescript": "^6.0.3"
+  }
+}
