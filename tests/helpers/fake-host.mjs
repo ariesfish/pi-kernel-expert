@@ -1,6 +1,6 @@
 /** Minimal extension host: enough ExtensionAPI/ExtensionCommandContext for unit tests. */
 
-export function fakePi() {
+export function fakePi({ exec } = {}) {
   const commands = new Map();
   const tools = new Map();
   const handlers = new Map();
@@ -22,7 +22,8 @@ export function fakePi() {
       existing.push(handler);
       handlers.set(event, existing);
     },
-    async exec() {
+    async exec(command, args, options) {
+      if (exec) return exec.exec(command, args, options);
       return { code: 1, stdout: "", stderr: "not a git repository", killed: false, truncated: false };
     },
   };

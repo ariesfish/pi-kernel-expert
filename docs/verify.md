@@ -10,7 +10,7 @@ Host: same dev box. No GPU, no ncu, no `ncu_report`, no pi-goal install.
 
 | Check | Command | Result |
 |---|---|---|
-| Unit + integration | `npm test` | 99 pass, 0 fail |
+| Unit + integration | `npm test` | 100 pass, 0 fail |
 | Summary parsing | fixture `metrics_key_full.json` | only numeric metrics kept; two absent metrics listed, not zeroed |
 | Rules ranking | fixture `rules_full.txt` | sorted by estimated speedup; a rule without one sorts last |
 | Stall attribution | fixture `stall_hotspots_full.txt` | kernel-line table preferred over inlined frames; totalLines and top rows parsed |
