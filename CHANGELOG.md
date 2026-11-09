@@ -15,6 +15,12 @@
   so an interrupted regeneration cannot leave a contract beside scripts whose
   embedded sha disagrees with it.
 
+### Added
+
+- `scripts/job-env-check.sh`: proves nvcc, Nsight Compute and a CUDA-enabled
+  torch are visible from a non-interactive shell on the GPU node, naming every
+  missing item and exiting non-zero.
+
 ## [0.4.0] - 2026-11-07
 
 ### Added
