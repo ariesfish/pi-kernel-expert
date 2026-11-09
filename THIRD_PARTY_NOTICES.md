@@ -23,10 +23,11 @@ is upstream-owned: fix bugs upstream, then re-sync, rather than editing it here.
 
 - Source: <https://github.com/ariesfish/kernel-wiki> — a maintained copy of
   <https://github.com/mit-han-lab/KernelWiki> (MIT, Copyright (c) 2026 hanlab).
-  Divergence, recorded in ADR 0007: the skill is named `kernel-wiki` so Agent
-  Skills runtimes load it without a warning; page ids are frozen because ids are
+  Divergence, recorded in ADR 0007: the skill is named `kernel-wiki`, declares the Agent Skills
+  frontmatter (`license`, `compatibility`, `metadata`) and carries no
+  runtime-specific files; page ids are frozen because ids are
   the citation contract; and the sanitization below happened at the source.
-- Fetched revision: `b0cd75891e107c81689eb723f5b2cc281b9c1889`.
+- Fetched revision: `377d4560840dfc09583b887b2c7f2a9487f22cff`.
 - Sanitization: upstream carries 19 files marked `LicenseRef-NvidiaProprietary`;
   they are removed in the copy and listed in its `SANITIZED.yaml`. The fetcher
   still scans every `artifacts/` file for that marker and refuses nothing it

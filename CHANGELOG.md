@@ -5,7 +5,9 @@
 ### Changed
 
 - The fetched corpus is now **`kernel-wiki`**, our own pinned copy of
-  mit-han-lab/KernelWiki (`b0cd75891e10`): the skill name is Agent Skills
+  mit-han-lab/KernelWiki (`377d4560840d`), packaged as a standard Agent Skill:
+  `CLAUDE.md` became `SCHEMA.md`, the frontmatter declares `license`,
+  `compatibility` and `metadata` and nothing Claude-specific: the skill name is Agent Skills
   compliant, so the corpus loads without a warning; the 19 files marked
   `LicenseRef-NvidiaProprietary` are removed at the source and listed in its
   `SANITIZED.yaml` (the fetch still scans for the marker); page ids are frozen.

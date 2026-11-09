@@ -18,7 +18,7 @@ export const NCU_SKILL = "ncu-report-skill";
  *
  * Updating this pin means updating THIRD_PARTY_NOTICES.md and the changelog.
  */
-export const KERNEL_WIKI_PIN = "c18b44efa8cab3e3a35bc69810f793e19bb75dbe";
+export const KERNEL_WIKI_PIN = "377d4560840dfc09583b887b2c7f2a9487f22cff";
 
 export interface AgentLayout {
   /** Pi's agent directory; `PI_CODING_AGENT_DIR` overrides the default. */

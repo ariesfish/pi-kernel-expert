@@ -16,6 +16,7 @@ test("extension registers the command, the tools, and the discovery handler", ()
     "kernel_milestone",
     "kernel_profile",
     "kernel_wiki",
+    "kernel_wiki_candidate",
   ]);
   assert.equal(pi.handlers.get("resources_discover")?.length, 1);
 });

@@ -26,14 +26,18 @@ copy, not a project.
 
 Maintain the corpus as its own repository, `ariesfish/kernel-wiki`, and keep fetching it at a pin:
 
-- **Name**: `kernel-wiki`, compliant; `license: MIT` declared; the Claude-only `argument-hint`
-  dropped; `allowed-tools` names the tools the consuming runtime has.
+- **Name and packaging**: `kernel-wiki`, compliant; the frontmatter declares what the Agent Skills
+  spec defines and nothing else — `license`, `compatibility`, `metadata`, `allowed-tools` — with the
+  Claude-only `argument-hint` dropped. `CLAUDE.md` became `SCHEMA.md`: its content was the schema and
+  navigation reference, which was never runtime-specific, and a file named after one agent's
+  conventions made a portable skill look like that agent's project. The README's install section is a
+  table of runtimes, not one clone command.
 - **Sanitisation happens at the source**: the 19 restricted files are removed in the repository and
   listed in `SANITIZED.yaml`. The fetch still scans for the marker — an absence it did not verify is
   an absence it cannot claim — but the normal result is now "0 removed".
 - **Page ids are frozen.** Ids are the citation contract; `migration-wgmma-to-tcgen05` must stay that
   id forever. New pages may be added; an id is never renumbered.
-- **The pin** is `b0cd75891e107c81689eb723f5b2cc281b9c1889`; `KERNEL_WIKI_SKILL` becomes
+- **The pin** is `377d4560840dfc09583b887b2c7f2a9487f22cff`; `KERNEL_WIKI_SKILL` becomes
   `kernel-wiki`, so the cache directory is `kernel-wiki@<pin>` and an older cache is simply not
   found.
 - **Delivery stays as ADR 0002 chose it**: fetched on demand into the agent cache, never bundled
