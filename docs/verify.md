@@ -4,6 +4,39 @@ Append-only. Every entry states what ran, where, and what it does not cover.
 Hardware claims name the GPU, clock state, and versions; without those they are
 written as unverified.
 
+## 2026-11-09 — a reading block from a real sm_90 node (T-003, T-005, T-007)
+
+Host **h200-7** (`ssh builder`): 8x NVIDIA H200 139.8 GiB, sm_90, **cards idle for this work**.
+Driver 580.178.04, CUDA 13.0.88 (`nvcc` `/usr/local/cuda-13.0/bin/nvcc`), Nsight Compute 2025.3.1,
+torch 2.14.1+cu130 in `/root/pkex/venv` (installed; the fixture does not use it).
+One card per run, claimed with `CUDA_VISIBLE_DEVICES=3`; clocks unlocked (no `nvidia-smi -lgc`).
+Fixture: `.dev/feature-kernel-expert-v2/fixtures/saxpy/`; archive:
+`runs/T-003/` and `runs/T-005/` with per-artifact READMEs.
+
+| Check | Command | Result |
+|---|---|---|
+| Honest reading, run 1 then run 2 | `CUDA_VISIBLE_DEVICES=3 bash goal.sh` on card 3 | exit 0; block `basis: device`, `basisSource: task-reported`, GPU `NVIDIA H200` index 3 visible `"3"`, SM clocks 345 → 1980 MHz, mem 3201 MHz, foreign 0 MiB at both samples, `hostEnqueueMs 0.002059`, `deviceMs 0.004476`, `hostBoundRatio 0.4600`, `hostBoundVerdict ok`, 3 groups x 5 samples (spread 2.6 / 4.0 / 2.8 %), `pairing absent` |
+| METRIC provenance | same run | `METRIC latency_us_saxpy_typical=4.473`, `…_zero_block=4.561`, `…_tail=4.476`, `latency_us_saxpy=4.503149335`, `geomean_speedup=0.9997405793` — the block's device/enqueue figures are these lines, not shell time |
+| Parser round-trip | `parseReadingBlock` over the archived stdout | ok: 3 cells, samples 5, `hostBoundVerdict` agrees with `verdictForRatio(0.4600)` |
+| Refusal set on the honest reading | `collectRefusals` with the archived contract, no diff | 0 refusals |
+| Group that fails | `CUDA_VISIBLE_DEVICES=3 bash goal.checks.sh` | exit 1: `FAIL cell saxpy group zero_block pass 1`, `max_diff=0.9999853373`; `typical` and `tail` exit 0 at `max_diff=1.192092896e-07`. The same data with the reference kernel (`--impl plain`) is exact, so the failure is the candidate's zero-input fast path, not the data |
+| Host-bound control | same contract, `benchmarkCommand` `bench --n 1048576 --sleep-ms 2` | exit 0; `hostEnqueueMs 2.092463`, `deviceMs 2.089599`, **`hostBoundRatio 1.0014`**, **`hostBoundVerdict host_bound`**; replayed through `collectRefusals` → 1 refusal, `host-bound (charged to the candidate)` with the four host causes and the fix |
+| Second broken enqueue path | `bench_bad.py` (ctypes launch, 2 ms sleep per call, wall clock as device time) | `hostBoundRatio 1.0012`, `host_bound` — same verdict through a real Python wrapper |
+| Real `max_diff` on fp32 | `verify --n 1048576` (grid 4096 x 256, N+37 for `tail`) | `1.192092896e-07` against a double CPU reference; no NaN, no zero |
+
+### Not covered
+
+- **Blackwell is unverified.** Every number above is sm_90. No sm_100/sm_120 compile or run happened.
+- No clock lock: `nvidia-smi -lgc` was not used, and the block has no `clockLocked` field to record a
+  lock even if one had been (the spec asks for it; `reading.ts` does not emit it). Every reading here
+  is unlocked, and carries both its start and end clocks.
+- No `referenceCommand`: `pairing` is `absent` in every reading here; same-job ABBA pairing (T-006)
+  and ABBA spread are unexercised on hardware.
+- The refusal text above comes from calling the refusal rules directly. `kernel_candidate` itself was
+  not invoked inside a live pi-goal journal (pi-goal is not installed on this host).
+- No `ncu` collection: the fixture benchmarks with CUDA events, so no `.ncu-rep` and no summary JSON
+  were produced. The report parser is still exercised only against fixtures.
+
 ## 2026-11-07 — evidence + skill layer (0.4.0)
 
 Host: same dev box. No GPU, no ncu, no `ncu_report`, no pi-goal install.
@@ -108,14 +141,17 @@ Hardware: **no GPU, no `ncu`, no `nvcc`** (`nvidia-smi`, `ncu`, `nvcc` all absen
   `ui.notify` has no output surface; command registration is covered by unit
   test only.
 
-### How to close the hardware gap
+### How to close the remaining hardware gap
 
-On a machine with an sm_90 GPU, CUDA 13.2, and Nsight Compute 2026.3.1:
+The sm_90 gap named here was closed on 2026-11-09 (entry above): a real reading block, real clocks,
+real `max_diff`, a failing input group, and a host-bound refusal on h200-7, CUDA 13.0.88, driver
+580.178.04. What is still unverified is narrower:
 
-```bash
-make gpu-smoke          # added in T-007
-```
+- **Blackwell (sm_100/sm_120)** — no compile, no run, no clock reading.
+- **Profile evidence** — no `ncu` collection on this node, so no `.ncu-rep`, no parsed metrics, no
+  written `summary.json`. The collection and report paths stay fixture-tested until a profiled run
+  is recorded here with GPU name, clock state, driver, CUDA, ncu version, report path and summary JSON.
+- **Clock-locked runs** — `nvidia-smi -lgc` has not been used, and the producer has no `clockLocked`
+  field yet, so a locked reading could not be recorded even when the operator takes one.
 
-Record here: GPU name, clock state, driver, CUDA, ncu version, the report path,
-and the summary JSON. Until then every profiling or speed claim stays
-unverified.
+Until those are recorded, no profiling claim and no Blackwell claim is verified.

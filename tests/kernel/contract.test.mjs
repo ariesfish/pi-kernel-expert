@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -185,13 +185,13 @@ test("a written contract declares schemaVersion 2, basis device, and the generat
   const contract = built();
   assert.equal(contract.schemaVersion, 2);
   assert.equal(contract.basis, "device");
-  assert.deepEqual(contract.harnessGlobs, ["goal.sh", "goal.checks.sh"]);
+  assert.deepEqual(contract.harnessGlobs, ["goal.sh", "goal.checks.sh", ".kernel/calibration.json", ".kernel/precision.tsv", ".kernel/baseline.tsv"]);
   assert.equal(contract.referenceCommand, null);
 
   const json = contractJson(contract);
   assert.match(json, /"schemaVersion": 2/);
   assert.match(json, /"basis": "device"/);
-  assert.match(json, /"harnessGlobs": \[\s*"goal\.sh",\s*"goal\.checks\.sh"\s*\]/);
+  assert.match(json, /"harnessGlobs": \[\s*"goal\.sh",\s*"goal\.checks\.sh",\s*"\.kernel\/calibration\.json",\s*"\.kernel\/precision\.tsv",\s*"\.kernel\/baseline\.tsv"\s*\]/);
   assert.doesNotMatch(json, /"version": 1/, "a v1 `version` key must not survive into v2");
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-contract-"));
@@ -247,7 +247,7 @@ test("an omitted harnessGlobs warns about a comparator the command runs", () => 
     { root },
   );
   assert.deepEqual(result.errors, []);
-  assert.deepEqual(result.contract.harnessGlobs, ["goal.sh", "goal.checks.sh"]);
+  assert.deepEqual(result.contract.harnessGlobs, ["goal.sh", "goal.checks.sh", ".kernel/calibration.json", ".kernel/precision.tsv", ".kernel/baseline.tsv"]);
   const text = result.warnings.join("\n");
   assert.match(text, /bench\.py \(called by benchmarkCommand\)/);
   assert.match(text, /compare\.py \(called by checkCommand\)/);
@@ -270,7 +270,7 @@ test("the freeze payload carries the basis, the harness globs, and the reference
 
   const withoutReference = freezePayload(built());
   assert.equal(withoutReference.reference_command, null);
-  assert.deepEqual(withoutReference.harness_globs, ["goal.sh", "goal.checks.sh"]);
+  assert.deepEqual(withoutReference.harness_globs, ["goal.sh", "goal.checks.sh", ".kernel/calibration.json", ".kernel/precision.tsv", ".kernel/baseline.tsv"]);
 });
 
 // --- the reading block, as the generated script prints it -------------------
@@ -292,9 +292,9 @@ function readingWorkspace(overrides = {}, benchBody = '#!/usr/bin/env bash\nset 
   return { root, paths: workspacePaths(root) };
 }
 
-function runScript(script, cwd, env) {
+function runScript(script, cwd, env, args = []) {
   try {
-    const stdout = execFileSync("bash", [script], {
+    const stdout = execFileSync("bash", [script, ...args], {
       cwd,
       encoding: "utf8",
       env: env ?? process.env,
@@ -304,6 +304,12 @@ function runScript(script, cwd, env) {
   } catch (error) {
     return { code: error.status ?? 1, stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
   }
+}
+
+/** Same as runScript, but keeps stderr of a *successful* run: the notes live there. */
+function runScriptStderr(script, cwd, args = []) {
+  const result = spawnSync("bash", [script, ...args], { cwd, encoding: "utf8" });
+  return { code: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 }
 
 function stubBin(name, body) {
@@ -431,7 +437,7 @@ test("the block is emitted before a guard failure's exit 1", () => {
 
 // --- input groups: a shape is not a data set --------------------------------
 
-function groupWorkspace({ cells, checkCommand = "bash check.sh", benchBody } = {}) {
+function groupWorkspace({ cells, checkCommand = "bash check.sh", benchBody, calibrateCommand } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-groups-"));
   initWorkspace(root);
   fs.writeFileSync(
@@ -454,6 +460,7 @@ function groupWorkspace({ cells, checkCommand = "bash check.sh", benchBody } = {
     ...BASE,
     benchmarkCommand: "bash bench.sh",
     checkCommand,
+    calibrateCommand,
     repeats: 2,
     warmup: 0,
     cells: cells ?? BASE.cells,
@@ -851,4 +858,164 @@ test("a contract with no referenceCommand reports pairing absent and changes not
     "METRIC latency_us_m4096=1.5",
     "METRIC geomean_speedup=1",
   ]);
+});
+
+// --- precision: the reference's own error as the ruler ----------------------
+
+test("calibrateCommand is optional, trimmed, and carried into the contract json", () => {
+  const withCalibration = built({ calibrateCommand: "  python ref_precision.py --calibrate  " });
+  assert.equal(withCalibration.calibrateCommand, "python ref_precision.py --calibrate");
+  assert.match(contractJson(withCalibration), /"calibrateCommand": "python ref_precision\.py --calibrate"/);
+
+  assert.equal(built().calibrateCommand, null, "absent means the precision gate is unarmed");
+  assert.equal(built({ calibrateCommand: "   " }).calibrateCommand, null);
+  // Reusing the check command as the calibration is legitimate: the reference's
+  // own max_diff is exactly what a check prints when it runs the reference.
+  assert.equal(built({ calibrateCommand: "bash check.sh" }).calibrateCommand, "bash check.sh");
+});
+
+test("the checks script writes one precision row per cell x group and leaves the FAIL/ok lines alone", () => {
+  const cells = [
+    { id: "m1024", dtype: "bf16", groups: THREE("m1024", 11) },
+    { id: "m4096", dtype: "fp8_e4m3", boundary: true },
+  ];
+  const { root, paths } = groupWorkspace({
+    cells,
+    checkCommand: 'bash -c \'echo "group $KERNEL_GROUP: max_diff=0.001"\'',
+  });
+  const result = runScript(paths.checksScript, root);
+  assert.equal(result.code, 0, result.stderr);
+
+  // One row per cell x group: 3 + 3 + 1 boundary default.
+  const rows = fs.readFileSync(path.join(root, ".kernel", "precision.tsv"), "utf8").split("\n").filter(Boolean);
+  assert.deepEqual(rows, [
+    "# cell\tgroup\tmax_diff",
+    "m1024\ttypical\t0.001",
+    "m1024\tzero_block\t0.001",
+    "m1024\ttail\t0.001",
+    "m4096\tdefault\t0.001",
+  ]);
+
+  // The lines that existed before are untouched: no METRIC line, the same
+  // `checks ok:` line, and the precision note on a line of its own.
+  assert.doesNotMatch(result.stdout, /^METRIC/m);
+  assert.match(result.stdout, /^checks ok: 2 cell\(s\), 2 passes each, 4 cell x group pair\(s\)$/m);
+  assert.match(result.stdout, /^precision: one max_diff row per cell x group in \.kernel\/precision\.tsv/m);
+  assert.doesNotMatch(result.stdout, /max_diff=0\.001/, "the check's own output is not echoed on success");
+});
+
+test("a check that prints no max_diff records n/a and says so, instead of zero", () => {
+  const cells = [{ id: "m1024", dtype: "bf16", groups: THREE("m1024", 11) }];
+  // Correct on every group, but not a precision measurement: no max_diff anywhere.
+  const { root, paths } = groupWorkspace({ cells });
+  const result = runScriptStderr(paths.checksScript, root);
+  assert.equal(result.code, 0, result.stderr);
+  const rows = fs.readFileSync(path.join(root, ".kernel", "precision.tsv"), "utf8").split("\n").filter(Boolean);
+  assert.deepEqual(rows, ["# cell\tgroup\tmax_diff", "m1024\ttypical\tn/a", "m1024\tzero_block\tn/a", "m1024\ttail\tn/a"]);
+  assert.match(result.stderr, /note: cell m1024 group tail printed no max_diff/);
+  assert.match(result.stderr, /not evidence of precision/);
+});
+
+test("a failing check records n/a for its group and still writes every other row", () => {
+  const cells = [{ id: "m1024", dtype: "bf16", groups: THREE("m1024", 11) }];
+  const { root, paths } = groupWorkspace({
+    cells,
+    checkCommand: 'bash -c \'[[ "$KERNEL_GROUP" != zero_block ]] && echo "max_diff=0.002"\'',
+  });
+  const result = runScript(paths.checksScript, root);
+  assert.equal(result.code, 1, "the correctness failure is unchanged");
+  assert.match(result.stderr, /^FAIL cell m1024 group zero_block pass 1:$/m);
+  const rows = fs.readFileSync(path.join(root, ".kernel", "precision.tsv"), "utf8").split("\n").filter(Boolean);
+  assert.deepEqual(rows, ["# cell\tgroup\tmax_diff", "m1024\ttypical\t0.002", "m1024\tzero_block\tn/a", "m1024\ttail\t0.002"]);
+});
+
+test("the worst of the two passes is the row's error", () => {
+  const { root, paths } = groupWorkspace({
+    cells: [{ id: "a", dtype: "bf16", boundary: true }],
+    // 0.001 on the first pass, 0.004 on the second.
+    checkCommand: 'bash -c \'n=$(cat pass.count 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > pass.count; if [[ $n -eq 1 ]]; then echo "max_diff=0.001"; else echo "max_diff=0.004"; fi\'',
+  });
+  const result = runScript(paths.checksScript, root);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(fs.readFileSync(path.join(root, ".kernel", "precision.tsv"), "utf8"), /^a\tdefault\t0\.004$/m);
+});
+
+test("--calibrate measures the reference once per dtype into calibration.json", () => {
+  const cells = [
+    { id: "m1024", dtype: "bf16", groups: THREE("m1024", 11) },
+    { id: "m2048", dtype: "bf16", groups: THREE("m2048", 22) },
+    { id: "m4096", dtype: "fp8_e4m3", boundary: true },
+  ];
+  const { root, paths } = groupWorkspace({
+    cells,
+    calibrateCommand: "bash calib.sh",
+  });
+  fs.writeFileSync(
+    path.join(root, "calib.sh"),
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      'printf "%s\\n" "$KERNEL_DTYPE" >> calib.log',
+      'case "$KERNEL_DTYPE" in',
+      '  bf16) echo "reference self-error: max_diff=1e-4" ;;',
+      '  *) echo "max_diff=0.0078125" ;;',
+      "esac",
+      "",
+    ].join("\n"),
+  );
+
+  const result = runScript(paths.checksScript, root, undefined, ["--calibrate"]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /^CALIBRATION dtype=bf16 max_diff=1e-4$/m);
+  assert.match(result.stdout, /^CALIBRATION dtype=fp8_e4m3 max_diff=0\.0078125$/m);
+  assert.match(result.stdout, /calibration recorded in \.kernel\/calibration\.json for 2 dtype\(s\)/);
+
+  // Once per dtype, not once per cell or per group.
+  const calls = fs.readFileSync(path.join(root, "calib.log"), "utf8").split("\n").filter(Boolean);
+  assert.deepEqual(calls, ["bf16", "fp8_e4m3"]);
+
+  const calibration = JSON.parse(fs.readFileSync(path.join(root, ".kernel", "calibration.json"), "utf8"));
+  assert.equal(calibration.schemaVersion, 1);
+  assert.match(calibration.contractSha, /^[0-9a-f]{64}$/);
+  assert.match(calibration.measuredAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(calibration.entries, [
+    { dtype: "bf16", maxDiff: 0.0001 },
+    { dtype: "fp8_e4m3", maxDiff: 0.0078125 },
+  ]);
+
+  // Calibration does not touch the precision table.
+  assert.equal(fs.existsSync(path.join(root, ".kernel", "precision.tsv")), false);
+});
+
+test("--calibrate records a null entry when the reference prints no max_diff, and names the dtype", () => {
+  const cells = [{ id: "a", dtype: "bf16", groups: THREE("a", 1) }];
+  const { root, paths } = groupWorkspace({ cells, calibrateCommand: "bash calib.sh" });
+  fs.writeFileSync(path.join(root, "calib.sh"), "#!/usr/bin/env bash\nexit 0\n");
+
+  const result = runScriptStderr(paths.checksScript, root, ["--calibrate"]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stderr, /calibration of dtype bf16 printed no usable max_diff/);
+  assert.match(result.stderr, /unmeasured dtype\(s\): bf16/);
+  const calibration = JSON.parse(fs.readFileSync(path.join(root, ".kernel", "calibration.json"), "utf8"));
+  assert.deepEqual(calibration.entries, [{ dtype: "bf16", maxDiff: null }]);
+});
+
+test("--calibrate refuses by name when the contract names no calibrateCommand", () => {
+  const { root, paths } = groupWorkspace({ cells: [{ id: "a", dtype: "bf16", boundary: true }] });
+  const result = runScript(paths.checksScript, root, undefined, ["--calibrate"]);
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /this contract names no calibrateCommand/);
+  assert.match(result.stderr, /max_diff=<number>/);
+  assert.equal(fs.existsSync(path.join(root, ".kernel", "calibration.json")), false);
+});
+
+test("the generated checks script passes bash -n with and without a calibration", () => {
+  for (const overrides of [{}, { calibrateCommand: "bash calibrate.sh" }]) {
+    const contract = built(overrides);
+    const script = renderChecksScript(contract, contractSha(contractJson(contract)));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-bashn-"));
+    const file = path.join(root, "goal.checks.sh");
+    fs.writeFileSync(file, script);
+    execFileSync("bash", ["-n", file], { stdio: ["ignore", "pipe", "pipe"] });
+  }
 });

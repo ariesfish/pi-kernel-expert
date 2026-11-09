@@ -1,19 +1,21 @@
 /**
- * The five refusals `kernel_candidate` applies to a keep.
+ * The refusals `kernel_candidate` applies to a keep.
  *
  * Each one answers a different question about the same number: *is it a
  * measurement of the kernel?* (basis, host path), *is it a measurement of a
  * change the apparatus allowed?* (harness), *is it a measurement of the whole
- * claim?* (cell x group) and *is it a measurement of this code?* (profile).
+ * claim?* (cell x group), *is it the same number the reading printed?*
+ * (metric-not-in-reading), *is it precise enough to be the same algorithm?*
+ * (precision) and *is it a measurement of this code?* (profile).
  *
  * Two properties are deliberate:
  *
  * - **A refusal names the rule, the side it is charged to, and the fix.** The
  *   side matters: a fat host path and a missing clock are defects of the *run*
- *   (re-run it), an edited harness and a stale profile are defects of the
- *   *candidate* (fix the change). Only the run-side ones may be forced — a
- *   human can accept a noisy run, but not a measurement taken through an
- *   apparatus the candidate edited.
+ *   (re-run it), an edited harness, an imprecise kernel and a stale profile are
+ *   defects of the *candidate* (fix the change). Only the run-side ones may be
+ *   forced — a human can accept a noisy run, but not a measurement taken
+ *   through an apparatus the candidate edited.
  * - **Every function is pure.** It takes the numbers and paths it judges, never
  *   a workspace, so the same rules are unit-testable without a git repo and the
  *   recorder cannot accidentally ask the rules to go and measure something.
@@ -22,6 +24,7 @@
  * exactly like `host_bound` does, with a different fix.
  */
 import { BASIS_VALUES, cellMetricName, DEFAULT_GROUP, type KernelContract } from "./contract.ts";
+import { formatPrecisionValue, type PrecisionComparison } from "./precision.ts";
 
 export const RULE_IDS = [
   "basis-missing",
@@ -30,6 +33,7 @@ export const RULE_IDS = [
   "cell-group-uncovered",
   "reading-contract-mismatch",
   "metric-not-in-reading",
+  "precision-regression",
   "profile-stale",
 ] as const;
 
@@ -45,17 +49,31 @@ export interface Refusal {
   message: string;
   /** What the caller does next; never "try again". */
   fix: string;
+  /**
+   * Per-instance override of `isForceable(rule)`. `precision-regression` uses
+   * it: with no calibration the ruler itself is missing (a run-side defect a
+   * human may accept once), but a *measured* precision regression is the
+   * candidate's arithmetic and is never forced — that is the whole gate.
+   */
+  forceable?: boolean;
 }
 
 /**
  * `forceWithReason` bypasses a run-level defect only. `harness-touched` and
  * `profile-stale` are not forceable: forcing them would let the candidate edit
  * the thing that judges it, or keep a candidate the profile never saw.
+ * `precision-regression` is not here: it decides per instance (see
+ * `Refusal.forceable`), because only its `unmeasured` form is a defect of the run.
  */
 export const FORCEABLE_RULES: readonly RuleId[] = ["basis-missing", "host-bound", "cell-group-uncovered"];
 
 export function isForceable(rule: RuleId): boolean {
   return FORCEABLE_RULES.includes(rule);
+}
+
+/** The rule level default, overridden by the instance when it says so. */
+export function isRefusalForceable(entry: Refusal): boolean {
+  return entry.forceable ?? isForceable(entry.rule);
 }
 
 /** The four causes a host-bound reading is diagnosed with, in the order to check them. */
@@ -98,11 +116,15 @@ export interface RefusalContext {
   changedFiles: readonly string[];
   /** The `METRIC` names the run printed, including one aggregate per cell. */
   metrics: Record<string, number>;
+  /** The precision gate's verdict over `.kernel/precision.tsv` and `calibration.json`. */
+  precision?: PrecisionComparison | null;
   profile?: ProfileStaleness | null;
 }
 
-function refusal(rule: RuleId, charged: ChargedTo, body: string, fix: string): Refusal {
-  return { rule, charged, message: `${rule} (charged to the ${charged}): ${body}`, fix };
+function refusal(rule: RuleId, charged: ChargedTo, body: string, fix: string, forceable?: boolean): Refusal {
+  const entry: Refusal = { rule, charged, message: `${rule} (charged to the ${charged}): ${body}`, fix };
+  if (forceable !== undefined) entry.forceable = forceable;
+  return entry;
 }
 
 function short(sha: string | undefined): string {
@@ -285,7 +307,68 @@ export function metricNotInReading(ctx: RefusalContext): Refusal | null {
   );
 }
 
-/** 7. The profile is older than the tree it is cited for. */
+/**
+ * 7. The candidate is less precise than the reference, in the way a tolerance
+ * cannot see: `e_cand > 3 * e_ref + max(ulp(dtype), 2^-17)`. A kernel that is
+ * green to `rtol` and 4x the reference's own error is a different algorithm
+ * wearing the same test result.
+ *
+ * Two shapes of the same rule:
+ *
+ * - **measured regression** — the numbers exist and the candidate lost. Not
+ *   forceable: the gate's whole point is that a human cannot wave this through.
+ * - **unmeasured** — no calibration, so the reference's own error (the ruler)
+ *   was never measured. Forceable once, with the reason recorded: defaulting
+ *   `e_ref` to 0 would instead refuse every candidate and teach nothing.
+ */
+export function precisionRegression(ctx: RefusalContext): Refusal | null {
+  const comparison = ctx.precision;
+  if (!comparison || !comparison.armed) return null;
+  const { regressions, unmeasured, skippedPairs, unknownDtypes } = comparison;
+  if (regressions.length === 0 && unmeasured.length === 0) return null;
+
+  const parts: string[] = [];
+  for (const entry of regressions) {
+    const floorFrom = entry.known ? `ulp(${entry.key})` : `fp32's 2^-23, the dtype is unknown`;
+    const ratio = entry.ratio === null ? "" : `; ${entry.ratio.toFixed(2)}x the reference's own error`;
+    const worst = entry.worst.length > 0 ? ` (worst group(s) ${capped(entry.worst)})` : "";
+    parts.push(
+      `dtype ${entry.dtype}: e_cand ${formatPrecisionValue(entry.eCand)} > threshold ${formatPrecisionValue(entry.threshold)} = 3 * e_ref ${formatPrecisionValue(entry.eRef)} + floor ${formatPrecisionValue(entry.floor)} (max(${floorFrom}, 2^-17))${ratio}${worst}`,
+    );
+  }
+  for (const entry of unmeasured) {
+    parts.push(`dtype ${entry.dtype}: e_ref is unmeasured — ${entry.reason}`);
+  }
+  if (skippedPairs.length > 0) {
+    parts.push(
+      `${skippedPairs.length} cell/group row(s) recorded n/a and were not compared (${capped(skippedPairs)}) — a non-numeric check is not evidence of precision`,
+    );
+  }
+  if (unknownDtypes.length > 0) {
+    parts.push(
+      `dtype(s) ${unknownDtypes.join(", ")} name no unit in the last place this build knows, so their floor is fp32's 2^-23 = ${formatPrecisionValue(2 ** -23)}`,
+    );
+  }
+
+  if (regressions.length > 0) {
+    return refusal(
+      "precision-regression",
+      "candidate",
+      `${parts.join("; ")}. The reference's own error is the ruler: past this threshold the candidate is not the same algorithm at a different speed.`,
+      "bring max_diff back under 3x the reference's by computing the way the reference does — accumulate in fp32, keep its upcast, drop a lossy fast path — then re-run goal.checks.sh; a candidate that is 4x the reference's error is a different result, not a faster one",
+      false,
+    );
+  }
+  return refusal(
+    "precision-regression",
+    "candidate",
+    `${parts.join("; ")}. With no ruler there is no verdict, and an unmeasured reference is not a pass.`,
+    "run bash goal.checks.sh --calibrate so .kernel/calibration.json records the reference's own max_diff per dtype, then re-run the checks; force_with_reason accepts an unmeasured reference once, and the ledger records that it was forced",
+    true,
+  );
+}
+
+/** 8. The profile is older than the tree it is cited for. */
 export function profileStale(ctx: RefusalContext): Refusal | null {
   const profile = ctx.profile;
   if (!profile) return null;
@@ -318,6 +401,7 @@ export function collectRefusals(ctx: RefusalContext): Refusal[] {
     cellGroupUncovered,
     readingContractMismatch,
     metricNotInReading,
+    precisionRegression,
     profileStale,
   ]
     .map((rule) => rule(ctx))
@@ -336,8 +420,8 @@ export function applyForce(
 ): { blocking: Refusal[]; forcedRules: RuleId[] } {
   if (!forceReason?.trim()) return { blocking: refusals, forcedRules: [] };
   return {
-    blocking: refusals.filter((entry) => !isForceable(entry.rule)),
-    forcedRules: refusals.filter((entry) => isForceable(entry.rule)).map((entry) => entry.rule),
+    blocking: refusals.filter((entry) => !isRefusalForceable(entry)),
+    forcedRules: refusals.filter((entry) => isRefusalForceable(entry)).map((entry) => entry.rule),
   };
 }
 

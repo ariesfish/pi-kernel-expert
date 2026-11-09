@@ -175,7 +175,7 @@ test("kernel_contract defaults the basis and warns about a comparator no glob co
 
   const contract = JSON.parse(fs.readFileSync(workspacePaths(root).contract, "utf8"));
   assert.equal(contract.basis, "device");
-  assert.deepEqual(contract.harnessGlobs, ["goal.sh", "goal.checks.sh"]);
+  assert.deepEqual(contract.harnessGlobs, ["goal.sh", "goal.checks.sh", ".kernel/calibration.json", ".kernel/precision.tsv", ".kernel/baseline.tsv"]);
 });
 
 test("kernel_contract refuses a self-reference before writing anything", async () => {

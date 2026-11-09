@@ -11,6 +11,18 @@ import {
   type KernelContract,
 } from "./contract.ts";
 import { diffFingerprint, sha256File, type DiffFingerprint } from "./diff.ts";
+import {
+  CALIBRATION_JSON_PATH,
+  PRECISION_TSV_PATH,
+  comparePrecision,
+  formatPrecisionValue,
+  parseCalibrationJson,
+  parsePrecisionTsv,
+  type CalibrationEntry,
+  type PrecisionComparison,
+  type PrecisionEvidence,
+  type PrecisionRow,
+} from "./precision.ts";
 import type { ProfileSummary } from "./profile.ts";
 import {
   READING_END_MARKER,
@@ -109,6 +121,8 @@ export type CandidateOutcome =
       fingerprint: DiffFingerprint;
       ledger: string;
       benchmarkCsv: { path: string; rows: number } | null;
+      /** The precision gate's verdict on a keep; null on a reject. */
+      precision?: PrecisionComparison | null;
     }
   | {
       ok: false;
@@ -234,6 +248,39 @@ export function readCandidates(workspace: string): CandidateRecord[] {
     .map((line) => JSON.parse(line) as CandidateRecord);
 }
 
+/**
+ * The two files the precision gate judges: `.kernel/precision.tsv` (one
+ * `max_diff` per cell x group, written by `goal.checks.sh`) and
+ * `.kernel/calibration.json` (the reference's own error per dtype, written by
+ * `goal.checks.sh --calibrate`). An absent file is `null`, never an empty one:
+ * "no evidence" and "wrote nothing" are different facts.
+ */
+export function readPrecisionEvidence(workspace: string): PrecisionEvidence {
+  const tsvPath = path.join(workspace, PRECISION_TSV_PATH);
+  const calibrationPath = path.join(workspace, CALIBRATION_JSON_PATH);
+
+  let rows: PrecisionRow[] | null = null;
+  if (fs.existsSync(tsvPath)) {
+    try {
+      rows = parsePrecisionTsv(fs.readFileSync(tsvPath, "utf8")).rows;
+    } catch {
+      rows = null;
+    }
+  }
+
+  let calibration: CalibrationEntry[] | null = null;
+  let calibrationReason: string | null = null;
+  if (!fs.existsSync(calibrationPath)) {
+    calibrationReason = `${CALIBRATION_JSON_PATH} does not exist — run bash goal.checks.sh --calibrate so the reference's own error is recorded per dtype`;
+  } else {
+    const parsed = parseCalibrationJson(fs.readFileSync(calibrationPath, "utf8"));
+    if (parsed.ok) calibration = parsed.entries;
+    else calibrationReason = parsed.reason;
+  }
+
+  return { rows, calibration, calibrationReason };
+}
+
 export async function recordCandidate(input: CandidateInput): Promise<CandidateOutcome> {
   const paths = workspacePaths(input.workspace);
   const loaded = readContract(input.workspace);
@@ -329,6 +376,7 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
 
   let refusals: Refusal[] = [];
   let forcedRules: RuleId[] = [];
+  let precision: PrecisionComparison | null = null;
 
   if (input.decision === "keep") {
     // Rule 4 owns the per-cell aggregates; the geomean is the gate's own metric
@@ -346,6 +394,10 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
       }
     }
 
+    // The precision gate needs the contract (which dtype each cell is) plus the
+    // two files on disk; the math lives in precision.ts, the words in refusals.ts.
+    precision = comparePrecision({ contract: loaded.contract, evidence: readPrecisionEvidence(input.workspace) });
+
     const collected = collectRefusals({
       contract: loaded.contract,
       contractSha: loaded.sha,
@@ -353,6 +405,7 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
       readingReason: resolved.reason,
       changedFiles: fingerprint.value.changedFiles,
       metrics,
+      precision,
       profile: staleness,
     });
     const applied = applyForce(collected, input.forceWithReason);
@@ -398,6 +451,7 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     fingerprint: fingerprint.value,
     ledger: paths.candidates,
     benchmarkCsv: csv.ok ? { path: csv.path, rows: csv.rows } : null,
+    precision,
   };
 }
 
@@ -497,6 +551,17 @@ function sanitizeMetrics(raw: Record<string, unknown>, errors: string[]): Record
   return metrics;
 }
 
+/** One line per dtype: the candidate's error, the ruler, and the threshold it had to beat. */
+function precisionLine(comparison: PrecisionComparison): string {
+  const parts = comparison.dtypes.map((entry) => {
+    const cand = entry.eCand === null ? "e_cand n/a" : `e_cand ${formatPrecisionValue(entry.eCand)}`;
+    const ref = entry.eRef === null ? "e_ref unmeasured" : `e_ref ${formatPrecisionValue(entry.eRef)}`;
+    const threshold = entry.threshold === null ? "" : `, threshold ${formatPrecisionValue(entry.threshold)}`;
+    return `${entry.dtype} ${cand} vs ${ref}${threshold}`;
+  });
+  return parts.length === 0 ? "no dtype to judge" : parts.join("; ");
+}
+
 export function formatCandidateOutcome(outcome: CandidateOutcome): string {
   if (!outcome.ok) {
     const lines = [
@@ -522,6 +587,8 @@ export function formatCandidateOutcome(outcome: CandidateOutcome): string {
     r.reading
       ? `  reading: basis ${r.reading.basis}, hostBoundRatio ${r.reading.hostBoundRatio ?? "absent"}, verdict ${r.verdict}, pairing ${r.pairing}`
       : `  reading: none — verdict ${r.verdict}, pairing ${r.pairing}`,
+    outcome.precision?.armed ? `  precision: ${precisionLine(outcome.precision)}` : null,
+    ...(outcome.precision?.armed ? outcome.precision.warnings.map((warning) => `  precision warning: ${warning}`) : []),
     r.forcedRules.length > 0 ? `  forced through: ${r.forcedRules.join(", ")}` : null,
     r.reason ? `  reason: ${r.reason}` : null,
     r.forced ? `  forced: ${r.forcedReason}` : null,

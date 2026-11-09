@@ -9,14 +9,14 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
     name: "kernel_candidate",
     label: "Record Kernel Candidate",
     description:
-      "Append a candidate to candidates.jsonl with its parent, diff hash, contract hash, per-cell metrics, the reading block it rests on, profile pointer, bottleneck claim, decision, and reason. Refuses a keep by naming every rule it breaks — the reading has no basis, the reading is host-bound or unmeasured, the diff edits a harnessGlobs path, a cell x group or a cell aggregate has no reading, a profile is stale — and prints all of them in one block, each with the side it is charged to and the fix.",
+      "Append a candidate to candidates.jsonl with its parent, diff hash, contract hash, per-cell metrics, the reading block it rests on, profile pointer, bottleneck claim, decision, and reason. Refuses a keep by naming every rule it breaks — the reading has no basis, the reading is host-bound or unmeasured, the diff edits a harnessGlobs path, a cell x group or a cell aggregate has no reading, the claimed cell value is not the reading's own, the candidate's max_diff is past 3x the reference's own error plus the dtype floor (.kernel/precision.tsv vs .kernel/calibration.json), a profile is stale — and prints all of them in one block, each with the side it is charged to and the fix.",
     promptSnippet: "Record a candidate decision with its evidence",
     promptGuidelines: [
       "Record every attempted candidate, kept or rejected. A rejection without a reason is not recorded.",
       "Pass reading: the stdout of goal.sh (or a path to the log). Without it the keep has no basis and is refused.",
       "Profile after the change and record the candidate before log_goal commits it; the diff hash binds the evidence.",
       "A bottleneck claim must name a metric that exists in the profile summary; absence is reported, never inferred.",
-      "force_with_reason only accepts a run-level defect (missing basis, host-bound or unmeasured reading, an unmeasured cell/group). It never accepts an edited harness or a stale profile.",
+      "force_with_reason only accepts a run-level defect (missing basis, host-bound or unmeasured reading, an unmeasured cell/group, an uncalibrated reference). It never accepts an edited harness, a stale profile, or a measured precision regression.",
       "pi-goal's log_goal is still the thing that commits a keep; this ledger is the lineage on top of it.",
     ],
     parameters: Type.Object({

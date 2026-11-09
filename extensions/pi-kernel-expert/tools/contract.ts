@@ -51,7 +51,7 @@ export function registerContractTool(pi: ExtensionAPI): void {
     name: "kernel_contract",
     label: "Generate Kernel Contract",
     description:
-      "Freeze a kernel task's shape matrix and its input groups into executable artifacts: kernel.contract.json, goal.sh (one METRIC line per cell x group plus a per-cell median, geomean speedup, per-cell regression guard), goal.checks.sh (per cell x group reference comparison, two passes), and kernel-freeze.json (the pi-goal freeze_criteria payload). Refuses incomplete drafts, a non-boundary cell with fewer than 3 groups, a group without an intent, and existing artifacts without force.",
+      "Freeze a kernel task's shape matrix and its input groups into executable artifacts: kernel.contract.json, goal.sh (one METRIC line per cell x group plus a per-cell median, geomean speedup, per-cell regression guard), goal.checks.sh (per cell x group reference comparison, two passes, plus --calibrate for the precision ruler), and kernel-freeze.json (the pi-goal freeze_criteria payload). Refuses incomplete drafts, a non-boundary cell with fewer than 3 groups, a group without an intent, and existing artifacts without force.",
     promptSnippet: "Generate goal.sh, goal.checks.sh, and the freeze payload",
     promptGuidelines: [
       "Call kernel_contract only after docs/draft.md and docs/plan.md hold real content.",
@@ -61,6 +61,7 @@ export function registerContractTool(pi: ExtensionAPI): void {
       "Pass the returned payload to freeze_criteria, and use metric_name geomean_speedup with direction higher.",
       "goal.sh and goal.checks.sh are protected by pi-goal in sealed mode; regenerating needs force and /goal allow-benchmark.",
       "If the check or benchmark command runs a file of your own (a .py comparator, a bench harness), add it to harness_globs: the default only protects the two generated scripts.",
+      "Have the check command print max_diff=<relative error> and pass calibrate_command (the reference measured against itself); then `bash goal.checks.sh --calibrate` records the ruler and kernel_candidate refuses a keep past 3x the reference's own error plus the dtype floor.",
       "Set basis to e2e only when the command times the whole host call; a device-basis number and an e2e-basis number are never comparable.",
     ],
     parameters: Type.Object({
@@ -109,6 +110,12 @@ export function registerContractTool(pi: ExtensionAPI): void {
         Type.String({
           description:
             "Shell command for the same-job reference implementation, measured in the same run. Must differ from benchmark_command.",
+        }),
+      ),
+      calibrate_command: Type.Optional(
+        Type.String({
+          description:
+            "Shell command that measures the REFERENCE against itself and prints max_diff=<number>; bash goal.checks.sh --calibrate runs it once per dtype into .kernel/calibration.json. Without it the precision gate has no ruler and stays unarmed.",
         }),
       ),
       burn_in_ms: Type.Optional(
@@ -164,6 +171,7 @@ export function registerContractTool(pi: ExtensionAPI): void {
         basis: params.basis,
         harnessGlobs: params.harness_globs,
         referenceCommand: params.reference_command,
+        calibrateCommand: params.calibrate_command,
         burnInMs: params.burn_in_ms,
         generator: GENERATOR,
       };
@@ -213,6 +221,9 @@ export function registerContractTool(pi: ExtensionAPI): void {
         contract.referenceCommand
           ? `reference ${contract.referenceCommand}`
           : "reference none (a cross-run baseline stays legal, labelled `pairing: absent`)",
+        contract.calibrateCommand
+          ? `calibration ${contract.calibrateCommand} (run: bash goal.checks.sh --calibrate)`
+          : "calibration none (the check's max_diff has no ruler, so the precision gate stays unarmed)",
         "",
         "written:",
         ...files.map((file) => `- ${path.relative(root, file)}`),

@@ -75,6 +75,8 @@ higher`.
 | `kernel.contract.json` | `kernel_contract` | the frozen matrix, tolerances, commands |
 | `goal.sh` | generated | the measurement; do not hand-edit |
 | `goal.checks.sh` | generated | the correctness matrix; do not hand-edit |
+| `.kernel/precision.tsv` | `goal.checks.sh` | one `max_diff` per cell x group; `n/a` means the check printed no error |
+| `.kernel/calibration.json` | `goal.checks.sh --calibrate` | the reference's own error per dtype — the precision ruler |
 | `.kernel/baseline.tsv` | first `goal.sh` run | the comparison point |
 | `profile/<run>/summary.json` | `kernel_profile` | the profile evidence; cite only what it lists |
 | `candidates.jsonl` | `kernel_candidate` | lineage, decisions, reasons |
@@ -117,6 +119,7 @@ higher`.
 | `goal.sh` exits 2 | `kernel.contract.json` changed under the scripts | regenerate, do not patch |
 | `goal.checks.sh` reports `pass 1` | the cell is wrong | fix correctness before measuring |
 | `goal.checks.sh` reports `pass 2` | order-dependent or stateful kernel | find the global/shared state |
+| `goal.checks.sh` prints `no max_diff` for a group | the check is not a precision measurement; the row is `n/a` | have the comparator print `max_diff=<rel err>`, or accept that the precision gate cannot judge that group |
 | `run_goal` says `checks_failed` | benchmark passed, correctness did not | log as `checks_failed`, never keep |
 | `kernel_profile`: no `metrics_key` | analysis did not run | re-run without `reuse_analysis` |
 | `kernel_profile`: `ncu_report` missing | helpers cannot import Nsight Compute | set `PYTHONPATH` to the ncu extras or profile on the GPU machine |
@@ -127,6 +130,8 @@ higher`.
 | `kernel_candidate`: `cell-group-uncovered` | a cell x group was never measured | re-run `goal.sh`; a cell you did not measure cannot be kept on |
 | `kernel_candidate`: `reading-contract-mismatch` | the reading belongs to another contract | re-run under the current contract |
 | `kernel_candidate`: `metric-not-in-reading` | the claimed cell value is not the geomean of the reading's groups | record the `METRIC` line `goal.sh` printed |
+| `kernel_candidate`: `precision-regression` | the candidate's `max_diff` is past `3 * e_ref + max(ulp(dtype), 2^-17)` — right to `rtol`, wrong where the reference is not | match how the reference computes (fp32 accumulation, its upcast); the ratio is in the message |
+| `kernel_candidate`: `precision-regression` says `e_ref is unmeasured` | nobody ran the calibration, so there is no ruler | `bash goal.checks.sh --calibrate`, or `force_with_reason` once and the ledger records it |
 | `kernel_candidate`: `profile-stale` | code changed after profiling | re-profile this diff |
 | `kernel_candidate`: metric not present | the claim cites a metric the report lacks | cite one that exists, or report the absence |
 
