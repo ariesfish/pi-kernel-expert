@@ -12,7 +12,7 @@ const PACKAGE_ROOT = packageRootFrom(import.meta.url);
 export function registerStatusCommand(pi: ExtensionAPI): void {
   pi.registerCommand("kernel-expert", {
     description:
-      "Show pi-kernel-expert status: loop engine, vendored ncu skill, KernelWiki cache",
+      "Show pi-kernel-expert status: loop engine, vendored ncu skill, kernel-wiki cache",
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       const report = inspectKnowledge({ packageRoot: PACKAGE_ROOT, layout: agentLayout() });
       ctx.ui.notify(formatKnowledgeReport(report), "info");

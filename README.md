@@ -1,15 +1,15 @@
 # pi-kernel-expert
 
-*CUDA kernel optimization for pi: the KDA flow on pi-goal's frozen-contract loop, with KernelWiki knowledge and Nsight Compute evidence.*
+*CUDA kernel optimization for pi: the KDA flow on pi-goal's frozen-contract loop, with kernel-wiki knowledge and Nsight Compute evidence.*
 
-Status: **0.4.0 — loop complete.** Contract, baseline, profiling evidence, candidate lineage, and the `kernel-flow` skill all ship. GPU verification is deferred until a machine exists (`docs/verify.md`).
+Status: **0.4.0 — loop complete.** Contract (schema v2 is on `main`, under Unreleased in `CHANGELOG.md`), baseline, profiling evidence, candidate lineage, and the `kernel-flow` skill are all in place. GPU verification started on an sm_90 node; Blackwell and the ncu collection path remain unverified (`docs/verify.md`).
 
 ## Why this exists
 
 Three good sources describe how to optimize GPU kernels, and none of them can stop an agent from promoting a kernel because the story sounds right:
 
 - **KDA** (NVlabs) describes the flow — task contract, plan draft, one candidate at a time, validate, measure, promote or record the rejection.
-- **KernelWiki** (mit-han-lab) holds the Blackwell/Hopper knowledge.
+- **KernelWiki** (mit-han-lab) holds the Blackwell/Hopper knowledge; this package fetches a maintained copy, `kernel-wiki`, at a pinned revision.
 - **ncu-report-skill** (mit-han-lab) holds the profiling procedure.
 
 `pi-goal` already provides the part that must not be re-litigated in prose: a frozen contract with a hash, a deterministic gate, an append-only journal, and a reverted attempt kept as evidence.
@@ -22,7 +22,7 @@ This package connects them. Kernel rules ride in data pi-goal already accepts �
 |---|---|---|
 | pi | >= 1.5.0 (`resources_discover`, `agent_before_settle`) | everything |
 | `@ariesfish/pi-goal` | >= 0.5.3 | the loop, contract, gate |
-| python3 | >= 3.11 | ncu helpers and KernelWiki queries (no PyYAML needed) |
+| python3 | >= 3.11 | ncu helpers and kernel-wiki queries (no PyYAML needed) |
 | CUDA toolkit + Nsight Compute | 13.2 + 2026.3.1 documented target | profiling |
 | NVIDIA GPU | sm_90 verified in v1 | measuring anything |
 
@@ -40,9 +40,12 @@ pi install npm:@ariesfish/pi-kernel-expert
 ```
 
 Not cached yet? Ask the agent to run `kernel_bootstrap`, then `/reload`. It
-clones the recorded KernelWiki revision, verifies it, removes the 19 files
-marked `LicenseRef-NvidiaProprietary`, and writes `SANITIZED.yaml` next to the
-corpus. A tree at another revision is refused, never overwritten.
+clones `ariesfish/kernel-wiki` at the recorded revision, verifies the checked-out
+SHA, and scans the tree for `LicenseRef-NvidiaProprietary`. The 19 restricted
+files are removed in the corpus itself and listed in its `SANITIZED.yaml`, so
+the normal result is "0 removed" — the scan still runs, because an absence it
+did not verify is an absence it cannot claim. A tree at another revision is
+refused, never overwritten.
 
 Then query it:
 
@@ -104,6 +107,13 @@ kernel_candidate({
   listed, never zeroed.
 - The profile is bound to the contract hash and the diff hash. Editing code
   after profiling makes it stale and `kernel_candidate` refuses it.
+- A keep carries the run's reading block (`goal.sh` stdout, the block alone, or
+  its JSON). `kernel_candidate` checks that each claimed cell value is the
+  geomean of the reading's groups, that the reading's contract sha matches this
+  task, that the timed window was not host-bound, that the diff did not touch a
+  harness glob, and that the candidate's `max_diff` stays within
+  `3 * e_ref + max(ulp(dtype), 2^-17)` of the reference's own error. A run that
+  never calibrated its precision ruler is `unmeasured`, never zero.
 - A keep below the contract's `noiseFloorPct` needs `force_with_reason`, and the
   reason is recorded. A rejection needs a reason.
 - `profile/` and `runs/` are excluded from the diff fingerprint, so evidence
@@ -150,6 +160,16 @@ kernel_wiki_candidate({
 baseline → candidate → profile → record, plus the hard rules, the failure
 table, and a GPU benchmark checklist.
 
+## Validate the plan
+
+If a task keeps `docs/milestone.md`, `kernel_milestone` validates it as an
+addressable plan: the seven sections, the phases `M0..Mk` and their order, every
+decision's five-tuple (`Action`, `Purpose`, `Trigger`, `Cost`, `Depends on`)
+with its `⇐`/`⊗`/`⇒` edges, the typed `[VERIFY: …]` gate lines, and the
+dead-end rows. It reports every refusal in one pass — rule, row, and fix — and
+never writes the file. `kernel_init` does not create the milestone: you write
+it, this tool judges it.
+
 ## Check what is wired
 
 ```text
@@ -157,31 +177,41 @@ table, and a GPU benchmark checklist.
 ```
 
 ```text
-pi-kernel-expert 0.2.0
+pi-kernel-expert 0.4.0
   loop engine   pi-goal installed
   ncu skill     vendored @c7980a43cb88 at .../skills/ncu-report-skill
-  KernelWiki    cached at ~/.pi/agent/kernel-expert/cache/KernelWiki@b6b4301f15e8
+  kernel-wiki   cached at ~/.pi/agent/kernel-expert/cache/kernel-wiki@377d4560840d
 ```
 
-The ncu skill is vendored and works offline. KernelWiki is fetched at a recorded revision, never bundled: it is ~37 MB, its artifacts carry upstream terms, and the restricted files are pruned at fetch time rather than trusted to be absent.
+The ncu skill is vendored and works offline. The kernel-wiki corpus is fetched
+at a recorded revision, never bundled: it is ~37 MB and its artifacts carry
+upstream terms. The fetch scans for the restricted marker rather than trusting
+it absent, and records what it removed in the cache's `SANITIZED.yaml`.
 
 ## What runs where
 
-No GPU, ncu, or nvcc exists on the build machine, so nothing hardware-dependent is claimed as verified. `docs/verify.md` records exactly what ran, on what, and what is deferred. The GPU smoke target is written first and executed when a machine exists.
+The build machine has no GPU, ncu, or nvcc, so nothing hardware-dependent is
+claimed as verified without a recorded GPU run. `docs/verify.md` records exactly
+what ran, on what, and what was deferred — including the sm_90 reading block and
+one clock-locked run, and the Blackwell and `.ncu-rep` paths that remain
+unexercised. The `make gpu-smoke` target and a CPU end-to-end fixture are still
+open; until they land, hardware claims stay unverified.
 
 ## Layout
 
 ```text
-extensions/pi-kernel-expert/   composition root, status, and the six tools
+extensions/pi-kernel-expert/   composition root, status, and the eight tools
   knowledge/                   fetch, sanitize, conflict scan, registration plan
-  kernel/                      contract, scripts, diff fingerprint, profile summary, candidate gate
+  kernel/                      contract, generated scripts, reading block, precision
+                               ruler, refusals, profile summary, candidate gate,
+                               milestone validator, wiki-candidate entry
   workspace/                   task workspace layout, draft/plan gate
 skills/kernel-flow/            the loop, the failure table, the benchmark checklist
-skills/ncu-report-skill/       vendored upstream profiling skill
-skills/ncu-report-skill/       vendored upstream skill, revision in VENDORED.yaml
-skills/KernelWiki/             fetched at runtime into the pi agent directory, never bundled
+skills/ncu-report-skill/       vendored upstream profiling skill, revision in VENDORED.yaml
 third_party_licenses/          verbatim upstream license texts
 docs/adr/                      why the loop engine is reused, why the packaging split, why sm_90 first
+
+~/.pi/agent/kernel-expert/cache/kernel-wiki@<pin>/   corpus fetched at runtime, never bundled
 ```
 
 ## License

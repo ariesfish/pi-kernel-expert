@@ -57,7 +57,7 @@ The resource the measured kernel is limited by, named from profiler counters (DR
 _Avoid_: bottleneck (used only when quoting a diagnosis).
 
 **Wiki Citation**:
-A KernelWiki page id plus its confidence label (`verified`, `source-reported`, `inferred`, `experimental`).
+A kernel-wiki page id plus its confidence label (`verified`, `source-reported`, `inferred`, `experimental`).
 _Avoid_: reference, link.
 
 **Pin**:

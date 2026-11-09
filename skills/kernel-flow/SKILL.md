@@ -49,7 +49,8 @@ kernel-shaped artifacts and the evidence. Do not re-implement the loop in prose.
 | 6. Candidate | edit → `run_goal` → `log_goal` | run entry + commit on keep, reverted attempt on reject |
 | 7. Evidence | `kernel_profile` when the change rests on a bottleneck claim | `profile/<run>/summary.json` |
 | 8. Lineage | `kernel_candidate` (keep or reject), passing the run's `reading` | `candidates.jsonl` |
-| 9. Stop | stop conditions met | final candidate + its evidence pointers |
+| 9. Knowledge | `kernel_wiki_candidate` when the keep rests on a mechanism | `.kernel/wiki-candidates/<id>.md` |
+| 10. Stop | stop conditions met | final candidate + its evidence pointers |
 
 Order matters: **profile after the change, record the candidate before
 `log_goal` commits it.** The summary is bound to the diff hash; a commit or a
@@ -72,6 +73,7 @@ higher`.
 |---|---|---|
 | `docs/draft.md` | you | before any code; the contract refuses placeholders |
 | `docs/plan.md` | you | before each candidate; steps and stop conditions |
+| `docs/milestone.md` | you | when the plan must be addressable; `kernel_milestone` validates it, never writes it |
 | `kernel.contract.json` | `kernel_contract` | the frozen matrix, tolerances, commands |
 | `goal.sh` | generated | the measurement; do not hand-edit |
 | `goal.checks.sh` | generated | the correctness matrix; do not hand-edit |
@@ -80,6 +82,7 @@ higher`.
 | `.kernel/baseline.tsv` | first `goal.sh` run | the comparison point |
 | `profile/<run>/summary.json` | `kernel_profile` | the profile evidence; cite only what it lists |
 | `candidates.jsonl` | `kernel_candidate` | lineage, decisions, reasons |
+| `.kernel/wiki-candidates/<id>.md` | `kernel_wiki_candidate` | a keep that rests on a mechanism, ready to publish to the corpus |
 | `goal.jsonl` | pi-goal | the single source of truth for runs and commits |
 
 ## Hard rules
@@ -100,14 +103,14 @@ higher`.
    group medians in the reading), binds the reading's contract sha to this
    task, and refuses a host-bound window, a diff that touched a harness glob,
    or a profile older than the tree.
-5. **A bottleneck claim needs a fresh profile** and a metric that exists in
+6. **A bottleneck claim needs a fresh profile** and a metric that exists in
    `summary.json`. An absent metric is a finding, not zero.
-6. **Do not compare across GPUs or clock states.** The summary records GPU
+7. **Do not compare across GPUs or clock states.** The summary records GPU
    identity and clocks; a number measured under another clock is another
    experiment.
-7. **The gate decides.** A keep below the noise floor needs
+8. **The gate decides.** A keep below the noise floor needs
    `force_with_reason`, and the reason is recorded.
-8. **Cite knowledge as knowledge.** A KernelWiki page id and confidence
+9. **Cite knowledge as knowledge.** A kernel-wiki page id and confidence
    (`verified` > `source-reported` > `inferred` > `experimental`) supports a
    direction or a diagnosis, never a measurement.
 

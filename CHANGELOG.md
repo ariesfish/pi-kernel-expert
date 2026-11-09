@@ -25,6 +25,10 @@
 - Contract artifacts are written through temp files and renamed, contract last,
   so an interrupted regeneration cannot leave a contract beside scripts whose
   embedded sha disagrees with it.
+- A contract cell now carries `groups` — the input data sets it is measured on.
+  A non-boundary cell needs at least three, each with an `intent`; the cell's
+  value is the geomean of its groups, so one group's regression moves the cell.
+  A contract without groups is refused at read time; regenerate it.
 
 ### Added
 
@@ -37,8 +41,38 @@
   and the verdict is `unmeasured`. `parseReadingBlock` refuses a truncated
   block, a non-JSON body, an unknown schema, and a verdict that contradicts its
   own ratio.
+- The reading records a declared clock lock (`clockLocked`: declared and
+  observed MHz, `held`) and the loaded sample (`gpu.loaded`, including the
+  card's maximum SM clock). A lock nobody declared stays absent rather than
+  reading `held: false`.
+- A same-job reference rides the benchmark when the contract names
+  `referenceCommand`: the reading reports `pairing`, the reference/candidate
+  `pairRatios`, and their `pairSpreadPct`.
+- `bash goal.checks.sh --calibrate` records the reference's own error per dtype
+  (`e_ref`), the precision ruler. A keep is refused when the candidate's
+  `max_diff` exceeds `3 * e_ref + max(ulp(dtype), 2^-17)`; with no calibration
+  the ruler is `unmeasured` — a run-side defect that may be forced with a
+  reason, never a judgement against an invented zero.
+- `kernel_candidate` refuses a keep the reading does not support, with eight
+  rules: `basis-missing`, `host-bound`, `harness-touched`,
+  `cell-group-uncovered`, `reading-contract-mismatch`, `metric-not-in-reading`,
+  `precision-regression`, `profile-stale`. Each names the side it is charged
+  to. `basis-missing`, `host-bound`, `cell-group-uncovered` and uncalibrated
+  precision may be forced with a reason; an edited harness, a measured
+  precision regression, a foreign reading and a stale profile may not.
+- `kernel_wiki_candidate`: a keep that rests on a mechanism writes a candidate
+  page to `.kernel/wiki-candidates/<id>.md` in kernel-wiki's own shape —
+  frontmatter plus Mechanism, Trigger, Measured footprint and cost,
+  Load-bearing conditions, Gotchas, Negative readings. It refuses a category
+  trigger, a `verified` source that does not resolve here, a leftover
+  placeholder, a taken id, and a body naming this task's cells or commands. It
+  never writes the corpus; publishing is a human step.
+- `kernel_milestone`: validates `docs/milestone.md` as an addressable plan —
+  the seven sections, phases `M0..Mk`, every decision's five-tuple (`Action`,
+  `Purpose`, `Trigger`, `Cost`, `Depends on`) with its `⇐`/`⊗`/`⇒` edges, and
+  the typed `[VERIFY: …]` gate lines. It reports every refusal in one pass with
+  the rule, the row, and the fix, and never writes the file.
 - `scripts/job-env-check.sh`: proves nvcc, Nsight Compute and a CUDA-enabled
-: proves nvcc, Nsight Compute and a CUDA-enabled
   torch are visible from a non-interactive shell on the GPU node, naming every
   missing item and exiting non-zero.
 

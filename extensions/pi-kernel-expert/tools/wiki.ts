@@ -91,10 +91,10 @@ export function formatWikiResult(options: {
 export function registerWikiTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "kernel_wiki",
-    label: "Query KernelWiki",
+    label: "Query kernel-wiki",
     description:
-      "Query the cached KernelWiki corpus: natural-language search with filters, or fetch one page by id. Returns page ids, paths, and confidence labels to cite in a plan or diagnosis.",
-    promptSnippet: "Query the KernelWiki kernel knowledge base",
+      "Query the cached kernel-wiki corpus: natural-language search with filters, or fetch one page by id. Returns page ids, paths, and confidence labels to cite in a plan or diagnosis.",
+    promptSnippet: "Query the kernel-wiki kernel knowledge base",
     promptGuidelines: [
       "Cite the page id and its confidence label; never present an inferred or experimental page as verified.",
       "One query per bottleneck or technique question; do not read the whole corpus into context.",
@@ -131,7 +131,7 @@ export function registerWikiTool(pi: ExtensionAPI): void {
         return {
           content: [{
             type: "text" as const,
-            text: `KernelWiki is not cached at ${wikiDir}. Run kernel_bootstrap, then /reload.`,
+            text: `kernel-wiki is not cached at ${wikiDir}. Run kernel_bootstrap, then /reload.`,
           }],
           details: {},
         };

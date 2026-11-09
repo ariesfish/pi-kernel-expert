@@ -21,13 +21,13 @@ Read `CONTEXT.md` and the relevant `docs/adr/` file before domain-sensitive work
 ## Evidence rules
 
 - Never claim a measured speedup without a recorded run: GPU identity, clock state, run count, and range.
-- No GPU, ncu, or nvcc on the build machine. Anything hardware-dependent is written as unverified until `make gpu-smoke` runs on a machine and the output is archived in `docs/verify.md`.
+- No GPU, ncu, or nvcc on the build machine. Anything hardware-dependent is written as unverified until a run on that machine is archived in `docs/verify.md` with GPU identity, clock state, and versions.
 - The vendored `skills/ncu-report-skill/` tree is upstream-owned: fix upstream, re-sync with `scripts/sync-vendored-skill.sh`, never hand-edit.
-- KernelWiki is fetched at a pin, never bundled. A pin bump updates `support/paths.ts`, `THIRD_PARTY_NOTICES.md`, and the changelog together.
+- The kernel-wiki corpus is fetched at a pin, never bundled. A pin bump updates `support/paths.ts`, `THIRD_PARTY_NOTICES.md`, and the changelog together.
 
 ## Release hygiene
 
-When changing `package.json` version, update `CHANGELOG.md` in the same change with a matching `## [x.y.z]` section. The publish workflow requires the changelog section for the package version.
+When changing `package.json` version, update `CHANGELOG.md` in the same change with a matching `## [x.y.z]` section; a version without its changelog section is not releasable.
 
 ## Boundaries
 

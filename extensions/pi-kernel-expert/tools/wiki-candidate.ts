@@ -285,7 +285,7 @@ function workspaceFiles(workspace: string): string[] {
 export function registerWikiCandidateTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "kernel_wiki_candidate",
-    label: "Write KernelWiki Candidate Entry",
+    label: "Write kernel-wiki Candidate Entry",
     description:
       "Turn a promotion into a validated kernel-wiki page in the workspace: `.kernel/wiki-candidates/<id>.md`, with kernel-wiki's own frontmatter (id, title, type, architectures, tags, confidence, sources) and six sections (Mechanism, Trigger, Measured footprint and cost, Load-bearing conditions, Gotchas, Negative readings). Pre-fills architectures from the newest profile/<run>/summary.json's GPU (H100/H200 → sm90, B200/GB200 → sm100) and sources from the cited candidate id and profile run; you supply type, mechanism, trigger, conditions and gotchas. Refuses an empty or placeholder section, a category trigger, `verified` with no resolvable source, a leftover template sentence, an id already in the cached corpus, an id already used in .kernel/wiki-candidates/, a body naming this task's cells, harness commands or files (outside a fenced code block), and an entry with no architecture. Never writes the corpus: publishing is a human cp plus a pin bump.",
     promptSnippet: "Write a validated kernel-wiki candidate entry for this promotion",

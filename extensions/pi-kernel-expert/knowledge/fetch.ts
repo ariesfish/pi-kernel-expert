@@ -256,7 +256,7 @@ export function formatFetchResult(result: FetchResult): string {
     lines.push(`revision ${result.revision} verified against the pin.`);
     lines.push("Run /reload so pi registers the fetched skill.");
   } else {
-    lines.push(`KernelWiki fetch refused: ${result.reason}`);
+    lines.push(`kernel-wiki fetch refused: ${result.reason}`);
     lines.push(`target: ${result.path}`);
     if (result.revision) lines.push(`current revision: ${result.revision}`);
     lines.push("Nothing was overwritten.");
