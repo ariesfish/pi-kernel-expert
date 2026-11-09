@@ -9,12 +9,14 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
     name: "kernel_candidate",
     label: "Record Kernel Candidate",
     description:
-      "Append a candidate to candidates.jsonl with its parent, diff hash, contract hash, per-cell metrics, profile pointer, bottleneck claim, decision, and reason. Refuses a keep below the contract's noise floor, a keep missing any matrix cell, a stale profile, or a bottleneck metric that is not in the report.",
+      "Append a candidate to candidates.jsonl with its parent, diff hash, contract hash, per-cell metrics, the reading block it rests on, profile pointer, bottleneck claim, decision, and reason. Refuses a keep by naming every rule it breaks — the reading has no basis, the reading is host-bound or unmeasured, the diff edits a harnessGlobs path, a cell x group or a cell aggregate has no reading, a profile is stale — and prints all of them in one block, each with the side it is charged to and the fix.",
     promptSnippet: "Record a candidate decision with its evidence",
     promptGuidelines: [
       "Record every attempted candidate, kept or rejected. A rejection without a reason is not recorded.",
+      "Pass reading: the stdout of goal.sh (or a path to the log). Without it the keep has no basis and is refused.",
       "Profile after the change and record the candidate before log_goal commits it; the diff hash binds the evidence.",
       "A bottleneck claim must name a metric that exists in the profile summary; absence is reported, never inferred.",
+      "force_with_reason only accepts a run-level defect (missing basis, host-bound or unmeasured reading, an unmeasured cell/group). It never accepts an edited harness or a stale profile.",
       "pi-goal's log_goal is still the thing that commits a keep; this ledger is the lineage on top of it.",
     ],
     parameters: Type.Object({
@@ -32,6 +34,12 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
         Type.String({ description: "A metric name present in the profile summary that supports the claim." }),
       ),
       reason: Type.Optional(Type.String({ description: "Required for reject." })),
+      reading: Type.Optional(
+        Type.String({
+          description:
+            "The evidence this keep rests on: goal.sh's stdout, the \"=== KERNEL READING ===\" block alone, the block's JSON, or a path to a log holding one. Missing = refused (basis-missing).",
+        }),
+      ),
       commit: Type.Optional(Type.String({ description: "Commit sha once pi-goal's log_goal keeps the change." })),
       force_with_reason: Type.Optional(
         Type.String({ description: "Keep below the noise floor, with the reason recorded." }),
@@ -57,6 +65,7 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
             : undefined,
         reason: params.reason,
         commit: params.commit,
+        reading: params.reading,
         forceWithReason: params.force_with_reason,
         exec: pi,
         signal,
@@ -65,8 +74,12 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
       return {
         content: [{ type: "text" as const, text: formatCandidateOutcome(outcome) }],
         details: outcome.ok
-          ? { record: outcome.record, benchmarkCsv: outcome.benchmarkCsv?.path ?? null }
-          : { errors: outcome.errors },
+          ? {
+              record: outcome.record,
+              benchmarkCsv: outcome.benchmarkCsv?.path ?? null,
+              refusals: [],
+            }
+          : { errors: outcome.errors, refusals: outcome.refusals },
       };
     },
   });

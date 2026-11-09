@@ -48,7 +48,7 @@ kernel-shaped artifacts and the evidence. Do not re-implement the loop in prose.
 | 5. Baseline | `run_goal` → `log_goal` (keep) | `.kernel/baseline.tsv`, `goal.jsonl` |
 | 6. Candidate | edit → `run_goal` → `log_goal` | run entry + commit on keep, reverted attempt on reject |
 | 7. Evidence | `kernel_profile` when the change rests on a bottleneck claim | `profile/<run>/summary.json` |
-| 8. Lineage | `kernel_candidate` (keep or reject) | `candidates.jsonl` |
+| 8. Lineage | `kernel_candidate` (keep or reject), passing the run's `reading` | `candidates.jsonl` |
 | 9. Stop | stop conditions met | final candidate + its evidence pointers |
 
 Order matters: **profile after the change, record the candidate before
@@ -91,6 +91,13 @@ higher`.
    number cannot be attributed; split them.
 4. **A rejected candidate keeps its reason.** `kernel_candidate` refuses a
    rejection without one.
+5. **A keep carries the run's reading block.** `kernel_candidate` takes the
+   `reading` from the same run — `goal.sh` stdout, the block alone, or its JSON.
+   Without it the keep is `unmeasured` and refused: the recorder checks the
+   arithmetic (each cell's claimed value must be the geomean of that cell's
+   group medians in the reading), binds the reading's contract sha to this
+   task, and refuses a host-bound window, a diff that touched a harness glob,
+   or a profile older than the tree.
 5. **A bottleneck claim needs a fresh profile** and a metric that exists in
    `summary.json`. An absent metric is a finding, not zero.
 6. **Do not compare across GPUs or clock states.** The summary records GPU
@@ -114,7 +121,13 @@ higher`.
 | `kernel_profile`: no `metrics_key` | analysis did not run | re-run without `reuse_analysis` |
 | `kernel_profile`: `ncu_report` missing | helpers cannot import Nsight Compute | set `PYTHONPATH` to the ncu extras or profile on the GPU machine |
 | `kernel_profile`: no stall report | no SourceCounters or no `-lineinfo` | collect `--set full` on a `-lineinfo` build |
-| `kernel_candidate`: stale profile | code changed after profiling | re-profile this diff |
+| `kernel_candidate`: `basis-missing` | no reading, or none that says what was timed | re-run `goal.sh` and pass the block |
+| `kernel_candidate`: `host-bound` | the timed window is mostly the host path | thin the host path (JIT per call, allocation, extra launches, an inner sync), then re-run |
+| `kernel_candidate`: `harness-touched` | the diff edited a file that makes the number | revert it; a changed apparatus is not a changed kernel |
+| `kernel_candidate`: `cell-group-uncovered` | a cell x group was never measured | re-run `goal.sh`; a cell you did not measure cannot be kept on |
+| `kernel_candidate`: `reading-contract-mismatch` | the reading belongs to another contract | re-run under the current contract |
+| `kernel_candidate`: `metric-not-in-reading` | the claimed cell value is not the geomean of the reading's groups | record the `METRIC` line `goal.sh` printed |
+| `kernel_candidate`: `profile-stale` | code changed after profiling | re-profile this diff |
 | `kernel_candidate`: metric not present | the claim cites a metric the report lacks | cite one that exists, or report the absence |
 
 ## Profiling discipline

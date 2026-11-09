@@ -4,9 +4,57 @@ import * as path from "node:path";
 
 import type { HostExec } from "../support/exec.ts";
 import { workspacePaths } from "../workspace/layout.ts";
-import { cellMetricName, CONTRACT_SCHEMA_VERSION, type KernelContract } from "./contract.ts";
+import {
+  CONTRACT_SCHEMA_VERSION,
+  DEFAULT_GROUP,
+  type Basis,
+  type KernelContract,
+} from "./contract.ts";
 import { diffFingerprint, sha256File, type DiffFingerprint } from "./diff.ts";
 import type { ProfileSummary } from "./profile.ts";
+import {
+  READING_END_MARKER,
+  READING_START_MARKER,
+  parseReadingBlock,
+  type HostBoundVerdict,
+  type KernelReading,
+} from "./reading.ts";
+import {
+  applyForce,
+  collectRefusals,
+  formatRefusal,
+  type ProfileStaleness,
+  type Refusal,
+  type RuleId,
+} from "./refusals.ts";
+
+/**
+ * Whether a same-job reference rode this run. Written by T-006's producer; a
+ * reading without the field is `absent`, which is legal and loudly labelled —
+ * a missing reference is the normal state of an existing task, not a defect.
+ */
+export type Pairing = "mirrored" | "absent";
+
+/**
+ * What the reading can support, never defaulted to a pass. `measured` means the
+ * host share was taken and is thin; `host_bound` means the number exists but is
+ * the host path's; `unmeasured` means the reading says somewhere that it could
+ * not measure. A keep with no reading is `unmeasured`, and rule 1 refuses it.
+ */
+export type CandidateVerdict = "measured" | "host_bound" | "unmeasured";
+
+/** The parsed reading's key fields, kept on the ledger row so the evidence travels with the claim. */
+export interface ReadingEvidence {
+  contractSha: string;
+  basis: Basis;
+  hostBoundRatio: number | null;
+  hostBoundVerdict: HostBoundVerdict;
+  pairing: Pairing;
+  verdict: CandidateVerdict;
+  cells: Array<{ id: string; group: string; median?: number; spreadPct?: number }>;
+  startedAt: string;
+  warnings: string[];
+}
 
 export interface CandidateRecord {
   id: string;
@@ -21,8 +69,14 @@ export interface CandidateRecord {
   profile: { runId: string; path: string; sha256: string } | null;
   bottleneck: { claim: string; metric: string; value: number } | null;
   reason: string | null;
+  /** The reading the keep rests on, or null when there was none. */
+  reading: ReadingEvidence | null;
+  pairing: Pairing;
+  verdict: CandidateVerdict;
   forced: boolean;
   forcedReason: string | null;
+  /** The refusals `forceWithReason` bypassed; empty on an unforced record. */
+  forcedRules: RuleId[];
 }
 
 export interface CandidateInput {
@@ -34,6 +88,11 @@ export interface CandidateInput {
   bottleneck?: { claim: string; metric: string };
   reason?: string;
   commit?: string;
+  /**
+   * goal.sh's stdout, the reading block on its own, the block's JSON, or a path
+   * to a log holding one. Without it the keep has no evidence and rule 1 fires.
+   */
+  reading?: string;
   forceWithReason?: string;
   exec: HostExec;
   signal?: AbortSignal;
@@ -48,7 +107,13 @@ export type CandidateOutcome =
       ledger: string;
       benchmarkCsv: { path: string; rows: number } | null;
     }
-  | { ok: false; errors: string[] };
+  | {
+      ok: false;
+      /** Every refusal line (rule, side, message, fix) first, then the non-rule errors. */
+      errors: string[];
+      /** The structured refusals, so a caller can assert without matching prose. */
+      refusals: Refusal[];
+    };
 
 export type ContractOutcome =
   | { ok: true; contract: KernelContract; sha: string }
@@ -112,6 +177,9 @@ export function renderBenchmarkCsv(records: CandidateRecord[]): string {
     "bottleneck_metric",
     "reason",
     "forced",
+    "pairing",
+    "verdict",
+    "forced_rules",
   ];
   const escape = (value: unknown): string => {
     const text = value === null || value === undefined ? "" : String(value);
@@ -131,6 +199,9 @@ export function renderBenchmarkCsv(records: CandidateRecord[]): string {
         record.bottleneck?.metric ?? "",
         record.reason ?? "",
         record.forced ? "yes" : "",
+        record.pairing ?? "",
+        record.verdict ?? "",
+        (record.forcedRules ?? []).join(" "),
       ]
         .map(escape)
         .join(","),
@@ -164,13 +235,17 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
   const paths = workspacePaths(input.workspace);
   const loaded = readContract(input.workspace);
   if (!loaded.ok) {
-    return { ok: false, errors: [loaded.reason] };
+    return { ok: false, errors: [loaded.reason], refusals: [] };
   }
   if (!input.description?.trim()) {
-    return { ok: false, errors: ["description is required: the ledger records what the candidate tried"] };
+    return {
+      ok: false,
+      errors: ["description is required: the ledger records what the candidate tried"],
+      refusals: [],
+    };
   }
   if (!input.decision) {
-    return { ok: false, errors: ['decision must be "keep" or "reject"'] };
+    return { ok: false, errors: ['decision must be "keep" or "reject"'], refusals: [] };
   }
 
   const fingerprint = await diffFingerprint({
@@ -179,38 +254,27 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     scopeGlobs: loaded.contract.scopeGlobs,
     signal: input.signal,
   });
-  if (!fingerprint.ok) return { ok: false, errors: [fingerprint.reason] };
+  if (!fingerprint.ok) return { ok: false, errors: [fingerprint.reason], refusals: [] };
 
   const errors: string[] = [];
   const metrics = sanitizeMetrics(input.metrics ?? {}, errors);
-
-  if (input.decision === "keep") {
-    const required = ["geomean_speedup", ...loaded.contract.cells.map((cell) => cellMetricName(loaded.contract, cell))];
-    const missing = required.filter((name) => metrics[name] === undefined);
-    if (missing.length > 0) {
-      errors.push(`keep needs these metrics from the run: ${missing.join(", ")}`);
-    }
-    const geomean = metrics.geomean_speedup;
-    if (geomean !== undefined) {
-      const floor = 1 + loaded.contract.noiseFloorPct / 100;
-      if (geomean < floor && !input.forceWithReason?.trim()) {
-        errors.push(
-          `geomean_speedup ${geomean} is below the ${loaded.contract.noiseFloorPct}% noise floor (needs >= ${floor.toFixed(4)}); pass force_with_reason to keep anyway`,
-        );
-      }
-    }
-  } else if (!input.reason?.trim()) {
-    errors.push("a rejected candidate needs a reason; that reason is the evidence a later reader gets");
-  }
+  const resolved = resolveReading(input.workspace, input.reading);
+  const evidence = resolved.reading === null ? null : summarizeReading(resolved.reading);
 
   let profile: CandidateRecord["profile"] = null;
   let bottleneck: CandidateRecord["bottleneck"] = null;
+  let staleness: ProfileStaleness | null = null;
   if (input.profileRun) {
-    if (!isSafeRunId(input.profileRun)) {
+    // An unsafe run id is refused before it is used as a path: reading through
+    // "../" would be the traversal the check exists to stop.
+    const safeRunId = isSafeRunId(input.profileRun);
+    if (!safeRunId) {
       errors.push(`profile_run "${input.profileRun}" must be a plain directory name`);
     }
     const summaryPath = path.join(input.workspace, "profile", input.profileRun, "summary.json");
-    if (!fs.existsSync(summaryPath)) {
+    if (!safeRunId) {
+      // nothing below may touch the filesystem for an unsafe id
+    } else if (!fs.existsSync(summaryPath)) {
       errors.push(`profile run not found: ${summaryPath}`);
     } else {
       let summary: ProfileSummary;
@@ -218,15 +282,22 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
         summary = JSON.parse(fs.readFileSync(summaryPath, "utf8")) as ProfileSummary;
       } catch {
         errors.push(`${summaryPath} is not readable JSON`);
-        return { ok: false, errors };
+        return { ok: false, errors, refusals: [] };
       }
       if (summary.contractSha !== loaded.sha) {
-        errors.push(`profile ${input.profileRun} was taken under contract ${summary.contractSha.slice(0, 12)}, current is ${loaded.sha.slice(0, 12)}`);
-      }
-      if (summary.diffHash !== fingerprint.value.hash) {
-        errors.push(
-          `profile ${input.profileRun} is stale: it measured diff ${summary.diffHash.slice(0, 12)}, the tree is now ${fingerprint.value.hash.slice(0, 12)}; re-profile before committing to this candidate`,
-        );
+        staleness = {
+          runId: input.profileRun,
+          problem: "contract",
+          measuredContract: summary.contractSha,
+          currentContract: loaded.sha,
+        };
+      } else if (summary.diffHash !== fingerprint.value.hash) {
+        staleness = {
+          runId: input.profileRun,
+          problem: "diff",
+          measuredDiff: summary.diffHash,
+          currentDiff: fingerprint.value.hash,
+        };
       }
       profile = {
         runId: input.profileRun,
@@ -253,7 +324,45 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     errors.push("a bottleneck claim needs a profile run; pass profile_run with the summary that supports it");
   }
 
-  if (errors.length > 0) return { ok: false, errors };
+  let refusals: Refusal[] = [];
+  let forcedRules: RuleId[] = [];
+
+  if (input.decision === "keep") {
+    // Rule 4 owns the per-cell aggregates; the geomean is the gate's own metric
+    // and has no cell to be covered by.
+    if (metrics.geomean_speedup === undefined) {
+      errors.push("keep needs geomean_speedup from the run (goal.sh prints it as METRIC geomean_speedup=)");
+    }
+    const geomean = metrics.geomean_speedup;
+    if (geomean !== undefined) {
+      const floor = 1 + loaded.contract.noiseFloorPct / 100;
+      if (geomean < floor && !input.forceWithReason?.trim()) {
+        errors.push(
+          `geomean_speedup ${geomean} is below the ${loaded.contract.noiseFloorPct}% noise floor (needs >= ${floor.toFixed(4)}); pass force_with_reason to keep anyway`,
+        );
+      }
+    }
+
+    const collected = collectRefusals({
+      contract: loaded.contract,
+      contractSha: loaded.sha,
+      reading: evidence,
+      readingReason: resolved.reason,
+      changedFiles: fingerprint.value.changedFiles,
+      metrics,
+      profile: staleness,
+    });
+    const applied = applyForce(collected, input.forceWithReason);
+    refusals = applied.blocking;
+    forcedRules = applied.forcedRules;
+  } else if (!input.reason?.trim()) {
+    errors.push("a rejected candidate needs a reason; that reason is the evidence a later reader gets");
+  }
+
+  if (refusals.length > 0 || errors.length > 0) {
+    // Every refusal is printed in one block: a keep with three problems says three.
+    return { ok: false, errors: [...refusals.map(formatRefusal), ...errors], refusals };
+  }
 
   const existing = readCandidates(input.workspace);
   const parent = existing.length > 0 ? existing[existing.length - 1].id : "baseline";
@@ -270,8 +379,12 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     profile,
     bottleneck,
     reason: input.reason?.trim() || null,
+    reading: evidence,
+    pairing: evidence?.pairing ?? "absent",
+    verdict: evidence?.verdict ?? "unmeasured",
     forced: Boolean(input.forceWithReason?.trim()),
     forcedReason: input.forceWithReason?.trim() || null,
+    forcedRules,
   };
 
   fs.appendFileSync(paths.candidates, `${JSON.stringify(record)}\n`);
@@ -285,8 +398,88 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
   };
 }
 
-function sanitizeMetrics(raw: Record<string, unknown>, errors: string[]): Record<string, number> {
-  const metrics: Record<string, number> = {};
+/**
+ * Turn the caller's `reading` into a parsed record. Four shapes are accepted because
+ * the evidence arrives in four shapes in practice: goal.sh's whole stdout, the block
+ * on its own, the block's JSON, or a path to a log holding one. A block that does not
+ * parse is *not* an error here — it is a reading the rules refuse by name, with the
+ * parser's reason quoted, which is more useful than a stack of JSON diagnostics.
+ */
+export function resolveReading(
+  workspace: string,
+  raw: string | undefined,
+): { reading: KernelReading | null; reason: string | null } {
+  const text = raw?.trim();
+  if (!text) {
+    return { reading: null, reason: "no reading was passed to the recorder" };
+  }
+
+  let body = text;
+  if (!body.includes(READING_START_MARKER) && !body.trimStart().startsWith("{")) {
+    const candidatePath = path.isAbsolute(body) ? body : path.join(workspace, body);
+    if (!fs.existsSync(candidatePath)) {
+      return {
+        reading: null,
+        reason: `"${text.split("\n")[0].slice(0, 60)}" is not a reading block, not the block's JSON, and not a readable path`,
+      };
+    }
+    try {
+      body = fs.readFileSync(candidatePath, "utf8");
+    } catch (error) {
+      return { reading: null, reason: `could not read ${candidatePath}: ${error instanceof Error ? error.message : String(error)}` };
+    }
+  } else if (!body.includes(READING_START_MARKER)) {
+    body = `${READING_START_MARKER}\n${body}\n${READING_END_MARKER}`;
+  }
+
+  const parsed = parseReadingBlock(body);
+  if (!parsed.ok) return { reading: null, reason: parsed.reason };
+  return { reading: parsed.reading, reason: null };
+}
+
+/**
+ * The ledger copy of a reading: the fields a later reader needs to re-judge the
+ * claim without the original log. `pairing` is read off the record when the
+ * producer writes it (T-006); today it does not, so the honest value is `absent`.
+ */
+export function summarizeReading(reading: KernelReading): ReadingEvidence {
+  const extras = reading as unknown as Record<string, unknown>;
+  const pairing: Pairing = extras.pairing === "mirrored" ? "mirrored" : "absent";
+  return {
+    contractSha: reading.contractSha,
+    basis: reading.basis,
+    hostBoundRatio: reading.hostBoundRatio ?? null,
+    hostBoundVerdict: reading.hostBoundVerdict,
+    pairing,
+    verdict: containsUnmeasured(reading) ? "unmeasured" : reading.hostBoundVerdict === "host_bound" ? "host_bound" : "measured",
+    cells: reading.cells.map((cell) => ({
+      id: cell.id,
+      group: cell.group ?? DEFAULT_GROUP,
+      median: cell.median,
+      spreadPct: cell.spreadPct,
+    })),
+    startedAt: reading.startedAt,
+    warnings: reading.warnings,
+  };
+}
+
+/**
+ * `unmeasured` anywhere in the record — the verdict, a pairing, a warning that
+ * says the error is unavailable — makes the whole reading unmeasured. Searching
+ * the values rather than naming the fields is deliberate: a field added later
+ * that says "unmeasured" must not slip through as a pass.
+ */
+function containsUnmeasured(value: unknown, depth = 0): boolean {
+  if (depth > 8) return false;
+  if (typeof value === "string") return value.trim().toLowerCase() === "unmeasured";
+  if (Array.isArray(value)) return value.some((entry) => containsUnmeasured(entry, depth + 1));
+  if (value !== null && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some((entry) => containsUnmeasured(entry, depth + 1));
+  }
+  return false;
+}
+
+function sanitizeMetrics(raw: Record<string, unknown>, errors: string[]): Record<string, number> {  const metrics: Record<string, number> = {};
   for (const [name, value] of Object.entries(raw)) {
     if (!/^[A-Za-z0-9_.]+$/.test(name)) {
       errors.push(`metric name "${name}" must match [A-Za-z0-9_.]+`);
@@ -303,7 +496,18 @@ function sanitizeMetrics(raw: Record<string, unknown>, errors: string[]): Record
 
 export function formatCandidateOutcome(outcome: CandidateOutcome): string {
   if (!outcome.ok) {
-    return ["Candidate not recorded:", ...outcome.errors.map((error) => `- ${error}`)].join("\n");
+    const lines = [
+      outcome.refusals.length > 0
+        ? `Candidate not recorded — ${outcome.refusals.length} refusal(s), all printed:`
+        : "Candidate not recorded:",
+    ];
+    for (const refusal of outcome.refusals) {
+      lines.push(`- ${formatRefusal(refusal)}`);
+    }
+    for (const error of outcome.errors.slice(outcome.refusals.length)) {
+      lines.push(`- ${error}`);
+    }
+    return lines.join("\n");
   }
   const r = outcome.record;
   const lines = [
@@ -312,6 +516,10 @@ export function formatCandidateOutcome(outcome: CandidateOutcome): string {
     r.metrics.geomean_speedup !== undefined ? `  geomean_speedup ${r.metrics.geomean_speedup}` : null,
     r.profile ? `  profile ${r.profile.runId} (${r.profile.sha256.slice(0, 12)})` : null,
     r.bottleneck ? `  bottleneck: ${r.bottleneck.claim} [${r.bottleneck.metric} = ${r.bottleneck.value}]` : null,
+    r.reading
+      ? `  reading: basis ${r.reading.basis}, hostBoundRatio ${r.reading.hostBoundRatio ?? "absent"}, verdict ${r.verdict}, pairing ${r.pairing}`
+      : `  reading: none — verdict ${r.verdict}, pairing ${r.pairing}`,
+    r.forcedRules.length > 0 ? `  forced through: ${r.forcedRules.join(", ")}` : null,
     r.reason ? `  reason: ${r.reason}` : null,
     r.forced ? `  forced: ${r.forcedReason}` : null,
     `ledger: ${path.basename(outcome.ledger)}`,

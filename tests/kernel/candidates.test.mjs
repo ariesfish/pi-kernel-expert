@@ -15,6 +15,7 @@ import {
 import { normalizeContract, writeContractFiles } from "../../extensions/pi-kernel-expert/kernel/contract.ts";
 import { diffFingerprint } from "../../extensions/pi-kernel-expert/kernel/diff.ts";
 import { buildProfileSummary } from "../../extensions/pi-kernel-expert/kernel/profile.ts";
+import { READING_END_MARKER, READING_START_MARKER } from "../../extensions/pi-kernel-expert/kernel/reading.ts";
 import {
   DRAFT_HEADINGS,
   PLAN_HEADINGS,
@@ -44,13 +45,23 @@ function fill(root) {
   );
 }
 
-async function setup({ noiseFloorPct = 2 } = {}) {
+async function setup({
+  noiseFloorPct = 2,
+  harnessGlobs,
+  scopeGlobs = ["kernel/**"],
+  extraFiles = {},
+} = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-cand-"));
   git(["init", "-q"], root);
   git(["config", "user.email", "test@example.com"], root);
   git(["config", "user.name", "Test"], root);
   fs.mkdirSync(path.join(root, "kernel"));
   fs.writeFileSync(path.join(root, "kernel", "attn.cu"), "v1\n");
+  for (const [relative, body] of Object.entries(extraFiles)) {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, body);
+  }
   git(["add", "-A"], root);
   git(["commit", "-q", "-m", "base"], root);
 
@@ -81,7 +92,8 @@ async function setup({ noiseFloorPct = 2 } = {}) {
       },
     ],
     tolerance: { rtol: 1e-2, atol: 1e-3 },
-    scopeGlobs: ["kernel/**"],
+    scopeGlobs,
+    harnessGlobs,
     noiseFloorPct,
   });
   assert.deepEqual(normalized.errors, []);
@@ -89,7 +101,7 @@ async function setup({ noiseFloorPct = 2 } = {}) {
   assert.equal(written.ok, true);
 
   fs.writeFileSync(path.join(root, "kernel", "attn.cu"), "v2\n");
-  const fingerprint = await diffFingerprint({ exec: processExec(), root, scopeGlobs: ["kernel/**"] });
+  const fingerprint = await diffFingerprint({ exec: processExec(), root, scopeGlobs });
   assert.equal(fingerprint.ok, true);
   const loaded = readContract(root);
   assert.equal(loaded.ok, true);
@@ -120,16 +132,76 @@ function writeProfile(ctx, runId, { metrics = {}, contractSha, diffHash } = {}) 
   return dir;
 }
 
+/**
+ * A reading block as the producer writes it, covering every cell x group of the
+ * fixture contract (`a` and `b`, three groups each) and one aggregate per cell.
+ * `group: "default"` is what a cell with no groups exports.
+ */
+function readingRecord(ctx, overrides = {}) {
+  const cells = [];
+  for (const cell of ctx.contract.cells) {
+    const groups = cell.groups.length > 0 ? cell.groups.map((group) => group.name) : ["default"];
+    for (const group of groups) {
+      cells.push({ id: cell.id, group, metric: `latency_us_${cell.id}_${group}`, median: 9.1, samples: 5, spreadPct: 1.1 });
+    }
+  }
+  return {
+    schemaVersion: 1,
+    contractSha: ctx.contractSha,
+    basis: "device",
+    basisSource: "task-reported",
+    gpu: {
+      available: true,
+      name: "NVIDIA H200",
+      index: 0,
+      visible: "0",
+      start: { clocksSmMhz: 1980, clocksMemMhz: 1593, utilPct: 0, foreignProcessMiB: 0 },
+      end: { clocksSmMhz: 1980, clocksMemMhz: 1593, utilPct: 44, foreignProcessMiB: 0 },
+    },
+    cells,
+    shellMs: 4120,
+    hostEnqueueMs: 0.18,
+    deviceMs: 9.1,
+    hostBoundRatio: 0.0198,
+    hostBoundVerdict: "ok",
+    startedAt: "2026-11-10T08:00:00Z",
+    finishedAt: "2026-11-10T08:00:05Z",
+    warnings: [],
+    ...overrides,
+  };
+}
+
+function readingText(record) {
+  return `${READING_START_MARKER}\n${JSON.stringify(record)}\n${READING_END_MARKER}\n`;
+}
+
+/** The per-cell metric each reading's own groups imply — the recorder now checks this arithmetic. */
+function cellMetrics(record) {
+  const byCell = new Map();
+  for (const cell of record.cells) {
+    const values = byCell.get(cell.id) ?? [];
+    values.push(cell.median);
+    byCell.set(cell.id, values);
+  }
+  const metrics = {};
+  for (const [id, values] of byCell) {
+    const geomean = Math.exp(values.reduce((sum, value) => sum + Math.log(value), 0) / values.length);
+    metrics[`latency_us_${id}`] = Number(geomean.toPrecision(10));
+  }
+  return metrics;
+}
+
 function keepInput(ctx, overrides = {}) {
+  const record = readingRecord(ctx);
   return {
     workspace: ctx.root,
     decision: "keep",
     description: "fuse the epilogue",
     metrics: {
       geomean_speedup: 1.12,
-      latency_us_a: 9.1,
-      latency_us_b: 18.2,
+      ...cellMetrics(record),
     },
+    reading: readingText(record),
     exec: ctx.exec,
     ...overrides,
   };
@@ -169,14 +241,14 @@ test("a keep with a fresh profile and a cited metric is recorded with lineage", 
 test("a keep below the noise floor is refused unless forced with a reason", async () => {
   const ctx = await setup();
   const noisy = await recordCandidate(
-    keepInput(ctx, { metrics: { geomean_speedup: 1.01, latency_us_a: 9.9, latency_us_b: 19.9 } }),
+    keepInput(ctx, { metrics: { geomean_speedup: 1.01, latency_us_a: 9.1, latency_us_b: 9.1 } }),
   );
   assert.equal(noisy.ok, false);
   assert.match(noisy.errors.join("\n"), /below the 2% noise floor/);
 
   const forced = await recordCandidate(
     keepInput(ctx, {
-      metrics: { geomean_speedup: 1.01, latency_us_a: 9.9, latency_us_b: 19.9 },
+      metrics: { geomean_speedup: 1.01, latency_us_a: 9.1, latency_us_b: 9.1 },
       forceWithReason: "removes a branch that was a correctness risk",
     }),
   );
@@ -188,7 +260,7 @@ test("a keep below the noise floor is refused unless forced with a reason", asyn
 test("a keep missing any matrix cell is refused", async () => {
   const ctx = await setup();
   const outcome = await recordCandidate(
-    keepInput(ctx, { metrics: { geomean_speedup: 1.2, latency_us_a: 9 } }),
+    keepInput(ctx, { metrics: { geomean_speedup: 1.2, latency_us_a: 9.1 } }),
   );
   assert.equal(outcome.ok, false);
   assert.match(outcome.errors.join("\n"), /latency_us_b/);
@@ -334,9 +406,12 @@ test("benchmark.csv is derived from the ledger and quotes free text", async () =
   const file = path.join(ctx.root, "benchmark.csv");
   assert.ok(fs.existsSync(file));
   const lines = fs.readFileSync(file, "utf8").trim().split("\n");
-  assert.match(lines[0], /^candidate,parent,at,decision,description,geomean_speedup,latency_us_a,latency_us_b,profile_run,bottleneck_metric,reason,forced$/);
+  assert.match(
+    lines[0],
+    /^candidate,parent,at,decision,description,geomean_speedup,latency_us_a,latency_us_b,profile_run,bottleneck_metric,reason,forced,pairing,verdict,forced_rules$/,
+  );
   assert.match(lines[1], /^C1,baseline,/);
-  assert.match(lines[1], /1\.12,9\.1,18\.2/);
+  assert.match(lines[1], /1\.12,9\.1,9\.1/);
   assert.match(lines[2], /"rejected: ""tile"" swap, slower"/);
   assert.match(lines[2], /"8k cell regressed, see goal\.jsonl"/);
 });
@@ -347,4 +422,154 @@ test("exporting before any candidate is a refusal", async () => {
   const outcome = exportBenchmarkCsv(ctx.root);
   assert.equal(outcome.ok, false);
   assert.match(outcome.reason, /candidates\.jsonl is empty/);
+});
+
+// --- the refusal set: five rules, each naming the side it is charged to ------
+
+test("a keep with no reading is refused for its basis, and every rule prints in one block", async () => {
+  const ctx = await setup();
+  const outcome = await recordCandidate(keepInput(ctx, { reading: undefined }));
+  assert.equal(outcome.ok, false);
+  assert.deepEqual(outcome.refusals.map((entry) => entry.rule), ["basis-missing", "cell-group-uncovered"]);
+  assert.equal(outcome.refusals[0].charged, "run");
+  assert.match(outcome.errors.join("\n"), /basis-missing \(charged to the run\)/);
+  assert.equal(outcome.errors[0], formatRefusalOf(outcome.refusals[0]), "the printable line is the refusal plus its fix");
+
+  const printed = formatCandidateOutcome(outcome);
+  assert.match(printed, /2 refusal\(s\), all printed/);
+  assert.match(printed, /6 cell\/group pair\(s\) have no reading entry: a\/typical, a\/zero_block, a\/tail/);
+  assert.match(printed, /re-run goal\.sh on a build that emits a reading block/);
+  assert.equal(printed.split("\n").filter((line) => line.startsWith("- ")).length, 2, "one line per refusal, one block");
+});
+
+function formatRefusalOf(refusal) {
+  return `${refusal.message} Fix: ${refusal.fix}`;
+}
+
+test("a host-bound reading is refused with the ratio and the four host causes", async () => {
+  const ctx = await setup();
+  const outcome = await recordCandidate(
+    keepInput(ctx, { reading: readingText(readingRecord(ctx, { hostBoundRatio: 4.25, hostBoundVerdict: "host_bound" })) }),
+  );
+  assert.equal(outcome.ok, false);
+  assert.deepEqual(outcome.refusals.map((entry) => entry.rule), ["host-bound"]);
+  assert.equal(outcome.refusals[0].charged, "candidate");
+  const text = outcome.errors.join("\n");
+  assert.match(text, /host-bound \(charged to the candidate\)/);
+  assert.match(text, /hostBoundRatio 4\.25/);
+  assert.match(text, /recompile\/JIT per call/);
+  assert.match(text, /python-side allocation/);
+  assert.match(text, /extra launches/);
+  assert.match(text, /synchronize inside the call/);
+});
+
+test("an unmeasured reading is refused rather than defaulted to a pass", async () => {
+  const ctx = await setup();
+  const outcome = await recordCandidate(
+    keepInput(ctx, {
+      reading: readingText(
+        readingRecord(ctx, {
+          hostBoundRatio: null,
+          hostBoundVerdict: "unmeasured",
+          hostBoundReason: "the task reported device_ms but no host_enqueue_ms",
+        }),
+      ),
+    }),
+  );
+  assert.equal(outcome.ok, false);
+  assert.deepEqual(outcome.refusals.map((entry) => entry.rule), ["host-bound"]);
+  assert.equal(outcome.refusals[0].charged, "run");
+  assert.match(outcome.errors.join("\n"), /not a pass/);
+});
+
+test("a reading passed as a path to the run log is accepted, and the ledger keeps its key fields", async () => {
+  const ctx = await setup();
+  const log = path.join(ctx.root, "runs", "run1.log");
+  fs.mkdirSync(path.dirname(log), { recursive: true });
+  fs.writeFileSync(log, `bench output\n${readingText(readingRecord(ctx))}exit 0\n`);
+
+  const outcome = await recordCandidate(keepInput(ctx, { reading: path.relative(ctx.root, log) }));
+  assert.equal(outcome.ok, true, outcome.ok ? "" : outcome.errors.join("\n"));
+  assert.equal(outcome.record.reading.basis, "device");
+  assert.equal(outcome.record.reading.hostBoundVerdict, "ok");
+  assert.equal(outcome.record.reading.cells.length, 6, "two cells x three groups");
+  assert.equal(outcome.record.reading.cells[0].group, "typical");
+
+  const [row] = readCandidates(ctx.root);
+  assert.equal(row.pairing, "absent");
+  assert.equal(row.verdict, "measured");
+  assert.deepEqual(row.forcedRules, []);
+  const ledgerLine = JSON.parse(fs.readFileSync(path.join(ctx.root, "candidates.jsonl"), "utf8").trim());
+  assert.equal(ledgerLine.pairing, "absent");
+  assert.equal(ledgerLine.verdict, "measured");
+});
+
+test("pairing is copied from the reading when the producer writes it", async () => {
+  const ctx = await setup();
+  const outcome = await recordCandidate(keepInput(ctx, { reading: readingText(readingRecord(ctx, { pairing: "mirrored" })) }));
+  assert.equal(outcome.ok, true, outcome.ok ? "" : outcome.errors.join("\n"));
+  assert.equal(outcome.record.pairing, "mirrored");
+  assert.equal(outcome.record.verdict, "measured");
+});
+
+test("force_with_reason accepts a run-level defect and the record lists what it forced", async () => {
+  const ctx = await setup();
+  const partial = readingRecord(ctx, { hostBoundRatio: 2.4, hostBoundVerdict: "host_bound" });
+  partial.cells = partial.cells.filter((cell) => cell.id === "a");
+
+  const forced = await recordCandidate(
+    keepInput(ctx, { reading: readingText(partial), forceWithReason: "the other card was contended; I re-timed by hand" }),
+  );
+  assert.equal(forced.ok, true, forced.ok ? "" : forced.errors.join("\n"));
+  assert.deepEqual(forced.record.forcedRules, ["host-bound", "cell-group-uncovered"]);
+  assert.equal(forced.record.verdict, "host_bound", "a forced keep does not record its host-bound reading as measured");
+  assert.equal(forced.record.forced, true);
+  assert.match(formatCandidateOutcome(forced), /forced through: host-bound, cell-group-uncovered/);
+
+  const clean = await recordCandidate(
+    keepInput(ctx, { description: "no rule fired, forced anyway", forceWithReason: "checked above noise by hand" }),
+  );
+  assert.equal(clean.ok, true);
+  assert.deepEqual(clean.record.forcedRules, [], "forcing with nothing to bypass records nothing forced");
+});
+
+test("force_with_reason cannot hide a harness edit or a stale profile", async () => {
+  const ctx = await setup({
+    harnessGlobs: ["compare.py"],
+    scopeGlobs: ["kernel/**", "compare.py"],
+    extraFiles: { "compare.py": "v1\n" },
+  });
+
+  fs.writeFileSync(path.join(ctx.root, "compare.py"), "v2, looser tolerance\n");
+  const harness = await recordCandidate(
+    keepInput(ctx, { forceWithReason: "the number is real, I checked it" }),
+  );
+  assert.equal(harness.ok, false, "an edited harness is never forced through");
+  assert.deepEqual(harness.refusals.map((entry) => entry.rule), ["harness-touched"]);
+  assert.equal(harness.refusals[0].charged, "candidate");
+  assert.match(harness.errors.join("\n"), /compare\.py/);
+  assert.match(formatCandidateOutcome(harness), /harness-touched \(charged to the candidate\)/);
+
+  fs.writeFileSync(path.join(ctx.root, "compare.py"), "v1\n");
+  writeProfile(ctx, "run1", { metrics: { "sm__throughput.avg.pct_of_peak_sustained_elapsed": 71 } });
+  fs.writeFileSync(path.join(ctx.root, "kernel", "attn.cu"), "v3\n");
+  const stale = await recordCandidate(
+    keepInput(ctx, { profileRun: "run1", forceWithReason: "the profile is close enough" }),
+  );
+  assert.equal(stale.ok, false, "a stale profile is never forced through");
+  assert.deepEqual(stale.refusals.map((entry) => entry.rule), ["profile-stale"]);
+  assert.equal(stale.refusals[0].charged, "candidate");
+  assert.match(stale.errors.join("\n"), /is stale/);
+});
+
+test("a cell x group with no reading entry is refused without blaming the whole cell", async () => {
+  const ctx = await setup();
+  const record = readingRecord(ctx);
+  record.cells = record.cells.filter((cell) => !(cell.id === "a" && cell.group !== "typical"));
+
+  const outcome = await recordCandidate(keepInput(ctx, { reading: readingText(record) }));
+  assert.equal(outcome.ok, false);
+  assert.deepEqual(outcome.refusals.map((entry) => entry.rule), ["cell-group-uncovered"]);
+  assert.match(outcome.errors.join("\n"), /a\/zero_block, a\/tail/);
+  assert.doesNotMatch(outcome.errors.join("\n"), /cell a carry/);
 });
