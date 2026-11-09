@@ -61,8 +61,24 @@ async function setup({ noiseFloorPct = 2 } = {}) {
     checkCommand: "bash check.sh",
     benchmarkCommand: "bash bench.sh",
     cells: [
-      { id: "a", dtype: "bf16" },
-      { id: "b", dtype: "fp8" },
+      {
+        id: "a",
+        dtype: "bf16",
+        groups: [
+          { name: "typical", intent: "random normal inputs, the ordinary case" },
+          { name: "zero_block", intent: "a fully masked block must not divide by zero" },
+          { name: "tail", intent: "a length off the tile boundary must not read past M" },
+        ],
+      },
+      {
+        id: "b",
+        dtype: "fp8",
+        groups: [
+          { name: "typical", intent: "fp8 saturates at the reference scale" },
+          { name: "zero_block", intent: "an all-zero block must not produce NaN" },
+          { name: "tail", intent: "a partial tile must not read past N" },
+        ],
+      },
     ],
     tolerance: { rtol: 1e-2, atol: 1e-3 },
     scopeGlobs: ["kernel/**"],

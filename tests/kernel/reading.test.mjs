@@ -91,6 +91,38 @@ test("a block with no hostEnqueueMs parses as unmeasured, never as a ratio", () 
   assert.match(parsed.hostBoundReason, /no host_enqueue_ms/);
 });
 
+test("a cell entry may name its input group, and need not", () => {
+  // The field is additive: schemaVersion stays 1, so a record written before
+  // groups existed still parses, and a per-group record parses too.
+  const grouped = reading({
+    cells: [
+      { id: "m1024", group: "typical", metric: "latency_us_m1024_typical", median: 12.5, samples: 5, spreadPct: 1.2 },
+      { id: "m1024", group: "zero_block", metric: "latency_us_m1024_zero_block", median: 13.5, samples: 5, spreadPct: 0.4 },
+      { id: "m4096", metric: "latency_us_m4096", median: 44.25, samples: 5, spreadPct: 0.8 },
+    ],
+  });
+  const parsed = parseOk(block(grouped));
+  assert.equal(parsed.cells.length, 3);
+  assert.equal(parsed.cells[0].group, "typical");
+  assert.equal(parsed.cells[1].group, "zero_block");
+  assert.equal(parsed.cells[2].group, undefined, "an entry without a group is still accepted");
+  assert.equal(READING_SCHEMA_VERSION, 1, "adding `group` must not bump the reading schema");
+
+  const noGroups = parseOk(block(reading()));
+  assert.deepEqual(
+    noGroups.cells.map((cell) => cell.group),
+    [undefined, undefined],
+  );
+});
+
+test("an empty or non-string group is refused, not ignored", () => {
+  const empty = reading({ cells: [{ id: "m1024", group: "", metric: "latency_us_m1024", samples: 1 }] });
+  assert.match(parseRefused(block(empty)), /cells\[0\]\.group must be a non-empty string when present/);
+
+  const numeric = reading({ cells: [{ id: "m1024", group: 7, metric: "latency_us_m1024", samples: 1 }] });
+  assert.match(parseRefused(block(numeric)), /cells\[0\]\.group must be a non-empty string/);
+});
+
 test("a truncated block is refused by name", () => {
   const text = `${READING_START_MARKER}\n{"schemaVersion":1,"contractSha":"b"`;
   const reason = parseRefused(text);
@@ -189,7 +221,18 @@ function setup(overrides = {}) {
     objective: "cut latency",
     checkCommand: "true",
     benchmarkCommand: "bash bench.sh",
-    cells: [{ id: "a", dtype: "bf16", vars: { M: "1024" } }],
+    cells: [
+      {
+        id: "a",
+        dtype: "bf16",
+        vars: { M: "1024" },
+        groups: [
+          { name: "typical", intent: "random normal inputs, the ordinary case" },
+          { name: "zero_block", intent: "a fully masked block must not divide by zero" },
+          { name: "tail", intent: "a length off the tile boundary must not read past M" },
+        ],
+      },
+    ],
     tolerance: { rtol: 1e-2, atol: 1e-3 },
     repeats: 2,
     warmup: 0,
@@ -211,9 +254,16 @@ test("the generated goal.sh emits one block the parser accepts, end to end", () 
   assert.equal(parsed.contractSha.length, 64);
   assert.equal(parsed.basis, "device");
   assert.equal(parsed.basisSource, "task-reported");
-  assert.equal(parsed.cells.length, 1);
-  assert.equal(parsed.cells[0].id, "a");
-  assert.equal(parsed.cells[0].metric, "latency_us_a");
+  // One entry per (cell, group); the per-cell aggregate is a METRIC line only.
+  assert.equal(parsed.cells.length, 3);
+  assert.deepEqual(
+    parsed.cells.map((cell) => [cell.id, cell.group, cell.metric]),
+    [
+      ["a", "typical", "latency_us_a_typical"],
+      ["a", "zero_block", "latency_us_a_zero_block"],
+      ["a", "tail", "latency_us_a_tail"],
+    ],
+  );
   assert.equal(parsed.cells[0].median, 1.5);
   assert.equal(parsed.cells[0].samples, 2);
   assert.equal(parsed.deviceMs, 1.5);

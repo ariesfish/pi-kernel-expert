@@ -29,7 +29,18 @@ const CONTRACT_PARAMS = {
   objective: "cut latency",
   check_command: "bash check.sh",
   benchmark_command: "bash bench.sh",
-  cells: [{ id: "a", dtype: "bf16", vars: { M: "1024" } }],
+  cells: [
+    {
+      id: "a",
+      dtype: "bf16",
+      vars: { M: "1024" },
+      groups: [
+        { name: "typical", intent: "random normal inputs, the ordinary case" },
+        { name: "zero_block", intent: "a fully masked block must not divide by zero" },
+        { name: "tail", intent: "a length off the tile boundary must not read past M" },
+      ],
+    },
+  ],
   rtol: 1e-2,
   atol: 1e-3,
   repeats: 2,
@@ -184,5 +195,87 @@ test("kernel_contract refuses a self-reference before writing anything", async (
   assert.match(result.content[0].text, /Contract not generated:/);
   assert.match(result.content[0].text, /referenceCommand and benchmarkCommand are the same command/);
   assert.match(result.content[0].text, /a self-reference is not a reference/);
+  assert.equal(fs.existsSync(workspacePaths(root).contract), false);
+});
+
+test("kernel_contract carries cells[].groups into the contract and names the group count", async () => {
+  const { pi, ctx } = host();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-tool-"));
+  ctx.cwd = root;
+  await pi.tools.get("kernel_init").execute("id", {}, undefined, undefined, ctx);
+  fill(root);
+
+  const result = await pi.tools.get("kernel_contract").execute("id", CONTRACT_PARAMS, undefined, undefined, ctx);
+  const text = result.content[0].text;
+  assert.match(text, /Contract frozen for 1 cell\(s\), 3 input group\(s\)\./);
+  assert.match(text, /groups a=typical,zero_block,tail/);
+  assert.equal(result.details.groupCount, 3);
+
+  const contract = JSON.parse(fs.readFileSync(workspacePaths(root).contract, "utf8"));
+  assert.deepEqual(contract.cells[0].groups, [
+    { name: "typical", intent: "random normal inputs, the ordinary case" },
+    { name: "zero_block", intent: "a fully masked block must not divide by zero" },
+    { name: "tail", intent: "a length off the tile boundary must not read past M" },
+  ]);
+
+  // The generated scripts iterate the cross product, and a boundary cell says
+  // "default" so its old one-shape command still runs.
+  const checks = fs.readFileSync(workspacePaths(root).checksScript, "utf8");
+  assert.match(checks, /CELL_GROUPS=\('a\|typical/);
+  assert.match(checks, /KERNEL_GROUP_SEED/);
+});
+
+test("kernel_contract refuses a cell with too few groups or a group without an intent", async () => {
+  const { pi, ctx } = host();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-tool-"));
+  ctx.cwd = root;
+  await pi.tools.get("kernel_init").execute("id", {}, undefined, undefined, ctx);
+  fill(root);
+
+  const tool = pi.tools.get("kernel_contract");
+  const tooFew = await tool.execute(
+    "id",
+    {
+      ...CONTRACT_PARAMS,
+      cells: [
+        {
+          id: "a",
+          dtype: "bf16",
+          groups: [
+            { name: "typical", intent: "random normal inputs" },
+            { name: "zero_block", intent: "an all-zero block" },
+          ],
+        },
+      ],
+    },
+    undefined,
+    undefined,
+    ctx,
+  );
+  assert.match(tooFew.content[0].text, /Contract not generated:/);
+  assert.match(tooFew.content[0].text, /cell "a"\) has 2 input group\(s\); a non-boundary cell needs at least 3/);
+  assert.equal(fs.existsSync(workspacePaths(root).contract), false);
+
+  const noIntent = await tool.execute(
+    "id",
+    {
+      ...CONTRACT_PARAMS,
+      cells: [
+        {
+          id: "a",
+          dtype: "bf16",
+          groups: [
+            { name: "typical", intent: "random normal inputs" },
+            { name: "zero_block", intent: "" },
+            { name: "tail", intent: "a length off the tile boundary" },
+          ],
+        },
+      ],
+    },
+    undefined,
+    undefined,
+    ctx,
+  );
+  assert.match(noIntent.content[0].text, /\(group "zero_block" of cell "a"\) has no intent/);
   assert.equal(fs.existsSync(workspacePaths(root).contract), false);
 });

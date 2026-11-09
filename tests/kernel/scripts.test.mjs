@@ -60,7 +60,16 @@ function setup(overrides = {}) {
     checkCommand: "bash check.sh",
     benchmarkCommand: "bash bench.sh",
     cells: [
-      { id: "a", dtype: "bf16", vars: { M: "1024" } },
+      {
+        id: "a",
+        dtype: "bf16",
+        vars: { M: "1024" },
+        groups: [
+          { name: "typical", intent: "random normal inputs, the ordinary case" },
+          { name: "zero_block", intent: "a fully masked block must not divide by zero" },
+          { name: "tail", intent: "a length off the tile boundary must not read past M" },
+        ],
+      },
       { id: "b", dtype: "fp8", vars: { M: "4096" }, boundary: true },
     ],
     tolerance: { rtol: 1e-2, atol: 1e-3 },
@@ -148,7 +157,16 @@ test("cell variables are exported to the benchmark command", () => {
   const { root, paths } = setup({
     benchmarkCommand: "bash vars.sh",
     cells: [
-      { id: "v", dtype: "bf16", vars: { M: "7", N: "6" } },
+      {
+        id: "v",
+        dtype: "bf16",
+        vars: { M: "7", N: "6" },
+        groups: [
+          { name: "typical", intent: "random normal inputs, the ordinary case" },
+          { name: "zero_block", intent: "a fully masked block must not divide by zero" },
+          { name: "tail", intent: "a length off the tile boundary must not read past M" },
+        ],
+      },
     ],
   });
   writeCommand(root, "vars.sh", '#!/usr/bin/env bash\nprintf "%s\\n" "$((KERNEL_M * KERNEL_N))"\n');
@@ -176,7 +194,17 @@ test("checks run two passes per cell and report a failure with the boundary note
 test("a check that fails only on the second pass is reported as pass 2", () => {
   const { root, paths } = setup({
     checkCommand: "bash flaky.sh",
-    cells: [{ id: "a", dtype: "bf16" }],
+    cells: [
+      {
+        id: "a",
+        dtype: "bf16",
+        groups: [
+          { name: "typical", intent: "random normal inputs, the ordinary case" },
+          { name: "zero_block", intent: "a fully masked block must not divide by zero" },
+          { name: "tail", intent: "a length off the tile boundary must not read past M" },
+        ],
+      },
+    ],
   });
   writeCommand(
     root,
@@ -185,7 +213,7 @@ test("a check that fails only on the second pass is reported as pass 2", () => {
   );
   const result = run(paths.checksScript, root);
   assert.equal(result.code, 1);
-  assert.match(result.stderr, /FAIL cell a pass 2/);
+  assert.match(result.stderr, /FAIL cell a group typical pass 2/);
   assert.match(result.stderr, /order-dependent|checks failed/);
 });
 
@@ -195,4 +223,57 @@ test("a changed contract refuses to run the checks", () => {
   const result = run(paths.checksScript, root);
   assert.equal(result.code, 2);
   assert.match(result.stderr, /kernel\.contract\.json changed/);
+});
+
+test("a cell's value is the geomean of its groups, so one slow group moves the cell", () => {
+  const { root, paths } = setup({
+    benchmarkCommand: "bash grouped.sh",
+    cells: [
+      {
+        id: "g",
+        dtype: "bf16",
+        groups: [
+          { name: "typical", intent: "ordinary draw" },
+          { name: "zero_block", intent: "fully masked block" },
+          { name: "tail", intent: "length off the tile boundary" },
+        ],
+      },
+    ],
+  });
+  // Every group equal: the cell value is that value, and the baseline is taken there.
+  writeCommand(root, "grouped.sh", '#!/usr/bin/env bash\necho "METRIC latency_us=10"\n');
+  assert.equal(run(paths.benchmarkScript, root).code, 0);
+
+  // Only the tail draw gets 10x slower. A median over three groups would read 10
+  // and promote the change; the geomean reads 21.54 and the guard fires.
+  writeCommand(
+    root,
+    "grouped.sh",
+    '#!/usr/bin/env bash\nif [[ "$KERNEL_GROUP" == "tail" ]]; then echo "METRIC latency_us=100"; else echo "METRIC latency_us=10"; fi\n',
+  );
+  const result = run(paths.benchmarkScript, root);
+  assert.equal(result.code, 1, "the guard must refuse the candidate");
+  assert.equal(metrics(result.stdout).latency_us_g, 21.5443469);
+  assert.match(result.stderr, /guard: cell g regressed/);
+});
+
+test("a non-positive group value has no geomean, so the cell refuses one", () => {
+  const { root, paths } = setup({
+    benchmarkCommand: "bash z.sh",
+    cells: [
+      {
+        id: "z",
+        dtype: "bf16",
+        groups: [
+          { name: "one", intent: "a" },
+          { name: "two", intent: "b" },
+          { name: "three", intent: "c" },
+        ],
+      },
+    ],
+  });
+  writeCommand(root, "z.sh", '#!/usr/bin/env bash\nif [[ "$KERNEL_GROUP" == "two" ]]; then echo "METRIC latency_us=0"; else echo "METRIC latency_us=10"; fi\n');
+  const result = run(paths.benchmarkScript, root);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /cell z has a non-positive group value/);
 });

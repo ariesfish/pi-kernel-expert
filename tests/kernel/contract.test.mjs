@@ -6,10 +6,13 @@ import * as path from "node:path";
 import test from "node:test";
 
 import {
+  DEFAULT_GROUP,
+  MIN_GROUPS_PER_CELL,
   cellMetricName,
   contractJson,
   contractSha,
   freezePayload,
+  groupMetricName,
   normalizeContract,
   renderBenchmarkScript,
   renderChecksScript,
@@ -22,12 +25,19 @@ import {
 } from "../../extensions/pi-kernel-expert/kernel/reading.ts";
 import { initWorkspace, workspacePaths } from "../../extensions/pi-kernel-expert/workspace/layout.ts";
 
+/** Three data sets: the minimum a non-boundary cell must state. */
+const GROUPS = [
+  { name: "typical", intent: "random normal inputs, the ordinary case" },
+  { name: "zero_block", intent: "a fully masked block must not divide by zero", seed: 7 },
+  { name: "tail", intent: "a length off the tile boundary must not read past M" },
+];
+
 const BASE = {
   objective: "cut attention latency",
   checkCommand: "bash check.sh",
   benchmarkCommand: "bash bench.sh",
   cells: [
-    { id: "m1024", dtype: "bf16", vars: { M: "1024" } },
+    { id: "m1024", dtype: "bf16", vars: { M: "1024" }, groups: GROUPS },
     { id: "m4096", dtype: "fp8_e4m3", vars: { M: "4096" }, boundary: true },
   ],
   tolerance: { rtol: 1e-2, atol: 1e-3 },
@@ -89,8 +99,10 @@ test("validation names every bad field", () => {
 });
 
 test("cell metric names are shell- and METRIC-safe", () => {
-  const contract = built({ cells: [{ id: "m1024.attn", dtype: "bf16" }] });
+  const contract = built({ cells: [{ id: "m1024.attn", dtype: "bf16", groups: GROUPS }] });
   assert.equal(cellMetricName(contract, contract.cells[0]), "latency_us_m1024_attn");
+  // The per-cell name cellMetricName returns is the aggregate; a group adds its name.
+  assert.equal(groupMetricName(contract, contract.cells[0], contract.cells[0].groups[1]), "latency_us_m1024_attn_zero_block");
 });
 
 test("freeze payload has one blocking metric and one command criterion", () => {
@@ -101,6 +113,8 @@ test("freeze payload has one blocking metric and one command criterion", () => {
   const blockingMetrics = payload.criteria.filter((c) => c.blocking && c.kind === "metric");
   assert.equal(blockingMetrics.length, 1);
   assert.deepEqual(blockingMetrics[0].metric, { name: "geomean_speedup", direction: "higher", unit: "x" });
+  assert.match(blockingMetrics[0].statement, /3 group\(s\) in the matrix/);
+  assert.match(payload.criteria.find((c) => c.kind === "command").statement, /every input group/);
   const command = payload.criteria.find((c) => c.kind === "command");
   assert.equal(command.blocking, true);
   assert.equal(command.check.command, "bash goal.checks.sh");
@@ -123,11 +137,17 @@ test("rendered scripts embed the cells, the hash, and the guard", () => {
   assert.match(bench, /GUARD_PCT='5'/);
   assert.match(bench, /METRIC geomean_speedup/);
   assert.match(bench, /--reset-baseline/);
+  // The group table is a separate row format: cell|group|seed|intent.
+  assert.match(bench, /CELL_GROUPS=\('m1024\|typical\|\|random normal inputs, the ordinary case'/);
+  assert.match(bench, /'m1024\|zero_block\|7\|a fully masked block must not divide by zero'/);
+  assert.match(bench, /KERNEL_GROUP_SEED/);
 
   const checks = renderChecksScript(contract, sha);
   assert.match(checks, /for pass in 1 2/);
   assert.match(checks, /CHECK_CMD='bash check\.sh'/);
   assert.match(checks, /boundary cell/);
+  assert.match(checks, /CELL_GROUPS=\('m1024\|typical/);
+  assert.match(checks, /export KERNEL_GROUP="\$gname" KERNEL_GROUP_INTENT="\$gintent" KERNEL_GROUP_SEED="\$gseed"/);
 });
 
 test("writeContractFiles refuses to clobber and writes executable scripts on force", () => {
@@ -322,7 +342,13 @@ test("one reading block per run, printed after every METRIC line", () => {
 
   const metricLines = result.stdout.split("\n").filter((line) => /^METRIC\s+/.test(line));
   assert.deepEqual(metricLines, [
+    "METRIC latency_us_m1024_typical=1",
+    "METRIC latency_us_m1024_zero_block=1",
+    "METRIC latency_us_m1024_tail=1",
+    // one aggregate per cell: the median over that cell's groups
     "METRIC latency_us_m1024=1",
+    // a boundary cell carries no groups, so it runs once as `default`
+    "METRIC latency_us_m4096_default=1",
     "METRIC latency_us_m4096=1",
     "METRIC geomean_speedup=1",
   ]);
@@ -386,7 +412,7 @@ test("the block records GPU state from nvidia-smi, escaping a name with spaces a
 
 test("the block is emitted before a guard failure's exit 1", () => {
   const { root, paths } = readingWorkspace(
-    { cells: [{ id: "a", dtype: "bf16", vars: { M: "1024" } }] },
+    { cells: [{ id: "a", dtype: "bf16", vars: { M: "1024" }, groups: GROUPS }] },
     '#!/usr/bin/env bash\nset -euo pipefail\ncat speed\n',
   );
   fs.writeFileSync(path.join(root, "speed"), "10\n");
@@ -401,4 +427,250 @@ test("the block is emitted before a guard failure's exit 1", () => {
   const parsed = parseReadingBlock(regressed.stdout);
   assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
   assert.equal(parsed.reading.cells[0].median, 40);
+});
+
+// --- input groups: a shape is not a data set --------------------------------
+
+function groupWorkspace({ cells, checkCommand = "bash check.sh", benchBody } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-groups-"));
+  initWorkspace(root);
+  fs.writeFileSync(
+    path.join(root, "bench.sh"),
+    benchBody ??
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'key="$KERNEL_CELL.$KERNEL_GROUP"',
+        'if [[ -f "speeds/$key" ]]; then cat "speeds/$key"; else echo 5; fi',
+        "",
+      ].join("\n"),
+  );
+  fs.writeFileSync(
+    path.join(root, "check.sh"),
+    '#!/usr/bin/env bash\nprintf "%s %s %s %s\\n" "$KERNEL_CELL" "$KERNEL_GROUP" "$KERNEL_GROUP_INTENT" "$KERNEL_GROUP_SEED" >> calls.log\n',
+  );
+  fs.mkdirSync(path.join(root, "speeds"));
+  const normalized = normalizeContract({
+    ...BASE,
+    benchmarkCommand: "bash bench.sh",
+    checkCommand,
+    repeats: 2,
+    warmup: 0,
+    cells: cells ?? BASE.cells,
+  });
+  assert.deepEqual(normalized.errors, []);
+  const written = writeContractFiles({ root, contract: normalized.contract });
+  assert.equal(written.ok, true);
+  return { root, paths: workspacePaths(root), contract: normalized.contract };
+}
+
+const THREE = (prefix, seed) => [
+  { name: "typical", intent: `${prefix}: random normal inputs, the ordinary case` },
+  { name: "zero_block", intent: `${prefix}: a fully masked block must not divide by zero`, seed },
+  { name: "tail", intent: `${prefix}: a length off the tile boundary must not read past N` },
+];
+
+test("a non-boundary cell with fewer than three groups is refused, naming the cell and the minimum", () => {
+  const result = normalizeContract({
+    ...BASE,
+    cells: [
+      {
+        id: "m1024",
+        dtype: "bf16",
+        groups: [
+          { name: "typical", intent: "random normal inputs" },
+          { name: "zero_block", intent: "an all-zero block" },
+        ],
+      },
+    ],
+  });
+  assert.equal(result.contract, undefined);
+  const text = result.errors.join("\n");
+  assert.match(text, /cells\[0\] \(cell "m1024"\) has 2 input group\(s\)/);
+  assert.match(text, new RegExp(`at least ${MIN_GROUPS_PER_CELL}`));
+  assert.match(text, /mark the cell boundary: true/);
+});
+
+test("a group without an intent is refused, naming the cell and the group", () => {
+  const result = normalizeContract({
+    ...BASE,
+    cells: [
+      {
+        id: "m1024",
+        dtype: "bf16",
+        groups: [
+          { name: "typical", intent: "random normal inputs" },
+          { name: "zero_block", intent: "   " },
+          { name: "tail" },
+        ],
+      },
+    ],
+  });
+  assert.equal(result.contract, undefined);
+  const text = result.errors.join("\n");
+  assert.match(text, /cells\[0\]\.groups\[1\] \(group "zero_block" of cell "m1024"\) has no intent/);
+  assert.match(text, /cells\[0\]\.groups\[2\] \(group "tail" of cell "m1024"\) has no intent/);
+});
+
+test("a duplicate group name in one cell, a bad name, and a non-integer seed are refused", () => {
+  const duplicate = normalizeContract({
+    ...BASE,
+    cells: [
+      {
+        id: "m1024",
+        dtype: "bf16",
+        groups: [
+          { name: "typical", intent: "one" },
+          { name: "TYPICAL", intent: "two" },
+          { name: "tail", intent: "three" },
+        ],
+      },
+    ],
+  });
+  assert.equal(duplicate.contract, undefined);
+  assert.match(duplicate.errors.join("\n"), /cells\[0\]\.groups\[1\]\.name "TYPICAL" is duplicated in cell "m1024"/);
+
+  const bad = normalizeContract({
+    ...BASE,
+    cells: [
+      {
+        id: "m1024",
+        dtype: "bf16",
+        groups: [
+          { name: "typical", intent: "one" },
+          { name: "has space", intent: "two" },
+          { name: "tail", intent: "three values, comma-separated", seed: 1.5 },
+          { name: "pipe", intent: "left|right" },
+        ],
+      },
+    ],
+  });
+  assert.equal(bad.contract, undefined);
+  const text = bad.errors.join("\n");
+  assert.match(text, /groups\[1\]\.name "has space"/);
+  assert.match(text, /groups\[2\]\.seed \(group "tail"\) must be an integer/);
+  assert.match(text, /groups\[3\]\.intent \(group "pipe"\) must not contain "\|"/);
+});
+
+test("a boundary cell with no groups is accepted and exports KERNEL_GROUP=default", () => {
+  const { root, paths, contract } = groupWorkspace({
+    cells: [{ id: "m4096", dtype: "fp8_e4m3", boundary: true }],
+  });
+  assert.deepEqual(contract.cells[0].groups, []);
+
+  const bench = runScript(paths.benchmarkScript, root);
+  assert.equal(bench.code, 0, bench.stderr);
+  const checks = runScript(paths.checksScript, root);
+  assert.equal(checks.code, 0, checks.stderr);
+
+  const calls = fs.readFileSync(path.join(root, "calls.log"), "utf8").split("\n").filter(Boolean);
+  assert.equal(calls.length, 2, "two passes, one default group");
+  for (const call of calls) {
+    assert.match(call, /^m4096 default {0,2}$/, "KERNEL_GROUP is default and the intent and seed are empty");
+  }
+  assert.equal(DEFAULT_GROUP, "default");
+});
+
+test("a boundary cell with no groups fails the checks as a shape, with no group in the line", () => {
+  const { root, paths } = groupWorkspace({
+    cells: [{ id: "m4096", dtype: "fp8_e4m3", boundary: true }],
+    checkCommand: "bash -c 'exit 1'",
+  });
+  const result = runScript(paths.checksScript, root);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /^FAIL cell m4096 \(boundary cell\) pass 1:$/m);
+  const failLines = result.stderr.split("\n").filter((line) => line.startsWith("FAIL "));
+  assert.doesNotMatch(failLines.join("\n"), /group /, "a shape failure must not name a group");
+  assert.match(result.stderr, /checks failed: 1 cell\/group pair\(s\)/);
+});
+
+test("a group failure is named as a group failure, not as a shape failure", () => {
+  const { root, paths } = groupWorkspace({
+    cells: [{ id: "m1024", dtype: "bf16", groups: THREE("m1024", 11) }],
+    // Correct on typical, wrong on zero_block: the case this ticket exists for.
+    checkCommand: 'bash -c \'[[ "$KERNEL_GROUP" != zero_block ]]\'',
+  });
+  const result = runScript(paths.checksScript, root);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /^FAIL cell m1024 group zero_block pass 1:$/m);
+  assert.equal(result.stderr.split("\n").filter((line) => line.startsWith("FAIL ")).length, 1);
+  assert.doesNotMatch(result.stderr, /FAIL cell m1024 pass/, "the shape line must not repeat for a group");
+});
+
+test("the generated checks script iterates every cell x group, twice each", () => {
+  const cells = [
+    { id: "m1024", dtype: "bf16", vars: { M: "1024" }, groups: THREE("m1024", 11) },
+    { id: "m4096", dtype: "fp8", vars: { M: "4096" }, groups: THREE("m4096", 22) },
+  ];
+  const { root, paths } = groupWorkspace({ cells });
+  const result = runScript(paths.checksScript, root);
+  assert.equal(result.code, 0, result.stderr);
+
+  const calls = fs.readFileSync(path.join(root, "calls.log"), "utf8").trim().split("\n");
+  const pairs = calls.map((line) => line.split(" ").slice(0, 2).join(" "));
+  // 2 cells x 3 groups = 6 pairs, each run twice (two passes).
+  assert.deepEqual([...new Set(pairs)].sort(), [
+    "m1024 tail",
+    "m1024 typical",
+    "m1024 zero_block",
+    "m4096 tail",
+    "m4096 typical",
+    "m4096 zero_block",
+  ]);
+  assert.equal(calls.length, 12);
+  assert.match(result.stdout, /checks ok: 2 cell\(s\), 2 passes each, 6 cell x group pair\(s\)/);
+
+  // The intent and the seed travel with the group, so the command can build it.
+  assert.ok(
+    calls.includes("m4096 zero_block m4096: a fully masked block must not divide by zero 22"),
+    `the zero_block call should carry its intent and seed:\n${calls.join("\n")}`,
+  );
+});
+
+test("the generated bench prints one METRIC per cell x group plus one aggregate per cell", () => {
+  const { root, paths } = groupWorkspace();
+  fs.writeFileSync(path.join(root, "speeds", "m1024.zero_block"), "20\n");
+  fs.writeFileSync(path.join(root, "speeds", "m1024.typical"), "10\n");
+  fs.writeFileSync(path.join(root, "speeds", "m1024.tail"), "10\n");
+
+  const result = runScript(paths.benchmarkScript, root);
+  assert.equal(result.code, 0, result.stderr);
+  const metricLines = result.stdout.split("\n").filter((line) => /^METRIC\s+/.test(line));
+  assert.deepEqual(metricLines, [
+    "METRIC latency_us_m1024_typical=10",
+    "METRIC latency_us_m1024_zero_block=20",
+    "METRIC latency_us_m1024_tail=10",
+    // the aggregate the gate reads: the geomean over the cell's groups
+    "METRIC latency_us_m1024=12.5992105",
+    "METRIC latency_us_m4096_default=5",
+    "METRIC latency_us_m4096=5",
+    "METRIC geomean_speedup=1",
+  ]);
+
+  const parsed = parseReadingBlock(result.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.deepEqual(
+    parsed.reading.cells.map((cell) => [cell.id, cell.group, cell.metric, cell.median]),
+    [
+      ["m1024", "typical", "latency_us_m1024_typical", 10],
+      ["m1024", "zero_block", "latency_us_m1024_zero_block", 20],
+      ["m1024", "tail", "latency_us_m1024_tail", 10],
+      ["m4096", "default", "latency_us_m4096_default", 5],
+    ],
+  );
+});
+
+test("a contract this build did not write — cells without groups — is refused at write time", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-contract-"));
+  initWorkspace(root);
+  const contract = built();
+  const legacy = {
+    ...contract,
+    cells: contract.cells.map(({ groups, ...rest }) => rest),
+  };
+  const outcome = writeContractFiles({ root, contract: legacy });
+  assert.equal(outcome.ok, false);
+  assert.match(outcome.errors[0], /cell "m1024" has no groups array/);
+  assert.match(outcome.errors[0], /regenerate with kernel_contract/);
+  assert.equal(fs.existsSync(workspacePaths(root).contract), false);
 });

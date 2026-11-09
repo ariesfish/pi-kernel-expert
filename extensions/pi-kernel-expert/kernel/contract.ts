@@ -21,12 +21,34 @@ export const BASIS_VALUES = ["device", "e2e"] as const satisfies readonly Basis[
  */
 export const DEFAULT_HARNESS_GLOBS = ["goal.sh", "goal.checks.sh"] as const;
 
+/**
+ * One data set a cell is judged on. A shape is not a data set: a cell names
+ * the distributions the kernel must survive, and each one carries the reason
+ * it exists, because "holdout" is already true of every input.
+ */
+export interface Group {
+  /** Exported as `KERNEL_GROUP`; `[A-Za-z0-9][A-Za-z0-9_.-]*`, unique in its cell. */
+  name: string;
+  /** What this data set must prove. Required: a group without one is a contract error. */
+  intent: string;
+  /** Optional integer the command may use to build the data. Exported as `KERNEL_GROUP_SEED`. */
+  seed?: number;
+}
+
+/** A non-boundary cell is a data set, not a shape: three groups or it is refused. */
+export const MIN_GROUPS_PER_CELL = 3;
+
+/** What a cell with no groups exports, so the old one-shape command still runs. */
+export const DEFAULT_GROUP = "default";
+
 export interface CellInput {
   id: string;
   dtype: string;
   /** Exported to the commands as `KERNEL_<KEY>=<value>`. */
   vars?: Record<string, string>;
   boundary?: boolean;
+  /** Required (>= MIN_GROUPS_PER_CELL) unless the cell is a boundary probe. */
+  groups?: Group[];
 }
 
 export interface ContractInput {
@@ -50,9 +72,11 @@ export interface ContractInput {
   generator?: string;
 }
 
-export interface Cell extends Required<Omit<CellInput, "boundary" | "vars">> {
+export interface Cell extends Required<Omit<CellInput, "boundary" | "vars" | "groups">> {
   vars: Record<string, string>;
   boundary: boolean;
+  /** Empty only on a boundary cell; the scripts then iterate `default` once. */
+  groups: Group[];
 }
 
 export interface KernelContract {
@@ -84,6 +108,8 @@ const ID_RULE = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 const VAR_KEY_RULE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const METRIC_RULE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const FORBIDDEN_IN_VALUE = /[|\n\r,]/;
+/** A group `intent` is a sentence, so commas are fine; it travels in a `|`-separated row. */
+const FORBIDDEN_IN_INTENT = /[|\n\r]/;
 
 export interface NormalizeResult {
   contract?: KernelContract;
@@ -179,11 +205,21 @@ export function normalizeContract(input: ContractInput, options: NormalizeOption
         }
         vars[key.toUpperCase()] = String(value);
       }
+      const boundary = cell.boundary === true;
+      const groups = normalizeGroups(cell, where, errors);
+      // A non-boundary cell is a claim that the kernel is correct, not that one
+      // shape of one distribution is. Three data sets make the claim checkable.
+      if (!boundary && groups.length < MIN_GROUPS_PER_CELL) {
+        errors.push(
+          `${where} (cell "${cell.id}") has ${groups.length} input group(s); a non-boundary cell needs at least ${MIN_GROUPS_PER_CELL} — name the data sets as { name, intent } (e.g. typical, zero_block, masked), or mark the cell boundary: true if it is a shape-extreme probe rather than a data set`,
+        );
+      }
       cells.push({
         id: cell.id,
         dtype: cell.dtype,
         vars,
-        boundary: cell.boundary === true,
+        boundary,
+        groups,
       });
     }
   }
@@ -363,19 +399,20 @@ export interface FreezePayload {
 
 /** Exactly one blocking metric criterion, as pi-goal requires. */
 export function freezePayload(contract: KernelContract): FreezePayload {
+  const groups = contract.cells.reduce((total, cell) => total + cell.groups.length, 0);
   return {
     objective: contract.objective,
     criteria: [
       {
         id: "M1",
-        statement: `geomean speedup over the recorded baseline across ${contract.cells.length} matrix cell(s)`,
+        statement: `geomean speedup over the recorded baseline across ${contract.cells.length} matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; ${groups} group(s) in the matrix)`,
         kind: "metric",
         blocking: true,
         metric: { name: "geomean_speedup", direction: "higher", unit: "x" },
       },
       {
         id: "C1",
-        statement: "every matrix cell matches the reference on two consecutive passes",
+        statement: "every matrix cell matches the reference on every input group, on two consecutive passes",
         kind: "command",
         blocking: true,
         check: {
@@ -406,6 +443,20 @@ export function writeContractFiles(options: {
   contract: KernelContract;
   force?: boolean;
 }): WriteOutcome {
+  // A contract that reached here without going through normalizeContract can
+  // only be hand-assembled or carried over from before groups existed. This
+  // build never produces one, so it refuses rather than writing a script that
+  // silently measures one shape per cell: re-normalize, i.e. regenerate.
+  const unnormalized = options.contract.cells.filter((cell) => !Array.isArray(cell.groups));
+  if (unnormalized.length > 0) {
+    return {
+      ok: false,
+      errors: unnormalized.map(
+        (cell) => `cell "${cell.id}" has no groups array; this contract was not written by this build — regenerate with kernel_contract`,
+      ),
+    };
+  }
+
   const paths = workspacePaths(options.root);
   const json = contractJson(options.contract);
   const sha = contractSha(json);
@@ -471,21 +522,99 @@ function writeFileAtomic(file: string, contents: string, mode?: number): void {
   }
 }
 
+/**
+ * Groups are structural: a group without an `intent` is a contract error, not a
+ * warning, because an input the writer cannot justify is an input nobody can
+ * judge a failure against. `groups` is never defaulted here — the point is that
+ * the writer states the data sets; a boundary cell is the one place an empty
+ * list is legal.
+ */
+function normalizeGroups(cell: CellInput, where: string, errors: string[]): Group[] {
+  const raw = cell.groups as unknown;
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    errors.push(`${where}.groups must be an array of { name, intent, seed? }`);
+    return [];
+  }
+
+  const groups: Group[] = [];
+  const seen = new Set<string>();
+  for (const [index, entry] of raw.entries()) {
+    const at = `${where}.groups[${index}]`;
+    const group = (entry ?? {}) as Partial<Group>;
+    const name = typeof group.name === "string" ? group.name.trim() : "";
+    if (name === "" || !ID_RULE.test(name)) {
+      errors.push(`${at}.name "${name}" must match ${ID_RULE}`);
+      continue;
+    }
+    if (seen.has(name.toLowerCase())) {
+      errors.push(`${at}.name "${name}" is duplicated in cell "${cell.id}"; group names must be unique within a cell`);
+      continue;
+    }
+    seen.add(name.toLowerCase());
+    const intent = typeof group.intent === "string" ? group.intent.trim() : "";
+    if (intent === "") {
+      errors.push(
+        `${at} (group "${name}" of cell "${cell.id}") has no intent: say what this data set must prove, or drop it`,
+      );
+      continue;
+    }
+    if (FORBIDDEN_IN_INTENT.test(intent)) {
+      errors.push(`${at}.intent (group "${name}") must not contain "|" or a newline`);
+      continue;
+    }
+    if (group.seed !== undefined && group.seed !== null) {
+      if (!Number.isInteger(group.seed)) {
+        errors.push(`${at}.seed (group "${name}") must be an integer, got ${JSON.stringify(group.seed)}`);
+        continue;
+      }
+      groups.push({ name, intent, seed: group.seed });
+      continue;
+    }
+    groups.push({ name, intent });
+  }
+  return groups;
+}
+
+export function groupMetricName(contract: KernelContract, cell: Cell, group: Group): string {
+  const safeCell = cell.id.replace(/[^A-Za-z0-9]/g, "_");
+  const safeGroup = group.name.replace(/[^A-Za-z0-9]/g, "_");
+  return `${contract.metricName}_${safeCell}_${safeGroup}`;
+}
+
+/**
+ * The cell table the generated scripts iterate: `id|dtype|rtol|atol|boundary|vars`
+ * per cell, and `id|group|seed|intent` per group (the `.kernel/cells.tsv`
+ * shape, embedded because the scripts run without a parser).
+ */
+export function cellRow(contract: KernelContract, cell: Cell): string {
+  const vars = Object.entries(cell.vars)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(",");
+  return [cell.id, cell.dtype, String(contract.tolerance.rtol), String(contract.tolerance.atol), cell.boundary ? "1" : "0", vars].join("|");
+}
+
+export function groupRow(cell: Cell, group: Group): string {
+  return [cell.id, group.name, group.seed === undefined ? "" : String(group.seed), group.intent].join("|");
+}
+
+/**
+ * Single-quoted for shell: a group intent holds spaces and may hold an apostrophe.
+ */
 function shQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 function cellsArray(contract: KernelContract): string {
-  return contract.cells
-    .map((cell) => {
-      const vars = Object.entries(cell.vars)
-        .map(([key, value]) => `${key}=${value}`)
-        .join(",");
-      return shQuote(
-        [cell.id, cell.dtype, String(contract.tolerance.rtol), String(contract.tolerance.atol), cell.boundary ? "1" : "0", vars].join("|"),
-      );
-    })
-    .join(" ");
+  return contract.cells.map((cell) => shQuote(cellRow(contract, cell))).join(" ");
+}
+
+function groupsArray(contract: KernelContract): string {
+  const rows: string[] = [];
+  for (const cell of contract.cells) {
+    for (const group of cell.groups) rows.push(shQuote(groupRow(cell, group)));
+  }
+  return rows.join(" ");
 }
 
 const HASH_FUNCTION = `hash_file() {
@@ -509,12 +638,48 @@ const EXPORTS = `  IFS='|' read -r cid dtype rtol atol boundary vars <<< "$entry
     done
   fi`;
 
+/**
+ * The per-group exports. `KERNEL_GROUP_SEED` and `KERNEL_GROUP_INTENT` are
+ * empty rather than absent, so a command can rely on the variable existing.
+ */
+const GROUP_EXPORTS = `    export KERNEL_GROUP="$gname" KERNEL_GROUP_INTENT="$gintent" KERNEL_GROUP_SEED="$gseed"`;
+
+/**
+ * Fills G_NAMES/G_SEEDS/G_INTENTS for one cell. A cell with no groups still runs
+ * once — as the group "default" — because a boundary probe is a shape, not a
+ * data set, and its command was written before groups existed. G_FROM_CONTRACT
+ * records which of the two happened so a failure line can say whether the data
+ * or the shape is what broke.
+ */
+function groupSelect(contract: KernelContract): string {
+  return `# CELL_GROUPS, not GROUPS: bash already owns GROUPS (the caller's gids).
+CELL_GROUPS=(${groupsArray(contract)})
+G_NAMES=()
+G_SEEDS=()
+G_INTENTS=()
+G_INDEX=0
+G_FROM_CONTRACT=0
+select_groups() {
+  local row gcid gname gseed gintent
+  G_NAMES=(); G_SEEDS=(); G_INTENTS=(); G_INDEX=0; G_FROM_CONTRACT=1
+  for row in \${CELL_GROUPS[@]+"\${CELL_GROUPS[@]}"}; do
+    IFS='|' read -r gcid gname gseed gintent <<< "$row"
+    [[ "$gcid" == "$1" ]] || continue
+    G_NAMES+=("$gname"); G_SEEDS+=("$gseed"); G_INTENTS+=("$gintent")
+  done
+  if [[ \${#G_NAMES[@]} -eq 0 ]]; then
+    G_NAMES=('${DEFAULT_GROUP}'); G_SEEDS=(''); G_INTENTS=(''); G_FROM_CONTRACT=0
+  fi
+}`;
+}
+
 export function renderBenchmarkScript(contract: KernelContract, sha: string): string {
   return `#!/usr/bin/env bash
 # Generated by ${contract.generator}. Do not edit: regenerate with kernel_contract.
 # Contract: kernel.contract.json (sha256 ${sha})
 #
-# One machine-readable reading block per run. Shell can time only its own wall
+# One machine-readable reading block per run, and one METRIC line per
+# (cell, group) plus a per-cell aggregate. Shell can time only its own wall
 # clock (shellMs) and read GPU state from nvidia-smi; device and enqueue figures
 # are recorded only when the bench command prints them (METRIC device_ms=,
 # METRIC host_enqueue_ms=). A host-free basis (cuda_graph, cupti_kernel_span)
@@ -530,7 +695,9 @@ WARMUP=${contract.warmup}
 GUARD_PCT=${shQuote(String(contract.guardPct))}
 BENCH_CMD=${shQuote(contract.benchmarkCommand)}
 BASELINE_FILE='.kernel/baseline.tsv'
+# The cell table: one row per cell, one row per group (see kernel_contract).
 CELLS=(${cellsArray(contract)})
+${groupSelect(contract)}
 READING_START='=== KERNEL READING ==='
 READING_END='=== END KERNEL READING ==='
 
@@ -827,8 +994,9 @@ fi
 
 mkdir -p "$(dirname "$BASELINE_FILE")"
 tmp=$(mktemp)
+group_tmp=$(mktemp)
 ratio_file=$(mktemp)
-trap 'rm -f "$tmp" "$ratio_file"' EXIT
+trap 'rm -f "$tmp" "$group_tmp" "$ratio_file"' EXIT
 failures=0
 new_baseline=()
 
@@ -840,75 +1008,91 @@ smi_version
 gpu_probe 'start'
 
 for entry in "\${CELLS[@]}"; do
-  IFS='|' read -r cid dtype rtol atol boundary vars <<< "$entry"
-  export KERNEL_CELL="$cid" KERNEL_DTYPE="$dtype" KERNEL_RTOL="$rtol" KERNEL_ATOL="$atol" KERNEL_BOUNDARY="$boundary"
-  if [[ -n "$vars" ]]; then
-    IFS=',' read -ra pairs <<< "$vars"
-    for pair in "\${pairs[@]}"; do
-      [[ -n "$pair" ]] || continue
-      export "KERNEL_\${pair%%=*}=\${pair#*=}"
-    done
-  fi
-
-  for ((w=0; w<WARMUP; w++)); do
-    if ! eval "$BENCH_CMD" >/dev/null 2>&1; then
-      echo "benchmark failed during warmup in cell $cid (warmup $((w+1))/$WARMUP)" >&2
-      exit 1
-    fi
-  done
-
-  : > "$tmp"
-  for ((r=0; r<REPEATS; r++)); do
-    if ! raw=$(eval "$BENCH_CMD" 2>&1); then
-      echo "benchmark failed in cell $cid:" >&2
-      printf '%s\\n' "$raw" >&2
-      exit 1
-    fi
-    if [[ $raw =~ METRIC[[:space:]]+[A-Za-z0-9_.]+=([0-9.eE+-]+) ]]; then
-      value="\${BASH_REMATCH[1]}"
-    else
-      value=$(printf '%s\\n' "$raw" | grep -oE '[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?' | tail -1 || true)
-    fi
-    [[ -n "\${value:-}" ]] || {
-      echo "benchmark in cell $cid printed no number" >&2
-      printf '%s\\n' "$raw" >&2
-      exit 1
-    }
-    printf '%s\\n' "$value" >> "$tmp"
-
-    # Only the task can say how long the device ran and how long the host took
-    # to enqueue; take its numbers as reported and median them over the run.
-    reported=$(printf '%s\\n' "$raw" | grep -oE 'METRIC[[:space:]]+[A-Za-z0-9_.]+=[0-9.eE+-]+' || true)
-    while IFS=' ' read -r tag pair; do
-      [[ "$tag" == 'METRIC' ]] || continue
-      case "\${pair%%=*}" in
-        host_enqueue_ms) HOST_ENQUEUE_VALUES+=("\${pair#*=}") ;;
-        device_ms) DEVICE_VALUES+=("\${pair#*=}") ;;
-      esac
-    done <<< "$reported"
-  done
-
-  median=$(sort -g "$tmp" | awk '{ a[NR]=$1 } END { if (NR==0) exit 1; if (NR%2) print a[(NR+1)/2]; else printf "%.10g\\n", (a[NR/2]+a[NR/2+1])/2 }')
+${EXPORTS}
   safe=$(printf '%s' "$cid" | tr -c 'A-Za-z0-9' '_')
-  printf 'METRIC %s_%s=%s\\n' "$METRIC_NAME" "$safe" "$median"
+  select_groups "$cid"
+  : > "$group_tmp"
 
-  spread=''
-  if [[ $REPEATS -ge 2 ]]; then
-    spread=$(awk -v m="$median" 'NR==1 { lo=$1; hi=$1 } { if ($1<lo) lo=$1; if ($1>hi) hi=$1 } END { if (m > 0 && NR > 0) printf "%.12g", (hi-lo)/m*100 }' "$tmp")
-  fi
-  median_json=$(json_number "$median" || true)
-  if [[ -z "$median_json" ]]; then
-    WARNINGS+=("cell $cid has no JSON-safe median (raw: $median); the cell is missing from this reading")
-  else
-    cell_json="{\\"id\\":$(json_string "$cid"),\\"metric\\":$(json_string "\${METRIC_NAME}_\${safe}"),\\"median\\":\${median_json},\\"samples\\":\${REPEATS}"
-    if [[ -n "$spread" ]] && spread_json=$(json_number "$spread"); then
-      cell_json="\${cell_json},\\"spreadPct\\":\${spread_json}"
+  # Cells x groups: one measurement per data set. KERNEL_GROUP is exported per
+  # group so the command can build that data set itself.
+  for gname in "\${G_NAMES[@]}"; do
+    gseed="\${G_SEEDS[$G_INDEX]}"
+    gintent="\${G_INTENTS[$G_INDEX]}"
+    G_INDEX=$(( G_INDEX + 1 ))
+    gsafe=$(printf '%s' "$gname" | tr -c 'A-Za-z0-9' '_')
+${GROUP_EXPORTS}
+
+    for ((w=0; w<WARMUP; w++)); do
+      if ! eval "$BENCH_CMD" >/dev/null 2>&1; then
+        echo "benchmark failed during warmup in cell $cid group $gname (warmup $((w+1))/$WARMUP)" >&2
+        exit 1
+      fi
+    done
+
+    : > "$tmp"
+    for ((r=0; r<REPEATS; r++)); do
+      if ! raw=$(eval "$BENCH_CMD" 2>&1); then
+        echo "benchmark failed in cell $cid group $gname:" >&2
+        printf '%s\\n' "$raw" >&2
+        exit 1
+      fi
+      if [[ $raw =~ METRIC[[:space:]]+[A-Za-z0-9_.]+=([0-9.eE+-]+) ]]; then
+        value="\${BASH_REMATCH[1]}"
+      else
+        value=$(printf '%s\\n' "$raw" | grep -oE '[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?' | tail -1 || true)
+      fi
+      [[ -n "\${value:-}" ]] || {
+        echo "benchmark in cell $cid group $gname printed no number" >&2
+        printf '%s\\n' "$raw" >&2
+        exit 1
+      }
+      printf '%s\\n' "$value" >> "$tmp"
+
+      # Only the task can say how long the device ran and how long the host took
+      # to enqueue; take its numbers as reported and median them over the run.
+      reported=$(printf '%s\\n' "$raw" | grep -oE 'METRIC[[:space:]]+[A-Za-z0-9_.]+=[0-9.eE+-]+' || true)
+      while IFS=' ' read -r tag pair; do
+        [[ "$tag" == 'METRIC' ]] || continue
+        case "\${pair%%=*}" in
+          host_enqueue_ms) HOST_ENQUEUE_VALUES+=("\${pair#*=}") ;;
+          device_ms) DEVICE_VALUES+=("\${pair#*=}") ;;
+        esac
+      done <<< "$reported"
+    done
+
+    gmedian=$(sort -g "$tmp" | awk '{ a[NR]=$1 } END { if (NR==0) exit 1; if (NR%2) print a[(NR+1)/2]; else printf "%.10g\\n", (a[NR/2]+a[NR/2+1])/2 }')
+    printf 'METRIC %s_%s_%s=%s\\n' "$METRIC_NAME" "$safe" "$gsafe" "$gmedian"
+
+    gspread=''
+    if [[ $REPEATS -ge 2 ]]; then
+      gspread=$(awk -v m="$gmedian" 'NR==1 { lo=$1; hi=$1 } { if ($1<lo) lo=$1; if ($1>hi) hi=$1 } END { if (m > 0 && NR > 0) printf "%.12g", (hi-lo)/m*100 }' "$tmp")
     fi
-    CELL_JSON+=("\${cell_json}}")
-  fi
+    gmedian_json=$(json_number "$gmedian" || true)
+    if [[ -z "$gmedian_json" ]]; then
+      WARNINGS+=("cell $cid group $gname has no JSON-safe median (raw: $gmedian); the group is missing from this reading")
+    else
+      cell_json="{\\"id\\":$(json_string "$cid"),\\"group\\":$(json_string "$gname"),\\"metric\\":$(json_string "\${METRIC_NAME}_\${safe}_\${gsafe}"),\\"median\\":\${gmedian_json},\\"samples\\":\${REPEATS}"
+      if [[ -n "$gspread" ]] && spread_json=$(json_number "$gspread"); then
+        cell_json="\${cell_json},\\"spreadPct\\":\${spread_json}"
+      fi
+      CELL_JSON+=("\${cell_json}}")
+    fi
+    printf '%s\\n' "$gmedian" >> "$group_tmp"
+  done
+
+  # The number the gate reads: the geomean over this cell's groups, so one group
+  # getting much slower moves the cell instead of hiding behind a median (three
+  # groups at 10/10/100 read as 21.5, not as 10). It is still the name
+  # cellMetricName returns. A non-positive group value has no geomean, so the
+  # cell refuses to produce one rather than round it to zero.
+  cell_value=$(awk '{ if ($1 <= 0) bad=1; s+=log($1); n++ } END { if (bad || n==0) exit 1; printf "%.10g\\n", exp(s/n) }' "$group_tmp") || {
+    echo "cell $cid has a non-positive group value; a geomean cannot be taken over $(tr '\\n' ' ' < "$group_tmp")" >&2
+    exit 1
+  }
+  printf 'METRIC %s_%s=%s\\n' "$METRIC_NAME" "$safe" "$cell_value"
 
   if [[ $baseline_run -eq 1 ]]; then
-    new_baseline+=("$cid|$median")
+    new_baseline+=("$cid|$cell_value")
     continue
   fi
 
@@ -917,7 +1101,7 @@ for entry in "\${CELLS[@]}"; do
     echo "baseline has no value for cell $cid; rerun with --reset-baseline" >&2
     exit 1
   fi
-  ratio=$(awk -v b="$base" -v c="$median" -v d="$DIRECTION" 'BEGIN { if (c<=0 || b<=0) exit 1; if (d=="lower") printf "%.10g\\n", b/c; else printf "%.10g\\n", c/b }')
+  ratio=$(awk -v b="$base" -v c="$cell_value" -v d="$DIRECTION" 'BEGIN { if (c<=0 || b<=0) exit 1; if (d=="lower") printf "%.10g\\n", b/c; else printf "%.10g\\n", c/b }')
   printf '%s\\n' "$ratio" >> "$ratio_file"
   if awk -v r="$ratio" -v g="$GUARD_PCT" 'BEGIN { exit (r < 1 - g/100) ? 1 : 0 }'; then
     :
@@ -963,7 +1147,9 @@ set -euo pipefail
 
 CONTRACT_SHA=${shQuote(sha)}
 CHECK_CMD=${shQuote(contract.checkCommand)}
+# The cell table: one row per cell, one row per group (see kernel_contract).
 CELLS=(${cellsArray(contract)})
+${groupSelect(contract)}
 
 ${HASH_FUNCTION}
 
@@ -975,25 +1161,40 @@ actual=$(hash_file kernel.contract.json) || exit 2
 }
 
 failures=0
+pair_count=0
 for entry in "\${CELLS[@]}"; do
 ${EXPORTS}
   boundary_note=""
   [[ "$boundary" == "1" ]] && boundary_note=" (boundary cell)"
+  select_groups "$cid"
 
-  for pass in 1 2; do
-    if ! out=$(eval "$CHECK_CMD" 2>&1); then
-      echo "FAIL cell $cid$boundary_note pass $pass:" >&2
-      printf '%s\\n' "$out" | tail -20 >&2
-      failures=$((failures+1))
-      break
-    fi
+  # Cells x groups: correctness is a claim about data sets, not about a shape.
+  # A cell with no groups keeps its old line, so a boundary probe still says
+  # FAIL cell <id> ...; only a data failure carries "group <name>".
+  for gname in "\${G_NAMES[@]}"; do
+    gseed="\${G_SEEDS[$G_INDEX]}"
+    gintent="\${G_INTENTS[$G_INDEX]}"
+    G_INDEX=$(( G_INDEX + 1 ))
+${GROUP_EXPORTS}
+    pair_count=$(( pair_count + 1 ))
+    group_note=""
+    [[ "$G_FROM_CONTRACT" == "1" ]] && group_note=" group $gname"
+
+    for pass in 1 2; do
+      if ! out=$(eval "$CHECK_CMD" 2>&1); then
+        echo "FAIL cell $cid$group_note$boundary_note pass $pass:" >&2
+        printf '%s\\n' "$out" | tail -20 >&2
+        failures=$((failures+1))
+        break
+      fi
+    done
   done
 done
 
 [[ $failures -eq 0 ]] || {
-  echo "checks failed: $failures cell(s); a cell that passes once and fails twice may be order-dependent" >&2
+  echo "checks failed: $failures cell/group pair(s); a pair that passes once and fails twice may be order-dependent" >&2
   exit 1
 }
-echo "checks ok: \${#CELLS[@]} cell(s), 2 passes each"
+echo "checks ok: \${#CELLS[@]} cell(s), 2 passes each, $pair_count cell x group pair(s)"
 `;
 }

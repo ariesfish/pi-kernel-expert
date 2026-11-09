@@ -10,6 +10,10 @@
  * basis (`cuda_graph`, `cupti_kernel_span`) needs a runner that can, and that
  * arrives with the runner, not with this script.
  *
+ * `cells[]` holds one entry per (cell, input group): a run judged on several
+ * data sets produces several entries under one cell id, and the per-cell
+ * aggregate stays a `METRIC` line rather than a second reading entry.
+ *
  * The parser is strict on purpose. A record here may be the only evidence a
  * promotion claim rests on, so a truncated block, a body that is not JSON, an
  * unknown `schemaVersion`, or a verdict that contradicts its ratio is refused
@@ -59,7 +63,13 @@ export interface ReadingGpu {
 
 export interface ReadingCell {
   id: string;
-  /** The `METRIC` name the run printed for this cell. */
+  /**
+   * The input group this entry measured. Absent on a record taken before groups
+   * existed (`schemaVersion` stays 1: the field is additive and optional); the
+   * generated script always writes one, `default` for a cell with no groups.
+   */
+  group?: string;
+  /** The `METRIC` name the run printed for this cell (per group, when grouped). */
   metric: string;
   /** Absent only when the run's number was not JSON-representable. */
   median?: number;
@@ -203,6 +213,9 @@ function readingIssues(record: Record<string, unknown>): string[] {
         continue;
       }
       if (typeof cell.id !== "string" || cell.id === "") issues.push(`cells[${index}].id is missing`);
+      if (cell.group !== undefined && (typeof cell.group !== "string" || cell.group === "")) {
+        issues.push(`cells[${index}].group must be a non-empty string when present`);
+      }
       if (typeof cell.metric !== "string" || cell.metric === "") issues.push(`cells[${index}].metric is missing`);
       if (cell.median !== undefined && !isFiniteNumber(cell.median)) {
         issues.push(`cells[${index}].median is not a number`);

@@ -48,7 +48,17 @@ test("kernel_candidate maps tool parameters onto the ledger through a real repo"
       objective: "cut latency",
       check_command: "bash check.sh",
       benchmark_command: "bash bench.sh",
-      cells: [{ id: "a", dtype: "bf16" }],
+      cells: [
+        {
+          id: "a",
+          dtype: "bf16",
+          groups: [
+            { name: "typical", intent: "random normal inputs, the ordinary case" },
+            { name: "zero_block", intent: "a fully masked block must not divide by zero" },
+            { name: "tail", intent: "a length off the tile boundary must not read past M" },
+          ],
+        },
+      ],
       rtol: 1e-2,
       atol: 1e-3,
       scope_globs: ["kernel/**"],

@@ -17,6 +17,16 @@ import {
 const PACKAGE_ROOT = packageRootFrom(import.meta.url);
 const GENERATOR = `pi-kernel-expert ${readPackageVersion(PACKAGE_ROOT)}`;
 
+const GroupSchema = Type.Object({
+  name: Type.String({
+    description: 'Data set name, exported as KERNEL_GROUP, e.g. typical, zero_block. [A-Za-z0-9][A-Za-z0-9_.-]*, unique in the cell.',
+  }),
+  intent: Type.String({
+    description: "What this data set must prove, in one sentence. Required: a group without an intent is refused.",
+  }),
+  seed: Type.Optional(Type.Number({ description: "Integer seed the command may use to build the data. Exported as KERNEL_GROUP_SEED." })),
+});
+
 const CellSchema = Type.Object({
   id: Type.String({ description: "Stable cell id, e.g. m1024_n4096_k4096" }),
   dtype: Type.String({ description: "Exported as KERNEL_DTYPE, e.g. bf16, fp8_e4m3" }),
@@ -26,7 +36,13 @@ const CellSchema = Type.Object({
     }),
   ),
   boundary: Type.Optional(
-    Type.Boolean({ description: "Mark an edge-case cell so failures name it as a boundary." }),
+    Type.Boolean({ description: "Mark an edge-case cell so failures name it as a boundary; a boundary cell may carry 0 groups." }),
+  ),
+  groups: Type.Optional(
+    Type.Array(GroupSchema, {
+      description:
+        "The data sets this cell is judged on. Required (>= 3) unless boundary is true; each group runs the check and the benchmark and reports its own METRIC line.",
+    }),
   ),
 });
 
@@ -35,10 +51,11 @@ export function registerContractTool(pi: ExtensionAPI): void {
     name: "kernel_contract",
     label: "Generate Kernel Contract",
     description:
-      "Freeze a kernel task's shape matrix into executable artifacts: kernel.contract.json, goal.sh (per-cell METRIC lines, median of repeats, geomean speedup, per-cell regression guard), goal.checks.sh (per-cell reference comparison, two passes), and kernel-freeze.json (the pi-goal freeze_criteria payload). Refuses incomplete drafts and existing artifacts without force.",
+      "Freeze a kernel task's shape matrix and its input groups into executable artifacts: kernel.contract.json, goal.sh (one METRIC line per cell x group plus a per-cell median, geomean speedup, per-cell regression guard), goal.checks.sh (per cell x group reference comparison, two passes), and kernel-freeze.json (the pi-goal freeze_criteria payload). Refuses incomplete drafts, a non-boundary cell with fewer than 3 groups, a group without an intent, and existing artifacts without force.",
     promptSnippet: "Generate goal.sh, goal.checks.sh, and the freeze payload",
     promptGuidelines: [
       "Call kernel_contract only after docs/draft.md and docs/plan.md hold real content.",
+      "A shape is not a data set: give every non-boundary cell at least 3 groups, each with a name and an intent saying what it must prove.",
       "The check command must exit non-zero on a correctness mismatch; the benchmark command must print one number (or a METRIC line).",
       "The benchmark's first run records .kernel/baseline.tsv and reports geomean_speedup=1; later runs compare against it.",
       "Pass the returned payload to freeze_criteria, and use metric_name geomean_speedup with direction higher.",
@@ -50,7 +67,8 @@ export function registerContractTool(pi: ExtensionAPI): void {
       objective: Type.String({ description: "One sentence: what this task optimizes." }),
       workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
       check_command: Type.String({
-        description: "Per-cell correctness command; env carries KERNEL_CELL, KERNEL_DTYPE, KERNEL_RTOL, KERNEL_ATOL and the cell vars. Exit 0 = correct.",
+        description:
+          "Per-cell, per-group correctness command; env carries KERNEL_CELL, KERNEL_GROUP, KERNEL_GROUP_INTENT, KERNEL_GROUP_SEED, KERNEL_DTYPE, KERNEL_RTOL, KERNEL_ATOL and the cell vars. Exit 0 = correct.",
       }),
       benchmark_command: Type.String({
         description: "Per-cell benchmark command; prints one number or a METRIC line. Same env as the check command.",
@@ -175,12 +193,18 @@ export function registerContractTool(pi: ExtensionAPI): void {
 
       const { sha, freeze, written: files } = written.result;
       const warnings = normalized.warnings;
+      const contract = normalized.contract;
+      const groupCount = contract.cells.reduce((total, cell) => total + cell.groups.length, 0);
+      const groupSummary = contract.cells
+        .map((cell) => `${cell.id}=${cell.groups.length === 0 ? "default" : cell.groups.map((group) => group.name).join(",")}`)
+        .join("  ");
       const text = [
-        `Contract frozen for ${normalized.contract.cells.length} cell(s).`,
+        `Contract frozen for ${contract.cells.length} cell(s), ${groupCount} input group(s).`,
         `kernel.contract.json sha256 ${sha}`,
-        `basis ${normalized.contract.basis}  harness ${normalized.contract.harnessGlobs.join(", ")}`,
-        normalized.contract.referenceCommand
-          ? `reference ${normalized.contract.referenceCommand}`
+        `groups ${groupSummary}`,
+        `basis ${contract.basis}  harness ${contract.harnessGlobs.join(", ")}`,
+        contract.referenceCommand
+          ? `reference ${contract.referenceCommand}`
           : "reference none (a cross-run baseline stays legal, labelled `pairing: absent`)",
         "",
         "written:",
@@ -199,7 +223,7 @@ export function registerContractTool(pi: ExtensionAPI): void {
 
       return {
         content: [{ type: "text" as const, text }],
-        details: { sha, written: files, freeze, warnings },
+        details: { sha, written: files, freeze, warnings, groupCount },
       };
     },
   });
