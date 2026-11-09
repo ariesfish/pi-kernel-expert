@@ -18,12 +18,14 @@ import { registerInitTool } from "./tools/init.ts";
 import { registerMilestoneTool } from "./tools/milestone.ts";
 import { registerProfileTool } from "./tools/profile.ts";
 import { registerStatusCommand } from "./tools/status.ts";
+import { registerWikiCandidateTool } from "./tools/wiki-candidate.ts";
 import { registerWikiTool } from "./tools/wiki.ts";
 
 export default function kernelExpertExtension(pi: ExtensionAPI): void {
   registerStatusCommand(pi);
   registerBootstrapTool(pi);
   registerWikiTool(pi);
+  registerWikiCandidateTool(pi);
   registerInitTool(pi);
   registerContractTool(pi);
   registerProfileTool(pi);

@@ -111,6 +111,39 @@ kernel_candidate({
 - Every recorded candidate refreshes `benchmark.csv` from the ledger: it is a
   derived view, never hand-edited.
 
+A promotion that rests on a mechanism leaves a page behind, in kernel-wiki's own
+shape:
+
+```text
+kernel_wiki_candidate({
+  id: "single-pass-epilogue-fusion",
+  title: "Fusing the gate-up epilogue into the second GEMM removes one global round-trip",
+  type: "technique",
+  mechanism: "the first GEMM's accumulator tile is staged into the second GEMM's smem operand instead of global memory",
+  trigger: "ncu shows DRAM throughput above 60% with the intermediate tensor still in global memory",
+  cost: "48 KiB more smem per block, so occupancy caps at two blocks per SM",
+  conditions: "holds while the intermediate tile fits smem",
+  gotchas: "the swizzle of the staged tile must match the mma layout",
+  sources: ["c2", "profile/run1"],
+})
+```
+
+- It writes `.kernel/wiki-candidates/<id>.md` — frontmatter plus Mechanism,
+  Trigger, Measured footprint and cost, Load-bearing conditions, Gotchas,
+  Negative readings. `architectures` (H100/H200 → `sm90`, B200/GB200 → `sm100`)
+  and `sources` are pre-filled from the newest `profile/<run>/summary.json` and
+  `candidates.jsonl`; `mechanism`, `trigger`, `conditions` and `gotchas` are
+  yours.
+- It refuses a category trigger (`when needed`, `optimize`, `tune`, …), a
+  `verified` confidence with no source that resolves here, a leftover `<...>` or
+  template sentence, an id already in the cached corpus or in
+  `.kernel/wiki-candidates/`, and a body that names this task's cells, harness
+  commands or files (a fenced code block is the allow-list) — because the corpus
+  is shared and the next operator cannot resolve them.
+- It never writes the corpus. Publishing is a human step: `cp` the file into
+  `kernel-wiki/wiki/<type>/`, run `generate-indices.py`, commit, bump
+  `KERNEL_WIKI_PIN`.
+
 ## The skill
 
 `/skill:kernel-flow` carries the loop: contract → draft → plan → freeze →
