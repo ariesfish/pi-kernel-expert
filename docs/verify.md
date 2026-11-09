@@ -155,3 +155,15 @@ real `max_diff`, a failing input group, and a host-bound refusal on h200-7, CUDA
   field yet, so a locked reading could not be recorded even when the operator takes one.
 
 Until those are recorded, no profiling claim and no Blackwell claim is verified.
+
+## 2026-11-09 — clock lock and the loaded sample (T-009)
+
+Same node and card as above (h200-7, card 3, driver 580.178.04, CUDA 13.0.88). Clocks were locked
+with `nvidia-smi -i 3 -lgc 1500` for one run and reset with `-rgc` immediately after; the archive is
+`runs/T-009/`.
+
+| Check | Result |
+|---|---|
+| Locked run | `clockLocked {declaredSmMhz 1500, declaredMemMhz 3201, observedSmMhz 1500, held: true}`; `gpu.loaded {clocksSmMhz 1500, clocksMaxSmMhz 1980, utilPct 2}`; `hostEnqueueSamples 15`, `deviceSamples 15` |
+| Same contract, unlocked | `observedSmMhz 1980`, `held: false`, warning naming both frequencies |
+| Not detectable | `nvidia-smi` has no "lock in force" field; an undeclared lock is invisible, so the field is absent rather than `held: false` |

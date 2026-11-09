@@ -118,6 +118,15 @@ export function registerContractTool(pi: ExtensionAPI): void {
             "Shell command that measures the REFERENCE against itself and prints max_diff=<number>; bash goal.checks.sh --calibrate runs it once per dtype into .kernel/calibration.json. Without it the precision gate has no ruler and stays unarmed.",
         }),
       ),
+      clock_lock_sm: Type.Optional(
+        Type.Number({
+          description:
+            "The SM clock you locked this card to, in MHz. Recorded with the loaded sample and checked against it: a lock that did not hold is reported, not assumed.",
+        }),
+      ),
+      clock_lock_mem: Type.Optional(
+        Type.Number({ description: "The memory clock you locked, in MHz. Recorded beside clock_lock_sm." }),
+      ),
       burn_in_ms: Type.Optional(
         Type.Number({
           description:
@@ -173,6 +182,10 @@ export function registerContractTool(pi: ExtensionAPI): void {
         referenceCommand: params.reference_command,
         calibrateCommand: params.calibrate_command,
         burnInMs: params.burn_in_ms,
+        clockLock:
+          params.clock_lock_sm === undefined
+            ? undefined
+            : { sm: params.clock_lock_sm, mem: params.clock_lock_mem },
         generator: GENERATOR,
       };
 

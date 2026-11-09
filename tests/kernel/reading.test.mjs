@@ -319,3 +319,37 @@ test("the contract's e2e basis is copied into the reading", () => {
   assert.equal(result.code, 0, result.stderr);
   assert.equal(parseOk(result.stdout).basis, "e2e");
 });
+
+test("a clock lock and a loaded sample round-trip, and a lock claimed without an observation is refused", () => {
+  const base = reading();
+  const withLock = {
+    ...base,
+    gpu: {
+      ...base.gpu,
+      start: { clocksSmMhz: 345, clocksMaxSmMhz: 1980, utilPct: 0 },
+      loaded: { clocksSmMhz: 1500, clocksMaxSmMhz: 1980, utilPct: 97 },
+      end: { clocksSmMhz: 1500, clocksMaxSmMhz: 1980, utilPct: 0 },
+    },
+    clockLocked: { declaredSmMhz: 1500, declaredMemMhz: 3201, observedSmMhz: 1500, held: true },
+    hostEnqueueSamples: 15,
+    deviceSamples: 15,
+  };
+  const parsed = parseReadingBlock(block(withLock));
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.equal(parsed.reading.gpu.loaded.clocksSmMhz, 1500);
+  assert.equal(parsed.reading.gpu.start.clocksSmMhz, 345, "the parked start clock is kept as taken");
+  assert.deepEqual(parsed.reading.clockLocked, withLock.clockLocked);
+  assert.equal(parsed.reading.hostEnqueueSamples, 15);
+
+  // A producer may not assert that its own lock held without an observation.
+  const asserted = parseReadingBlock(
+    block({ ...withLock, clockLocked: { declaredSmMhz: 1500, held: true } }),
+  );
+  assert.equal(asserted.ok, false);
+  assert.match(asserted.reason, /held is true but no observedSmMhz/);
+
+  // An undeclared lock is absent, not false: the parser must not invent one.
+  const unlocked = parseReadingBlock(block({ ...base, clockLocked: undefined }));
+  assert.equal(unlocked.ok, true, unlocked.ok ? "" : unlocked.reason);
+  assert.equal(unlocked.reading.clockLocked, undefined);
+});

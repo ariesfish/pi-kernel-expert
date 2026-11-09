@@ -86,6 +86,8 @@ export interface ContractInput {
   calibrateCommand?: string;
   /** Wall-clock burn-in before the first measured window when pairing. Default 4000. */
   burnInMs?: number;
+  /** The operator's clock lock, declared so the reading can say what it ran under. */
+  clockLock?: { sm: number; mem?: number };
   generator?: string;
 }
 
@@ -123,6 +125,8 @@ export interface KernelContract {
    */
   calibrateCommand: string | null;
   burnInMs: number;
+  /** `null` when no lock was declared: an undeclared lock is invisible, not absent. */
+  clockLock: { sm: number; mem: number | null } | null;
   generator: string;
 }
 
@@ -271,6 +275,16 @@ export function normalizeContract(input: ContractInput, options: NormalizeOption
     errors.push(`burnInMs must be an integer between 0 and ${BURN_IN_MS_MAX}`);
   }
 
+  const clockLock = input.clockLock === undefined ? null : input.clockLock;
+  if (clockLock !== null) {
+    if (!Number.isFinite(clockLock.sm) || clockLock.sm < 100 || clockLock.sm > 5000) {
+      errors.push("clockLock.sm must be a frequency in MHz between 100 and 5000");
+    }
+    if (clockLock.mem !== undefined && (!Number.isFinite(clockLock.mem) || clockLock.mem < 100 || clockLock.mem > 10000)) {
+      errors.push("clockLock.mem must be a frequency in MHz between 100 and 10000");
+    }
+  }
+
   const benchmarkCommand = input.benchmarkCommand?.trim() ?? "";
   const referenceCommand = input.referenceCommand?.trim() || null;
   if (referenceCommand !== null && referenceCommand === benchmarkCommand) {
@@ -305,6 +319,7 @@ export function normalizeContract(input: ContractInput, options: NormalizeOption
     referenceCommand,
     calibrateCommand,
     burnInMs,
+    clockLock: clockLock === null ? null : { sm: clockLock.sm, mem: clockLock.mem ?? null },
     generator: input.generator?.trim() || "pi-kernel-expert",
   };
   const warnings =
@@ -431,6 +446,7 @@ export interface FreezePayload {
   /** Recorded even when there is none, so the payload always states the pairing. */
   reference_command: string | null;
   burn_in_ms: number;
+  clock_lock: { sm: number; mem: number | null } | null;
 }
 
 /** Exactly one blocking metric criterion, as pi-goal requires. */
@@ -464,6 +480,7 @@ export function freezePayload(contract: KernelContract): FreezePayload {
     harness_globs: contract.harnessGlobs,
     reference_command: contract.referenceCommand,
     burn_in_ms: contract.burnInMs,
+    clock_lock: contract.clockLock,
   };
 }
 
@@ -761,6 +778,9 @@ BASELINE_FILE='.kernel/baseline.tsv'
 PAIRING_ENABLED=${contract.referenceCommand === null ? "0" : "1"}
 REF_CMD=${shQuote(contract.referenceCommand ?? "")}
 BURN_IN_MS=${contract.burnInMs}
+CLOCK_LOCK_SM=${contract.clockLock === null ? "''" : contract.clockLock.sm}
+CLOCK_LOCK_MEM=${contract.clockLock?.mem === null || contract.clockLock === null ? "''" : contract.clockLock.mem}
+CLOCK_LOCK_DECLARED=${contract.clockLock === null ? "0" : "1"}
 BURN_IN_MAX_RUNS=${BURN_IN_MAX_RUNS}
 PAIR_MIN_RATIOS=${PAIR_MIN_RATIOS}
 PAIR_SPREAD_MAX_PCT=${PAIR_SPREAD_MAX_PCT}
@@ -794,6 +814,10 @@ GPU_ERROR=''
 GPU_NAME=''
 GPU_INDEX=''
 GPU_SAMPLE_START=''
+GPU_SAMPLE_LOADED=''
+GPU_LOADED_SM=''
+GPU_LOADED_MAX=''
+GPU_LOADED_UTIL=''
 GPU_SAMPLE_END=''
 CELL_JSON=()
 HOST_ENQUEUE_VALUES=()
@@ -908,12 +932,20 @@ gpu_probe() {
     return 0
   fi
 
-  local idx name csm cmem util foreign body sep n
+  local idx name csm cmem util cmax foreign body sep n
   idx=$(printf '%s\\n' "$row" | awk -F',' '{ v=$1; gsub(/[[:space:]]/,"",v); print v }')
   name=$(printf '%s\\n' "$row" | awk -F',' '{ v=$2; for (i=3; i<=NF-3; i++) v=v","$i; sub(/^[[:space:]]+/,"",v); sub(/[[:space:]]+$/,"",v); print v }')
   csm=$(printf '%s\\n' "$row" | awk -F',' '{ v=$(NF-2); gsub(/[[:space:]]/,"",v); print v }')
   cmem=$(printf '%s\\n' "$row" | awk -F',' '{ v=$(NF-1); gsub(/[[:space:]]/,"",v); print v }')
   util=$(printf '%s\\n' "$row" | awk -F',' '{ v=$NF; gsub(/[[:space:]]/,"",v); print v }')
+  # A separate, best-effort query: a driver that does not know clocks.max.sm must
+  # not cost the whole sample, so its absence is a missing field, not an error.
+  cmax=''
+  if [[ -n "$first" && "$first" =~ ^[0-9]+$ ]]; then
+    cmax=$(nvidia-smi -i "$first" --query-gpu=clocks.max.sm --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d '[:space:]' || true)
+  else
+    cmax=$(nvidia-smi --query-gpu=clocks.max.sm --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d '[:space:]' || true)
+  fi
   foreign=$(foreign_mib "$first")
 
   GPU_AVAILABLE=1
@@ -924,15 +956,21 @@ gpu_probe() {
 
   body=''
   sep=''
-  if n=$(json_number "$csm"); then body="\${body}\${sep}\\"clocksSmMhz\\":\${n}"; sep=','; fi
-  if n=$(json_number "$cmem"); then body="\${body}\${sep}\\"clocksMemMhz\\":\${n}"; sep=','; fi
-  if n=$(json_number "$util"); then body="\${body}\${sep}\\"utilPct\\":\${n}"; sep=','; fi
-  if [[ "$foreign" =~ ^[0-9]+$ ]]; then body="\${body}\${sep}\\"foreignProcessMiB\\":\${foreign}"; sep=','; fi
+  if n=$(json_number "$csm"); then body="\${body}\${sep}\\"clocksSmMhz\\":\${n}"; sep=\',\'; fi
+  if n=$(json_number "$cmem"); then body="\${body}\${sep}\\"clocksMemMhz\\":\${n}"; sep=\',\'; fi
+  if n=$(json_number "$util"); then body="\${body}\${sep}\\"utilPct\\":\${n}"; sep=\',\'; fi
+  if [[ "$foreign" =~ ^[0-9]+$ ]]; then body="\${body}\${sep}\\"foreignProcessMiB\\":\${foreign}"; sep=\',\'; fi
+  if n=$(json_number "$cmax"); then body="\${body}\${sep}\\"clocksMaxSmMhz\\":\${n}"; sep=\',\'; fi
 
-  if [[ "$phase" == 'start' ]]; then
-    GPU_SAMPLE_START="{\${body}}"
-  else
-    GPU_SAMPLE_END="{\${body}}"
+  case "$phase" in
+    start)  GPU_SAMPLE_START="{\${body}}" ;;
+    loaded) GPU_SAMPLE_LOADED="{\${body}}" ;;
+    *)      GPU_SAMPLE_END="{\${body}}" ;;
+  esac
+  if [[ "$phase" == "loaded" ]]; then
+    GPU_LOADED_SM="$csm"
+    GPU_LOADED_MAX="$cmax"
+    GPU_LOADED_UTIL="$util"
   fi
   return 0
 }
@@ -1120,6 +1158,7 @@ emit_reading() {
     if [[ -n "$GPU_INDEX" ]] && w=$(json_number "$GPU_INDEX"); then gpu_json="\${gpu_json},\\"index\\":\${w}"; fi
     if [[ -n "$VISIBLE" ]]; then gpu_json="\${gpu_json},\\"visible\\":$(json_string "$VISIBLE")"; fi
     if [[ -n "$GPU_SAMPLE_START" ]]; then gpu_json="\${gpu_json},\\"start\\":\${GPU_SAMPLE_START}"; fi
+    if [[ -n "$GPU_SAMPLE_LOADED" ]]; then gpu_json="\${gpu_json},\\"loaded\\":\${GPU_SAMPLE_LOADED}"; fi
     if [[ -n "$GPU_SAMPLE_END" ]]; then gpu_json="\${gpu_json},\\"end\\":\${GPU_SAMPLE_END}"; fi
     gpu_json="\${gpu_json}}"
     if [[ -z "$VISIBLE" ]]; then
@@ -1158,6 +1197,39 @@ emit_reading() {
     if n=$(json_number "$PAIR_SPREAD_PCT"); then pairing_json="\${pairing_json},\\"pairSpreadPct\\":\${n}"; fi
   fi
 
+  # Clock lock: a declared lock is recorded with what the loaded sample observed.
+  # held is null when no lock was declared — an undeclared lock is invisible to
+  # nvidia-smi, and claiming otherwise would be a fabricated pass.
+  lock_json=\'\'
+  if [[ "$CLOCK_LOCK_DECLARED" == \'1\' ]]; then
+    lock_json="\\"clockLocked\\":{\\"declaredSmMhz\\":\${CLOCK_LOCK_SM}"
+    if [[ -n "$CLOCK_LOCK_MEM" ]]; then lock_json="\${lock_json},\\"declaredMemMhz\\":\${CLOCK_LOCK_MEM}"; fi
+    if [[ -n "$GPU_LOADED_SM" ]]; then
+      observed="$GPU_LOADED_SM"
+      lock_json="\${lock_json},\\"observedSmMhz\\":\${observed}"
+      if awk -v o="$observed" -v d="$CLOCK_LOCK_SM" \'BEGIN { exit (o < d - 50 || o > d + 50) ? 1 : 0 }\'; then
+        lock_json="\${lock_json},\\"held\\":true"
+      else
+        lock_json="\${lock_json},\\"held\\":false"
+        WARNINGS+=("clock lock declared at \${CLOCK_LOCK_SM} MHz but the loaded sample read \${observed} MHz: the lock did not hold, so this reading\'s clocks are not the ones the contract names")
+      fi
+    fi
+    lock_json="\${lock_json}}"
+  fi
+
+  # A busy card that sits far below its own max clock is either locked or capped.
+  # Unnamed, it looks like ordinary load and the number is read as if unlocked.
+  if [[ "$CLOCK_LOCK_DECLARED" != \'1\' && -n "$GPU_SAMPLE_LOADED" ]]; then
+    loaded_sm="$GPU_LOADED_SM"
+    loaded_max="$GPU_LOADED_MAX"
+    loaded_util="$GPU_LOADED_UTIL"
+    if [[ -n "$loaded_sm" && -n "$loaded_max" && -n "$loaded_util" ]] && awk -v u="$loaded_util" 'BEGIN { exit (u >= 50) ? 0 : 1 }'; then
+      if awk -v o="$loaded_sm" -v m="$loaded_max" 'BEGIN { exit (o < 0.9 * m) ? 0 : 1 }'; then
+        WARNINGS+=("the card was busy ($loaded_util %) at $loaded_sm MHz of its $loaded_max MHz max: a clock lock or a power/thermal cap is in force, and this reading's clocks are not the card's free-running ones")
+      fi
+    fi
+  fi
+
   warnings_json=''
   sep=''
   for w in \${WARNINGS[@]+"\${WARNINGS[@]}"}; do
@@ -1178,6 +1250,8 @@ emit_reading() {
   if [[ -n "$reason" ]]; then printf ',"hostBoundReason":%s' "$(json_string "$reason")"; fi
   printf '%s' "$pairing_json"
   printf ',"startedAt":%s,"finishedAt":%s' "$(json_string "$STARTED_AT")" "$(json_string "$finished")"
+  if [[ -n "$lock_json" ]]; then printf ',%s' "$lock_json"; fi
+  printf ',"hostEnqueueSamples":%s,"deviceSamples":%s' "$HOST_ENQUEUE_SAMPLES" "$DEVICE_SAMPLES"
   if [[ -n "$NVIDIA_SMI_VERSION" ]]; then printf ',"nvidiaSmi":%s' "$(json_string "$NVIDIA_SMI_VERSION")"; fi
   printf ',"warnings":[%s]}\\n' "$warnings_json"
   printf '%s\\n' "$READING_END"
@@ -1386,9 +1460,16 @@ ${GROUP_EXPORTS}
   fi
 done
 
+# Sampled after the last measured window: start is taken before any work and
+# therefore always shows the parked clock, so the block needs one sample taken
+# while the card was busy to say what it actually ran at.
+gpu_probe 'loaded'
+
 if [[ \${#DEVICE_VALUES[@]} -gt 0 || \${#HOST_ENQUEUE_VALUES[@]} -gt 0 ]]; then
   BASIS_SOURCE='task-reported'
 fi
+HOST_ENQUEUE_SAMPLES=$(printf '%s' "\${#HOST_ENQUEUE_VALUES[@]}")
+DEVICE_SAMPLES=$(printf '%s' "\${#DEVICE_VALUES[@]}")
 
 # --- pairing admission ------------------------------------------------------
 # mirrored only when every cell mirrored and gave two ratios that agree inside

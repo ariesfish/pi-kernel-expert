@@ -62,6 +62,20 @@ export interface GpuSample {
   utilPct?: number;
   /** Memory held by processes that are not this run. > 0 means contended. */
   foreignProcessMiB?: number;
+  /** The card's own maximum SM clock, so a loaded sample can be read against it. */
+  clocksMaxSmMhz?: number;
+}
+
+/**
+ * A clock lock the contract declared, with what the loaded sample observed.
+ * `held` is absent when no lock was declared: nvidia-smi cannot report a lock,
+ * so an undeclared one is invisible and must not be claimed as "not locked".
+ */
+export interface ClockLock {
+  declaredSmMhz: number;
+  declaredMemMhz?: number;
+  observedSmMhz?: number;
+  held?: boolean;
 }
 
 export interface ReadingGpu {
@@ -73,6 +87,8 @@ export interface ReadingGpu {
   /** `CUDA_VISIBLE_DEVICES` as inherited: the claim, when the run made one. */
   visible?: string;
   start?: GpuSample;
+  /** Sampled after the last measured window, while the card was still busy. */
+  loaded?: GpuSample;
   end?: GpuSample;
 }
 
@@ -114,6 +130,10 @@ export interface KernelReading {
   hostBoundReason?: string;
   startedAt: string;
   finishedAt: string;
+  /** How many device_ms / host_enqueue_ms figures the ratio was built from. */
+  hostEnqueueSamples?: number;
+  deviceSamples?: number;
+  clockLocked?: ClockLock;
   /**
    * Written by the generated script when the contract names a reference; absent
    * on a reading taken before pairing existed (the field is additive, so
@@ -221,13 +241,41 @@ function readingIssues(record: Record<string, unknown>): string[] {
     issues.push(`basisSource must be one of ${BASIS_SOURCE_VALUES.join(", ")}, got ${JSON.stringify(record.basisSource ?? null)}`);
   }
 
+  for (const key of ["hostEnqueueSamples", "deviceSamples"] as const) {
+    if (record[key] !== undefined && (!Number.isInteger(record[key]) || (record[key] as number) < 0)) {
+      issues.push(`${key} must be a non-negative integer when present`);
+    }
+  }
+  if (record.clockLocked !== undefined) {
+    if (!isPlainObject(record.clockLocked)) {
+      issues.push("clockLocked must be an object when present");
+    } else {
+      const lock = record.clockLocked as Record<string, unknown>;
+      if (!isFiniteNumber(lock.declaredSmMhz)) issues.push("clockLocked.declaredSmMhz must be a number");
+      if (lock.declaredMemMhz !== undefined && !isFiniteNumber(lock.declaredMemMhz)) {
+        issues.push("clockLocked.declaredMemMhz must be a number when present");
+      }
+      if (lock.observedSmMhz !== undefined && !isFiniteNumber(lock.observedSmMhz)) {
+        issues.push("clockLocked.observedSmMhz must be a number when present");
+      }
+      if (lock.held !== undefined && typeof lock.held !== "boolean") {
+        issues.push("clockLocked.held must be a boolean when present");
+      }
+      // A lock claimed to hold without an observation is a claim with no reading
+      // behind it: refuse it rather than let a producer assert its own compliance.
+      if (lock.held === true && !isFiniteNumber(lock.observedSmMhz)) {
+        issues.push("clockLocked.held is true but no observedSmMhz was recorded");
+      }
+    }
+  }
+
   if (!isPlainObject(record.gpu) || typeof record.gpu.available !== "boolean") {
     issues.push("gpu must be an object with a boolean available");
   } else {
     if (record.gpu.available === false && (typeof record.gpu.error !== "string" || record.gpu.error.trim() === "")) {
       issues.push("gpu.available is false but gpu.error is missing");
     }
-    for (const phase of ["start", "end"] as const) {
+    for (const phase of ["start", "loaded", "end"] as const) {
       const sample = record.gpu[phase];
       if (sample !== undefined && !isPlainObject(sample)) {
         issues.push(`gpu.${phase} must be an object when present`);
