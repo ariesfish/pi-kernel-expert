@@ -105,6 +105,7 @@ export function writeWikiCandidate(options: WikiCandidateOptions): WikiCandidate
     contract,
     candidateIds: prefill.candidateIds,
     profileRunIds: prefill.profileRunIds,
+    contractSha: contractOutcome.ok ? contractOutcome.sha : null,
     workspaceFiles: workspaceFiles(workspace),
     corpusPageIds,
     wikiCandidateIds: readCandidateEntryIds(workspace),

@@ -487,3 +487,17 @@ test("the extension registers kernel_wiki_candidate, and it writes under ctx.cwd
   assert.match(refused.content[0].text, /entry-id-shape double-buffer-smem-tile/);
   assert.match(refused.content[0].text, /entry-trigger-category Trigger/);
 });
+
+test("a reading can cite its own contract, so an entry written before the ledger row still resolves", () => {
+  const base = model({ confidence: "verified", sources: [] });
+  const ctx = { ...CONTEXT, contractSha: "abc123def456789012345678901234567890123456789012345678901234567890" };
+
+  const unresolved = validateEntry(base, ctx);
+  assert.deepEqual(unresolved.map((problem) => problem.rule), ["entry-unverified-source"]);
+
+  const cited = validateEntry({ ...base, sources: ["contract:abc123def456"] }, ctx);
+  assert.deepEqual(cited, [], "a 12-char prefix of this workspace's contract sha resolves");
+
+  const wrongContract = validateEntry({ ...base, sources: ["contract:ffffffffffff"] }, ctx);
+  assert.deepEqual(wrongContract.map((problem) => problem.rule), ["entry-unverified-source"]);
+});

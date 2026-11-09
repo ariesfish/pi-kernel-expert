@@ -25,6 +25,7 @@
  * The refusal message is `${rule} ${section-or-id}: ${what} Fix: ${fix}`, the
  * same shape `milestone.ts` and `refusals.ts` use, so one line is one edit.
  */
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -142,6 +143,8 @@ export interface EntryContext {
   candidateIds?: readonly string[];
   /** `profile/<run>` directories that exist. */
   profileRunIds?: readonly string[];
+  /** The current `kernel.contract.json` sha256, so a reading can cite itself. */
+  contractSha?: string | null;
   /** Workspace-relative file paths an entry must not name. */
   workspaceFiles?: readonly string[];
   /** Page ids in the cached corpus; `null` when the corpus is not cached. */
@@ -478,7 +481,7 @@ function unverifiedSource(entry: WikiEntryModel, ctx: EntryContext): WikiEntryPr
     makeProblem(
       "entry-unverified-source",
       "sources",
-      `confidence is "verified" with ${listed}, and nothing in this workspace resolves: a candidate id from candidates.jsonl or a profile/<run> directory. Verified means this workspace measured it, not that a page said so.`,
+      `confidence is "verified" with ${listed}, and nothing in this workspace resolves: a candidate id from candidates.jsonl, a profile/<run> directory, or contract:<sha> for a reading's own contract. Verified means this workspace measured it, not that a page said so.`,
       `cite the candidate id or the profile run that measured it, or lower confidence to "source-reported" (a source reported it) or "inferred" (nothing measured it here)`,
     ),
   ];
@@ -574,6 +577,14 @@ export function resolvesSource(source: string, ctx: EntryContext): boolean {
   const token = source.trim();
   if (token === "") return false;
   if ((ctx.candidateIds ?? []).includes(token)) return true;
+  // A goal.sh reading identities itself by the contract it ran under, so a run
+  // that has no candidate yet — the common case, since the entry is written
+  // before the ledger row that cites it — can still be sourced.
+  const contractPointer = /^contract:([0-9a-f]{12,64})$/.exec(token);
+  if (contractPointer) {
+    const sha = ctx.contractSha ?? "";
+    return sha.startsWith(contractPointer[1]);
+  }
   const pointer = /^profile[/:](.+)$/.exec(token);
   const run = pointer ? pointer[1].trim() : token;
   return (ctx.profileRunIds ?? []).includes(run);
@@ -638,15 +649,19 @@ export function prefillFromWorkspace(options: PrefillOptions): WorkspacePrefill 
     }
   }
 
+  const contractSha = readContractSha(options.workspace);
   const sources: string[] = [];
   const unresolvedSources: string[] = [];
   for (const raw of options.sources ?? []) {
     const token = raw.trim();
     if (token === "") continue;
+    const contractPointer = /^contract:([0-9a-f]{12,64})$/.exec(token);
     const pointer = /^profile[/:](.+)$/.exec(token);
     const normalized = pointer ? pointer[1].trim() : token;
     const resolves =
-      candidateIds.includes(normalized) || profileRunIds.includes(normalized);
+      candidateIds.includes(normalized) ||
+      profileRunIds.includes(normalized) ||
+      (contractPointer !== null && (contractSha ?? "").startsWith(contractPointer[1]));
     if (!resolves) {
       if (!unresolvedSources.includes(token)) unresolvedSources.push(token);
     }
@@ -676,6 +691,17 @@ export function prefillFromWorkspace(options: PrefillOptions): WorkspacePrefill 
     unresolvedSources,
     profileCited,
   };
+}
+
+/** The workspace contract's own sha, so a `contract:<sha>` source can resolve. */
+function readContractSha(workspace: string): string | null {
+  try {
+    const file = path.join(workspace, "kernel.contract.json");
+    if (!fs.existsSync(file)) return null;
+    return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+  } catch {
+    return null;
+  }
 }
 
 interface ProfileSummaryView {
