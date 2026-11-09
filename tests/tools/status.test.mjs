@@ -8,7 +8,15 @@ test("extension registers the command, the tools, and the discovery handler", ()
   const pi = fakePi();
   kernelExpertExtension(pi);
   assert.deepEqual([...pi.commands.keys()], ["kernel-expert"]);
-  assert.deepEqual([...pi.tools.keys()].sort(), ["kernel_bootstrap", "kernel_candidate", "kernel_contract", "kernel_init", "kernel_profile", "kernel_wiki"]);
+  assert.deepEqual([...pi.tools.keys()].sort(), [
+    "kernel_bootstrap",
+    "kernel_candidate",
+    "kernel_contract",
+    "kernel_init",
+    "kernel_milestone",
+    "kernel_profile",
+    "kernel_wiki",
+  ]);
   assert.equal(pi.handlers.get("resources_discover")?.length, 1);
 });
 
