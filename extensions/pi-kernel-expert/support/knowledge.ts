@@ -118,7 +118,7 @@ export function formatKnowledgeReport(report: KnowledgeReport): string {
     `pi-kernel-expert ${report.version}`,
     `  loop engine   pi-goal ${loopEngine}`,
     `  ncu skill     ${ncu}`,
-    `  KernelWiki    ${wiki}`,
+    `  kernel-wiki   ${wiki}`,
   ].join("\n");
 }
 
@@ -128,7 +128,7 @@ function shorten(revision: string | null): string {
 
 export function knowledgeSummary(report: KnowledgeReport): string {
   const wiki = report.kernelWiki.present ? "cached" : "missing";
-  return `ncu=${report.ncu.present ? "vendored" : "missing"} KernelWiki=${wiki} pi-goal=${report.loopEngine.state}`;
+  return `ncu=${report.ncu.present ? "vendored" : "missing"} kernel-wiki=${wiki} pi-goal=${report.loopEngine.state}`;
 }
 
 export { KERNEL_WIKI_SKILL, NCU_SKILL };

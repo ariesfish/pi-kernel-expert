@@ -23,8 +23,8 @@ test("PI_CODING_AGENT_DIR overrides the agent directory", () => {
 
 test("KernelWiki cache path carries the pinned revision", () => {
   const layout = agentLayout({ PI_CODING_AGENT_DIR: "/srv/pi-agent" }, "/home/tester");
-  assert.equal(layout.kernelWikiDir, path.join(layout.cacheDir, `KernelWiki@${KERNEL_WIKI_PIN}`));
-  assert.equal(KERNEL_WIKI_PIN, "b6b4301f15e8ce6955a56776690643ce5db369e6");
+  assert.equal(layout.kernelWikiDir, path.join(layout.cacheDir, `kernel-wiki@${KERNEL_WIKI_PIN}`));
+  assert.equal(KERNEL_WIKI_PIN, "c18b44efa8cab3e3a35bc69810f793e19bb75dbe");
 });
 
 test("package root resolves three levels up from a support module", () => {

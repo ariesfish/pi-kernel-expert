@@ -4,6 +4,15 @@
 
 ### Changed
 
+- The fetched corpus is now **`kernel-wiki`**, our own pinned copy of
+  mit-han-lab/KernelWiki (`b0cd75891e10`): the skill name is Agent Skills
+  compliant, so the corpus loads without a warning; the 19 files marked
+  `LicenseRef-NvidiaProprietary` are removed at the source and listed in its
+  `SANITIZED.yaml` (the fetch still scans for the marker); page ids are frozen.
+  The cache directory moves to `kernel-wiki@<pin>`, so an existing
+  `KernelWiki@…` cache is orphaned and one `kernel_bootstrap` replaces it. See
+  ADR 0007.
+
 - **Breaking**: `kernel.contract.json` is now schema v2. A v1 or unversioned
   contract is refused at read time with "regenerate with kernel_contract";
   there is no migration. See `docs/adr/0006-contract-v2-reading-provenance.md`.

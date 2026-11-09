@@ -19,8 +19,8 @@ function writeSkill(dir, name) {
 
 test("finds a conflicting skill declared by frontmatter", () => {
   const root = tempDir("pi-kernel-expert-skills-");
-  writeSkill(path.join(root, "some-dir"), "KernelWiki");
-  const conflict = findSkillConflict([{ path: root, label: "test root" }], "KernelWiki");
+  writeSkill(path.join(root, "some-dir"), "kernel-wiki");
+  const conflict = findSkillConflict([{ path: root, label: "test root" }], "kernel-wiki");
   assert.ok(conflict);
   assert.equal(conflict.path, path.join(root, "some-dir"));
   assert.equal(conflict.label, "test root");
@@ -28,16 +28,16 @@ test("finds a conflicting skill declared by frontmatter", () => {
 
 test("falls back to the directory name when frontmatter has no name", () => {
   const root = tempDir("pi-kernel-expert-skills-");
-  fs.mkdirSync(path.join(root, "KernelWiki"), { recursive: true });
-  fs.writeFileSync(path.join(root, "KernelWiki", "SKILL.md"), "---\ndescription: no name\n---\n");
-  assert.ok(findSkillConflict([{ path: root, label: "root" }], "KernelWiki"));
+  fs.mkdirSync(path.join(root, "kernel-wiki"), { recursive: true });
+  fs.writeFileSync(path.join(root, "kernel-wiki", "SKILL.md"), "---\ndescription: no name\n---\n");
+  assert.ok(findSkillConflict([{ path: root, label: "root" }], "kernel-wiki"));
 });
 
 test("no conflict for a differently named skill or a missing root", () => {
   const root = tempDir("pi-kernel-expert-skills-");
   writeSkill(path.join(root, "other"), "other-skill");
-  assert.equal(findSkillConflict([{ path: root, label: "root" }], "KernelWiki"), null);
-  assert.equal(findSkillConflict([{ path: path.join(root, "absent"), label: "root" }], "KernelWiki"), null);
+  assert.equal(findSkillConflict([{ path: root, label: "root" }], "kernel-wiki"), null);
+  assert.equal(findSkillConflict([{ path: path.join(root, "absent"), label: "root" }], "kernel-wiki"), null);
 });
 
 test("skill roots cover user, project, and agents locations", () => {
@@ -56,7 +56,7 @@ test("registration registers the cache when nothing conflicts", () => {
   const cwd = tempDir("pi-kernel-expert-cwd-");
   fs.mkdirSync(path.join(cwd, ".git"));
   const layout = agentLayout({ PI_CODING_AGENT_DIR: agentDir }, "/home/tester");
-  writeSkill(layout.kernelWikiDir, "KernelWiki");
+  writeSkill(layout.kernelWikiDir, "kernel-wiki");
 
   const plan = planKernelWikiRegistration({ cwd, layout, home: "/home/tester" });
   assert.equal(plan.present, true);
@@ -70,9 +70,9 @@ test("registration yields to an existing installation and names it", () => {
   const cwd = tempDir("pi-kernel-expert-cwd-");
   fs.mkdirSync(path.join(cwd, ".git"));
   const layout = agentLayout({ PI_CODING_AGENT_DIR: agentDir }, "/home/tester");
-  writeSkill(layout.kernelWikiDir, "KernelWiki");
-  const existing = path.join(cwd, ".pi", "skills", "KernelWiki");
-  writeSkill(existing, "KernelWiki");
+  writeSkill(layout.kernelWikiDir, "kernel-wiki");
+  const existing = path.join(cwd, ".pi", "skills", "kernel-wiki");
+  writeSkill(existing, "kernel-wiki");
 
   const plan = planKernelWikiRegistration({ cwd, layout, home: "/home/tester" });
   assert.equal(plan.present, true);

@@ -2,19 +2,23 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const KERNEL_WIKI_SKILL = "KernelWiki";
+export const KERNEL_WIKI_SKILL = "kernel-wiki";
 export const NCU_SKILL = "ncu-report-skill";
 
 /**
- * KernelWiki revision this package fetches.
+ * The corpus this package fetches: our own maintained copy of
+ * mit-han-lab/KernelWiki (MIT), pinned by commit.
  *
- * Chosen for the bundled pure-Python YAML fallback (upstream commit 7073fac),
- * so the query tools run without host PyYAML. The revision still carries 19
- * files marked LicenseRef-NvidiaProprietary — the same count as kda's older
- * pin — so the fetch prunes them and records the removal in SANITIZED.yaml.
+ * Three differences from upstream, recorded in ADR 0007: the skill is named
+ * `kernel-wiki` so Agent Skills runtimes load it without a warning; the 19 files
+ * marked LicenseRef-NvidiaProprietary are removed at the source and listed in
+ * SANITIZED.yaml; and page ids are frozen because ids are the citation contract.
+ * The fetch still scans for the restricted marker — an absence it did not
+ * verify is an absence it cannot claim.
+ *
  * Updating this pin means updating THIRD_PARTY_NOTICES.md and the changelog.
  */
-export const KERNEL_WIKI_PIN = "b6b4301f15e8ce6955a56776690643ce5db369e6";
+export const KERNEL_WIKI_PIN = "c18b44efa8cab3e3a35bc69810f793e19bb75dbe";
 
 export interface AgentLayout {
   /** Pi's agent directory; `PI_CODING_AGENT_DIR` overrides the default. */

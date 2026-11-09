@@ -3,7 +3,7 @@ import * as path from "node:path";
 
 import type { HostExec } from "../support/exec.ts";
 
-export const KERNEL_WIKI_REMOTE = "https://github.com/mit-han-lab/KernelWiki.git";
+export const KERNEL_WIKI_REMOTE = "https://github.com/ariesfish/kernel-wiki.git";
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SKILL_NAME_RULE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -225,14 +225,14 @@ async function readRevision(
   return result.code === 0 ? result.stdout.trim() : null;
 }
 
-/** KernelWiki's SKILL.md name is not Agent Skills compliant; pi loads it with a warning. */
+/** The pinned corpus declares a compliant name; a non-compliant one is reported, not fixed. */
 function nameWarnings(dir: string): string[] {
   try {
     const text = fs.readFileSync(path.join(dir, "SKILL.md"), "utf8");
     const name = /^name:\s*(.+?)\s*$/m.exec(/^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? "")?.[1];
     if (!name) return [`${dir}/SKILL.md declares no name; pi falls back to the directory name`];
     if (!SKILL_NAME_RULE.test(name)) {
-      return [`upstream skill name "${name}" is not Agent Skills compliant; pi loads it with a warning`];
+      return [`corpus skill name "${name}" is not Agent Skills compliant; pi loads it with a warning`];
     }
   } catch {
     // unreadable SKILL.md is caught by the caller's existence check
@@ -249,10 +249,10 @@ function tail(text: string, maxChars = 600): string {
 export function formatFetchResult(result: FetchResult): string {
   const lines: string[] = [];
   if (result.state === "already") {
-    lines.push(`KernelWiki already cached at ${result.path}`);
+    lines.push(`kernel-wiki already cached at ${result.path}`);
     lines.push(`revision ${result.revision} matches the pin.`);
   } else if (result.state === "installed") {
-    lines.push(`KernelWiki fetched to ${result.path}`);
+    lines.push(`kernel-wiki fetched to ${result.path}`);
     lines.push(`revision ${result.revision} verified against the pin.`);
     lines.push("Run /reload so pi registers the fetched skill.");
   } else {

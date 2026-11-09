@@ -34,5 +34,5 @@ test("kernel-expert command reports the three knowledge facts", async () => {
   assert.match(message, /pi-kernel-expert/);
   assert.match(message, /loop engine/);
   assert.match(message, /ncu skill/);
-  assert.match(message, /KernelWiki/);
+  assert.match(message, /kernel-wiki/);
 });

@@ -56,7 +56,7 @@ function hostExec() {
 
 test("installs the pinned revision, not the branch tip", async () => {
   const source = makeSourceRepo();
-  const target = path.join(tempDir("pi-kernel-expert-cache-"), "KernelWiki@pin");
+  const target = path.join(tempDir("pi-kernel-expert-cache-"), "kernel-wiki@pin");
 
   const result = await fetchPinnedCorpus({
     remote: source.dir,
@@ -74,7 +74,7 @@ test("installs the pinned revision, not the branch tip", async () => {
 
 test("a second fetch reports already and does not re-clone", async () => {
   const source = makeSourceRepo();
-  const target = path.join(tempDir("pi-kernel-expert-cache-"), "KernelWiki@pin");
+  const target = path.join(tempDir("pi-kernel-expert-cache-"), "kernel-wiki@pin");
   const exec = hostExec();
 
   const first = await fetchPinnedCorpus({ remote: source.dir, pin: source.first, targetDir: target, exec });
@@ -95,7 +95,7 @@ test("a second fetch reports already and does not re-clone", async () => {
 test("a wrong pin is refused and leaves no target or temp directory", async () => {
   const source = makeSourceRepo();
   const parent = tempDir("pi-kernel-expert-cache-");
-  const target = path.join(parent, "KernelWiki@pin");
+  const target = path.join(parent, "kernel-wiki@pin");
 
   const result = await fetchPinnedCorpus({
     remote: source.dir,
@@ -112,7 +112,7 @@ test("a wrong pin is refused and leaves no target or temp directory", async () =
 
 test("an existing tree at another revision is refused, not overwritten", async () => {
   const source = makeSourceRepo();
-  const target = path.join(tempDir("pi-kernel-expert-cache-"), "KernelWiki@pin");
+  const target = path.join(tempDir("pi-kernel-expert-cache-"), "kernel-wiki@pin");
   await fetchPinnedCorpus({ remote: source.dir, pin: source.first, targetDir: target, exec: hostExec() });
 
   const result = await fetchPinnedCorpus({
@@ -129,7 +129,7 @@ test("an existing tree at another revision is refused, not overwritten", async (
 
 test("a directory without SKILL.md is refused untouched", async () => {
   const parent = tempDir("pi-kernel-expert-cache-");
-  const target = path.join(parent, "KernelWiki@pin");
+  const target = path.join(parent, "kernel-wiki@pin");
   fs.mkdirSync(target);
   fs.writeFileSync(path.join(target, "notes.txt"), "mine\n");
 
@@ -161,10 +161,10 @@ test("a malformed pin is refused before any process runs", async () => {
 
 test("formatFetchResult names the reload step after an install", async () => {
   const source = makeSourceRepo();
-  const target = path.join(tempDir("pi-kernel-expert-cache-"), "KernelWiki@pin");
+  const target = path.join(tempDir("pi-kernel-expert-cache-"), "kernel-wiki@pin");
   const result = await fetchPinnedCorpus({ remote: source.dir, pin: source.first, targetDir: target, exec: hostExec() });
   const text = formatFetchResult(result);
-  assert.match(text, /KernelWiki fetched to/);
+  assert.match(text, /kernel-wiki fetched to/);
   assert.match(text, /Run \/reload/);
   assert.match(text, new RegExp(source.first));
 });
@@ -187,7 +187,7 @@ test("restricted artifact headers are pruned and recorded", async () => {
   git(["commit", "-q", "-m", "restricted"], source.dir);
   const pin = git(["rev-parse", "HEAD"], source.dir);
 
-  const target = path.join(tempDir("pi-kernel-expert-cache-"), "KernelWiki@pin");
+  const target = path.join(tempDir("pi-kernel-expert-cache-"), "kernel-wiki@pin");
   const result = await fetchPinnedCorpus({ remote: source.dir, pin, targetDir: target, exec: hostExec() });
 
   assert.equal(result.state, "installed");
@@ -218,7 +218,7 @@ test("an already-cached tree is repaired when a restricted file reappears", asyn
   git(["commit", "-q", "-m", "artifacts"], source.dir);
   const pin = git(["rev-parse", "HEAD"], source.dir);
 
-  const target = path.join(tempDir("pi-kernel-expert-cache-"), "KernelWiki@pin");
+  const target = path.join(tempDir("pi-kernel-expert-cache-"), "kernel-wiki@pin");
   await fetchPinnedCorpus({ remote: source.dir, pin, targetDir: target, exec: hostExec() });
 
   const reintroduced = path.join(target, "artifacts", "x", "b.py");
@@ -241,7 +241,7 @@ test("repairs keep the earlier removals in the record", async () => {
   git(["commit", "-q", "-m", "artifacts"], source.dir);
   const pin = git(["rev-parse", "HEAD"], source.dir);
 
-  const target = path.join(tempDir("pi-kernel-expert-cache-"), "KernelWiki@pin");
+  const target = path.join(tempDir("pi-kernel-expert-cache-"), "kernel-wiki@pin");
   const first = await fetchPinnedCorpus({ remote: source.dir, pin, targetDir: target, exec: hostExec() });
   assert.match(first.warnings.join("\n"), /removed 1 file/);
 

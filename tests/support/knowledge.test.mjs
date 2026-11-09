@@ -75,6 +75,6 @@ test("report states the vendored skill and the missing corpus", () => {
   const text = formatKnowledgeReport(report);
   assert.match(text, /pi-kernel-expert \d+\.\d+\.\d+/);
   assert.match(text, /ncu skill {5}vendored @c7980a43cb88/);
-  assert.match(text, new RegExp(`KernelWiki {4}not cached — pin ${KERNEL_WIKI_PIN.slice(0, 12)}, run kernel_bootstrap`));
+  assert.match(text, new RegExp(`kernel-wiki\\s+not cached — pin ${KERNEL_WIKI_PIN.slice(0, 12)}, run kernel_bootstrap`));
   assert.match(text, /loop engine {3}pi-goal installed/);
 });

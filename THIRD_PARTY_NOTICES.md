@@ -19,23 +19,26 @@ is upstream-owned: fix bugs upstream, then re-sync, rather than editing it here.
 
 ## Fetched at runtime, not distributed
 
-### KernelWiki
+### kernel-wiki (formerly KernelWiki)
 
-- Source: <https://github.com/mit-han-lab/KernelWiki>
-- Fetched revision: `b6b4301f15e8ce6955a56776690643ce5db369e6` (upstream HEAD when
-  adopted; bundles the pure-Python YAML fallback).
-- Sanitization: the upstream tree at this revision carries 19 files marked
-  `LicenseRef-NvidiaProprietary`. The fetcher deletes every `artifacts/` file
-  whose body carries that marker and records the paths in the cache's
-  `SANITIZED.yaml`. kda's older pin carries the same 19 files; the omission is
-  not upstream.
+- Source: <https://github.com/ariesfish/kernel-wiki> — a maintained copy of
+  <https://github.com/mit-han-lab/KernelWiki> (MIT, Copyright (c) 2026 hanlab).
+  Divergence, recorded in ADR 0007: the skill is named `kernel-wiki` so Agent
+  Skills runtimes load it without a warning; page ids are frozen because ids are
+  the citation contract; and the sanitization below happened at the source.
+- Fetched revision: `b0cd75891e107c81689eb723f5b2cc281b9c1889`.
+- Sanitization: upstream carries 19 files marked `LicenseRef-NvidiaProprietary`;
+  they are removed in the copy and listed in its `SANITIZED.yaml`. The fetcher
+  still scans every `artifacts/` file for that marker and refuses nothing it
+  finds — an absence it did not verify is an absence it cannot claim — so the
+  normal result is "0 removed".
 - License: MIT for original KernelWiki material (Copyright (c) 2026 hanlab);
   verbatim artifact bundles under `artifacts/` retain their upstream terms.
 - License text: `third_party_licenses/MIT-hanlab.txt`
 
-This package does not ship KernelWiki content. The bootstrap fetch clones the
-recorded revision into the user's pi agent directory and prunes the restricted
-files before installing it. The terms that apply to the remaining tree are the
+This package does not ship the corpus. The bootstrap fetch clones the recorded
+revision into the user's pi agent directory and verifies the restricted files are
+absent before installing it. The terms that apply to the remaining tree are the
 upstream ones, including per-bundle `PROVENANCE.yaml` records under
 `artifacts/`.
 
