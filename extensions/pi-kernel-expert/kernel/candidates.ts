@@ -92,7 +92,16 @@ export interface CandidateRecord {
   forcedReason: string | null;
   /** The refusals `forceWithReason` bypassed; empty on an unforced record. */
   forcedRules: RuleId[];
+  /**
+   * The knowledge page this promotion left behind: a candidate id, `none` when
+   * the keep proved no transferable mechanism, `declined` with a reason when the
+   * author chose not to write one. Absent means nobody said — which is a warning
+   * on a keep that has profile evidence, never a refusal.
+   */
+  wiki: WikiRecord | null;
 }
+
+export type WikiRecord = { state: "produced"; id: string } | { state: "none" } | { state: "declined"; reason: string };
 
 export interface CandidateInput {
   workspace: string;
@@ -108,6 +117,8 @@ export interface CandidateInput {
    * to a log holding one. Without it the keep has no evidence and rule 1 fires.
    */
   reading?: string;
+  /** `{ id }`, `"none"`, or `{ declined: "reason" }`. */
+  wiki?: { id?: string; declined?: string; none?: boolean };
   forceWithReason?: string;
   exec: HostExec;
   signal?: AbortSignal;
@@ -123,6 +134,8 @@ export type CandidateOutcome =
       benchmarkCsv: { path: string; rows: number } | null;
       /** The precision gate's verdict on a keep; null on a reject. */
       precision?: PrecisionComparison | null;
+      /** Non-blocking findings, e.g. a keep with profile evidence and no wiki entry. */
+      warnings: string[];
     }
   | {
       ok: false;
@@ -197,6 +210,7 @@ export function renderBenchmarkCsv(records: CandidateRecord[]): string {
     "pairing",
     "verdict",
     "forced_rules",
+    "wiki",
   ];
   const escape = (value: unknown): string => {
     const text = value === null || value === undefined ? "" : String(value);
@@ -219,6 +233,11 @@ export function renderBenchmarkCsv(records: CandidateRecord[]): string {
         record.pairing ?? "",
         record.verdict ?? "",
         (record.forcedRules ?? []).join(" "),
+        record.wiki === null || record.wiki === undefined
+          ? ""
+          : record.wiki.state === "produced"
+            ? record.wiki.id
+            : record.wiki.state,
       ]
         .map(escape)
         .join(","),
@@ -235,6 +254,44 @@ export function exportBenchmarkCsv(workspace: string): { ok: true; path: string;
   const file = path.join(workspace, "benchmark.csv");
   fs.writeFileSync(file, renderBenchmarkCsv(records));
   return { ok: true, path: file, rows: records.length };
+}
+
+/**
+ * The knowledge page a keep left behind. A candidate entry that `kernel_wiki_candidate`
+ * actually wrote is checked to exist: a ledger row that cites a page nobody wrote is
+ * worse than a row that says `none`.
+ */
+function readWikiInput(
+  input: CandidateInput["wiki"],
+  workspace: string,
+): { ok: true; record: WikiRecord | null } | { ok: false; errors: string[]; record: WikiRecord | null } {
+  if (input === undefined) return { ok: true, record: null };
+  if (input.none === true) return { ok: true, record: { state: "none" } };
+  if (input.declined !== undefined) {
+    const reason = input.declined.trim();
+    if (reason === "") {
+      return { ok: false, errors: ['a declined wiki entry needs a reason; "declined" alone is a shrug'], record: null };
+    }
+    return { ok: true, record: { state: "declined", reason } };
+  }
+  if (input.id !== undefined) {
+    const id = input.id.trim();
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(id)) {
+      return { ok: false, errors: [`wiki id "${id}" is not kebab-case`], record: null };
+    }
+    const file = path.join(workspace, ".kernel", "wiki-candidates", `${id}.md`);
+    if (!fs.existsSync(file)) {
+      return {
+        ok: false,
+        errors: [
+          `wiki id "${id}" cites ${path.relative(workspace, file)}, which does not exist; run kernel_wiki_candidate first or record wiki: { none: true }`,
+        ],
+        record: null,
+      };
+    }
+    return { ok: true, record: { state: "produced", id } };
+  }
+  return { ok: false, errors: ["wiki must be { id }, { none: true }, or { declined: \"reason\" }"], record: null };
 }
 
 export function readCandidates(workspace: string): CandidateRecord[] {
@@ -420,6 +477,13 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     return { ok: false, errors: [...refusals.map(formatRefusal), ...errors], refusals };
   }
 
+  // The wiki field is checked here, after the refusal gate, because it is not a
+  // refusal: a malformed value is an error, and an error still stops the record.
+  const wikiInput = readWikiInput(input.wiki, input.workspace);
+  if (!wikiInput.ok) {
+    return { ok: false, errors: wikiInput.errors, refusals: [] };
+  }
+
   const existing = readCandidates(input.workspace);
   const parent = existing.length > 0 ? existing[existing.length - 1].id : "baseline";
   const record: CandidateRecord = {
@@ -441,6 +505,7 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     forced: Boolean(input.forceWithReason?.trim()),
     forcedReason: input.forceWithReason?.trim() || null,
     forcedRules,
+    wiki: wikiInput.record,
   };
 
   fs.appendFileSync(paths.candidates, `${JSON.stringify(record)}\n`);
@@ -452,7 +517,24 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     ledger: paths.candidates,
     benchmarkCsv: csv.ok ? { path: csv.path, rows: csv.rows } : null,
     precision,
+    warnings: keepWarnings(record),
   };
+}
+
+/**
+ * A keep that proved a mechanism but left no page is a missed entry, not a bad
+ * keep: the promotion is still valid, so this warns. It fires only when there is
+ * something to write about — profile evidence plus a bottleneck claim — because a
+ * bare speedup with no mechanism has nothing to say and `none` is its answer.
+ */
+function keepWarnings(record: CandidateRecord): string[] {
+  if (record.decision !== "keep") return [];
+  if (record.wiki !== null) return [];
+  if (record.profile === null) return [];
+  if (record.bottleneck === null) return [];
+  return [
+    `this keep has profile evidence (${record.profile.runId}) and a bottleneck claim but no wiki entry: run kernel_wiki_candidate to leave the mechanism behind, or pass wiki: { none: true } if it does not transfer`,
+  ];
 }
 
 /**
@@ -589,6 +671,13 @@ export function formatCandidateOutcome(outcome: CandidateOutcome): string {
       : `  reading: none — verdict ${r.verdict}, pairing ${r.pairing}`,
     outcome.precision?.armed ? `  precision: ${precisionLine(outcome.precision)}` : null,
     ...(outcome.precision?.armed ? outcome.precision.warnings.map((warning) => `  precision warning: ${warning}`) : []),
+    r.wiki === null
+      ? null
+      : r.wiki.state === "produced"
+        ? `  wiki: ${r.wiki.id}`
+        : r.wiki.state === "declined"
+          ? `  wiki: declined — ${r.wiki.reason}`
+          : "  wiki: none (this keep proved no transferable mechanism)",
     r.forcedRules.length > 0 ? `  forced through: ${r.forcedRules.join(", ")}` : null,
     r.reason ? `  reason: ${r.reason}` : null,
     r.forced ? `  forced: ${r.forcedReason}` : null,
@@ -600,5 +689,8 @@ export function formatCandidateOutcome(outcome: CandidateOutcome): string {
   if (r.decision === "keep") {
     lines.push("Next: pi-goal's log_goal decides the keep; this record is the lineage and evidence.");
   }
-  return lines.join("\n");
+  const body = lines.join("\n");
+  return outcome.warnings.length === 0
+    ? body
+    : `${body}\n\nwarning(s):\n${outcome.warnings.map((warning) => `- ${warning}`).join("\n")}`;
 }

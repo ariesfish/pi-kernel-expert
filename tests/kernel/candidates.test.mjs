@@ -408,7 +408,7 @@ test("benchmark.csv is derived from the ledger and quotes free text", async () =
   const lines = fs.readFileSync(file, "utf8").trim().split("\n");
   assert.match(
     lines[0],
-    /^candidate,parent,at,decision,description,geomean_speedup,latency_us_a,latency_us_b,profile_run,bottleneck_metric,reason,forced,pairing,verdict,forced_rules$/,
+    /^candidate,parent,at,decision,description,geomean_speedup,latency_us_a,latency_us_b,profile_run,bottleneck_metric,reason,forced,pairing,verdict,forced_rules,wiki$/,
   );
   assert.match(lines[1], /^C1,baseline,/);
   assert.match(lines[1], /1\.12,9\.1,9\.1/);
@@ -590,4 +590,60 @@ test("a cell x group with no reading entry is refused without blaming the whole 
   assert.deepEqual(outcome.refusals.map((entry) => entry.rule), ["cell-group-uncovered"]);
   assert.match(outcome.errors.join("\n"), /a\/zero_block, a\/tail/);
   assert.doesNotMatch(outcome.errors.join("\n"), /cell a carry/);
+});
+
+test("a keep records the wiki entry it left behind, and refuses one that was never written", async () => {
+  const ctx = await setup();
+  const none = await recordCandidate(keepInput(ctx, { wiki: { none: true } }));
+  assert.equal(none.ok, true, none.ok ? "" : none.errors.join("\n"));
+  assert.deepEqual(none.record.wiki, { state: "none" });
+
+  const declined = await recordCandidate(keepInput(ctx, { wiki: { declined: "the gain was a ptxas fluke, not a mechanism" } }));
+  assert.equal(declined.ok, true);
+  assert.deepEqual(declined.record.wiki, { state: "declined", reason: "the gain was a ptxas fluke, not a mechanism" });
+
+  const empty = await recordCandidate(keepInput(ctx, { wiki: { declined: "   " } }));
+  assert.equal(empty.ok, false);
+  assert.match(empty.errors.join("\n"), /declined wiki entry needs a reason/);
+
+  const missing = await recordCandidate(keepInput(ctx, { wiki: { id: "no-such-entry" } }));
+  assert.equal(missing.ok, false);
+  assert.match(missing.errors.join("\n"), /"no-such-entry" cites \.kernel\/wiki-candidates\/no-such-entry\.md, which does not exist/);
+
+  const dir = path.join(ctx.root, ".kernel", "wiki-candidates");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "real-entry.md"), "#!/usr/bin/env\n");
+  const produced = await recordCandidate(keepInput(ctx, { wiki: { id: "real-entry" } }));
+  assert.equal(produced.ok, true, produced.ok ? "" : produced.errors.join("\n"));
+  assert.deepEqual(produced.record.wiki, { state: "produced", id: "real-entry" });
+  assert.equal(produced.record.wiki.state, "produced");
+});
+
+test("a keep with profile evidence and no wiki field warns instead of refusing", async () => {
+  const ctx = await setup();
+  writeProfile(ctx, "run1", { metrics: { "l1tex__throughput.avg.pct_of_peak_sustained_elapsed": 8.4 } });
+  const outcome = await recordCandidate(
+    keepInput(ctx, {
+      profileRun: "run1",
+      bottleneck: { claim: "latency-bound on L1", metric: "l1tex__throughput.avg.pct_of_peak_sustained_elapsed" },
+    }),
+  );
+  assert.equal(outcome.ok, true, outcome.ok ? "" : outcome.errors.join("\n"));
+  assert.equal(outcome.warnings.length, 1);
+  assert.match(outcome.warnings[0], /has profile evidence \(run1\) and a bottleneck claim but no wiki entry/);
+  assert.match(formatCandidateOutcome(outcome), /warning\(s\):/);
+
+  const answered = await recordCandidate(
+    keepInput(ctx, {
+      profileRun: "run1",
+      bottleneck: { claim: "latency-bound on L1", metric: "l1tex__throughput.avg.pct_of_peak_sustained_elapsed" },
+      wiki: { none: true },
+    }),
+  );
+  assert.equal(answered.ok, true);
+  assert.deepEqual(answered.warnings, [], "answering the question silences the warning");
+
+  const bare = await recordCandidate(keepInput(ctx, { description: "no profile, no claim" }));
+  assert.equal(bare.ok, true);
+  assert.deepEqual(bare.warnings, [], "a keep with nothing to say is not nagged");
 });

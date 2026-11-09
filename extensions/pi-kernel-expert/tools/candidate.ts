@@ -14,6 +14,7 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
     promptGuidelines: [
       "Record every attempted candidate, kept or rejected. A rejection without a reason is not recorded.",
       "Pass reading: the stdout of goal.sh (or a path to the log). Without it the keep has no basis and is refused.",
+      "Pass wiki: { id } after kernel_wiki_candidate, or { none: true } when the keep proved nothing that transfers. A keep with profile evidence and a bottleneck claim that omits it warns.",
       "Profile after the change and record the candidate before log_goal commits it; the diff hash binds the evidence.",
       "A bottleneck claim must name a metric that exists in the profile summary; absence is reported, never inferred.",
       "force_with_reason only accepts a run-level defect (missing basis, host-bound or unmeasured reading, an unmeasured cell/group, an uncalibrated reference). It never accepts an edited harness, a stale profile, or a measured precision regression.",
@@ -39,6 +40,19 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
           description:
             "The evidence this keep rests on: goal.sh's stdout, the \"=== KERNEL READING ===\" block alone, the block's JSON, or a path to a log holding one. Missing = refused (basis-missing).",
         }),
+      ),
+      wiki: Type.Optional(
+        Type.Object(
+          {
+            id: Type.Optional(Type.String({ description: "The kernel_wiki_candidate id this keep produced." })),
+            none: Type.Optional(Type.Boolean({ description: "True when the keep proved no transferable mechanism." })),
+            declined: Type.Optional(Type.String({ description: "Why no entry was written; required when declining." })),
+          },
+          {
+            description:
+              "The page this promotion left behind. A keep with profile evidence and a bottleneck claim that omits this warns, never refuses.",
+          },
+        ),
       ),
       commit: Type.Optional(Type.String({ description: "Commit sha once pi-goal's log_goal keeps the change." })),
       force_with_reason: Type.Optional(
@@ -66,6 +80,7 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
         reason: params.reason,
         commit: params.commit,
         reading: params.reading,
+        wiki: params.wiki,
         forceWithReason: params.force_with_reason,
         exec: pi,
         signal,
