@@ -17,7 +17,17 @@
 
 ### Added
 
+- `goal.sh` prints one `=== KERNEL READING ===` JSON block per run — contract
+  sha, basis and its source, GPU state (name, clocks, utilisation, foreign
+  memory) at start and end, per-cell medians and spread, shell wall time,
+  `hostEnqueueMs`/`deviceMs` when the task reports them, a tri-state
+  `hostBoundVerdict`, and warnings. A number bash cannot measure is absent,
+  never zero: without the task's own device/enqueue figures the ratio is null
+  and the verdict is `unmeasured`. `parseReadingBlock` refuses a truncated
+  block, a non-JSON body, an unknown schema, and a verdict that contradicts its
+  own ratio.
 - `scripts/job-env-check.sh`: proves nvcc, Nsight Compute and a CUDA-enabled
+: proves nvcc, Nsight Compute and a CUDA-enabled
   torch are visible from a non-interactive shell on the GPU node, naming every
   missing item and exiting non-zero.
 

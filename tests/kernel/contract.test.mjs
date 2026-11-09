@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -14,6 +15,11 @@ import {
   renderChecksScript,
   writeContractFiles,
 } from "../../extensions/pi-kernel-expert/kernel/contract.ts";
+import {
+  READING_END_MARKER,
+  READING_START_MARKER,
+  parseReadingBlock,
+} from "../../extensions/pi-kernel-expert/kernel/reading.ts";
 import { initWorkspace, workspacePaths } from "../../extensions/pi-kernel-expert/workspace/layout.ts";
 
 const BASE = {
@@ -245,4 +251,154 @@ test("the freeze payload carries the basis, the harness globs, and the reference
   const withoutReference = freezePayload(built());
   assert.equal(withoutReference.reference_command, null);
   assert.deepEqual(withoutReference.harness_globs, ["goal.sh", "goal.checks.sh"]);
+});
+
+// --- the reading block, as the generated script prints it -------------------
+
+function readingWorkspace(overrides = {}, benchBody = '#!/usr/bin/env bash\nset -euo pipefail\necho "METRIC device_ms=1.5"\necho "METRIC host_enqueue_ms=3"\n') {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-reading-"));
+  initWorkspace(root);
+  fs.writeFileSync(path.join(root, "bench.sh"), benchBody);
+  const normalized = normalizeContract({
+    ...BASE,
+    benchmarkCommand: "bash bench.sh",
+    repeats: 2,
+    warmup: 0,
+    ...overrides,
+  });
+  assert.deepEqual(normalized.errors, []);
+  const written = writeContractFiles({ root, contract: normalized.contract });
+  assert.equal(written.ok, true);
+  return { root, paths: workspacePaths(root) };
+}
+
+function runScript(script, cwd, env) {
+  try {
+    const stdout = execFileSync("bash", [script], {
+      cwd,
+      encoding: "utf8",
+      env: env ?? process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return { code: 0, stdout, stderr: "" };
+  } catch (error) {
+    return { code: error.status ?? 1, stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
+  }
+}
+
+function stubBin(name, body) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-stub-"));
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, body);
+  fs.chmodSync(file, 0o755);
+  return dir;
+}
+
+function withPath(dir, extraEnv = {}) {
+  return { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH ?? ""}`, ...extraEnv };
+}
+
+test("the generated benchmark script passes bash -n", () => {
+  const contract = built();
+  const script = renderBenchmarkScript(contract, contractSha(contractJson(contract)));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-bashn-"));
+  const file = path.join(root, "goal.sh");
+  fs.writeFileSync(file, script);
+  // execFileSync throws on a non-zero exit; a syntax error must not be a passing test.
+  execFileSync("bash", ["-n", file], { stdio: ["ignore", "pipe", "pipe"] });
+});
+
+test("one reading block per run, printed after every METRIC line", () => {
+  const contract = built();
+  const script = renderBenchmarkScript(contract, contractSha(contractJson(contract)));
+  assert.equal(script.split(READING_START_MARKER).length - 1, 1, "the start marker is written once");
+  assert.equal(script.split(READING_END_MARKER).length - 1, 1, "the end marker is written once");
+
+  const { root, paths } = readingWorkspace({ benchmarkCommand: "bash -c 'echo METRIC x=1'" });
+  const result = runScript(paths.benchmarkScript, root);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.stdout.split(READING_START_MARKER).length - 1, 1);
+  assert.equal(result.stdout.split(READING_END_MARKER).length - 1, 1);
+
+  const metricLines = result.stdout.split("\n").filter((line) => /^METRIC\s+/.test(line));
+  assert.deepEqual(metricLines, [
+    "METRIC latency_us_m1024=1",
+    "METRIC latency_us_m4096=1",
+    "METRIC geomean_speedup=1",
+  ]);
+  const blockAt = result.stdout.indexOf(READING_START_MARKER);
+  const lastMetricAt = result.stdout.lastIndexOf(`METRIC geomean_speedup=1`);
+  assert.ok(lastMetricAt < blockAt, "every METRIC line precedes the block");
+});
+
+test("the block prints with gpu.available false when nvidia-smi fails, and the exit code is unchanged", () => {
+  const { root, paths } = readingWorkspace();
+  const bin = stubBin("nvidia-smi", "#!/usr/bin/env bash\nexit 1\n");
+  const result = runScript(paths.benchmarkScript, root, withPath(bin));
+  assert.equal(result.code, 0, result.stderr);
+
+  const parsed = parseReadingBlock(result.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.equal(parsed.reading.gpu.available, false);
+  assert.match(parsed.reading.gpu.error, /nvidia-smi/);
+  assert.ok(
+    parsed.reading.warnings.some((warning) => /no GPU state/.test(warning)),
+    `warnings should say the state is missing: ${JSON.stringify(parsed.reading.warnings)}`,
+  );
+});
+
+test("the block records GPU state from nvidia-smi, escaping a name with spaces and quotes", () => {
+  const { root, paths } = readingWorkspace();
+  const bin = stubBin(
+    "nvidia-smi",
+    [
+      "#!/usr/bin/env bash",
+      'for arg in "$@"; do',
+      '  case "$arg" in',
+      "    --version) printf 'NVIDIA-SMI version    : 999.0.0\\nCUDA Version          : 12.4\\n'; exit 0 ;;",
+      '    --query-gpu=*) printf \'0, NVIDIA H200 "PCIe", 1980, 1593, 7\\n\'; exit 0 ;;',
+      "    --query-compute-apps=*) printf '424242, 512\\n'; exit 0 ;;",
+      "  esac",
+      "done",
+      "exit 1",
+    ].join("\n"),
+  );
+  const result = runScript(paths.benchmarkScript, root, withPath(bin, { CUDA_VISIBLE_DEVICES: "0" }));
+  assert.equal(result.code, 0, result.stderr);
+
+  const parsed = parseReadingBlock(result.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  const gpu = parsed.reading.gpu;
+  assert.equal(gpu.available, true);
+  assert.equal(gpu.name, 'NVIDIA H200 "PCIe"');
+  assert.equal(gpu.index, 0);
+  assert.equal(gpu.visible, "0");
+  assert.equal(gpu.start.clocksSmMhz, 1980);
+  assert.equal(gpu.start.clocksMemMhz, 1593);
+  assert.equal(gpu.start.utilPct, 7);
+  assert.equal(gpu.start.foreignProcessMiB, 512);
+  assert.match(parsed.reading.nvidiaSmi, /NVIDIA-SMI version/);
+  assert.ok(
+    parsed.reading.warnings.some((warning) => /contended/.test(warning)),
+    `a foreign process should be called out: ${JSON.stringify(parsed.reading.warnings)}`,
+  );
+});
+
+test("the block is emitted before a guard failure's exit 1", () => {
+  const { root, paths } = readingWorkspace(
+    { cells: [{ id: "a", dtype: "bf16", vars: { M: "1024" } }] },
+    '#!/usr/bin/env bash\nset -euo pipefail\ncat speed\n',
+  );
+  fs.writeFileSync(path.join(root, "speed"), "10\n");
+  const baseline = runScript(paths.benchmarkScript, root);
+  assert.equal(baseline.code, 0, baseline.stderr);
+  fs.writeFileSync(path.join(root, "speed"), "40\n");
+
+  const regressed = runScript(paths.benchmarkScript, root);
+  assert.equal(regressed.code, 1, "the guard exit code is unchanged");
+  assert.match(regressed.stderr, /guard: cell a regressed/);
+  assert.equal(regressed.stdout.split(READING_START_MARKER).length - 1, 1);
+  const parsed = parseReadingBlock(regressed.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.equal(parsed.reading.cells[0].median, 40);
 });
