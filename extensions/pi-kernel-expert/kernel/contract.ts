@@ -69,6 +69,8 @@ export interface ContractInput {
   basis?: Basis;
   harnessGlobs?: string[];
   referenceCommand?: string;
+  /** Wall-clock burn-in before the first measured window when pairing. Default 4000. */
+  burnInMs?: number;
   generator?: string;
 }
 
@@ -99,6 +101,7 @@ export interface KernelContract {
   harnessGlobs: string[];
   /** `null` when the task has no same-job reference; a self-reference is refused. */
   referenceCommand: string | null;
+  burnInMs: number;
   generator: string;
 }
 
@@ -242,6 +245,11 @@ export function normalizeContract(input: ContractInput, options: NormalizeOption
     );
   }
 
+  const burnInMs = input.burnInMs ?? BURN_IN_MS_DEFAULT;
+  if (!Number.isInteger(burnInMs) || burnInMs < 0 || burnInMs > BURN_IN_MS_MAX) {
+    errors.push(`burnInMs must be an integer between 0 and ${BURN_IN_MS_MAX}`);
+  }
+
   const benchmarkCommand = input.benchmarkCommand?.trim() ?? "";
   const referenceCommand = input.referenceCommand?.trim() || null;
   if (referenceCommand !== null && referenceCommand === benchmarkCommand) {
@@ -270,6 +278,7 @@ export function normalizeContract(input: ContractInput, options: NormalizeOption
     basis,
     harnessGlobs,
     referenceCommand,
+    burnInMs,
     generator: input.generator?.trim() || "pi-kernel-expert",
   };
   const warnings =
@@ -395,6 +404,7 @@ export interface FreezePayload {
   harness_globs: string[];
   /** Recorded even when there is none, so the payload always states the pairing. */
   reference_command: string | null;
+  burn_in_ms: number;
 }
 
 /** Exactly one blocking metric criterion, as pi-goal requires. */
@@ -427,6 +437,7 @@ export function freezePayload(contract: KernelContract): FreezePayload {
     basis: contract.basis,
     harness_globs: contract.harnessGlobs,
     reference_command: contract.referenceCommand,
+    burn_in_ms: contract.burnInMs,
   };
 }
 
@@ -617,6 +628,25 @@ function groupsArray(contract: KernelContract): string {
   return rows.join(" ");
 }
 
+/**
+ * Two same-job ratios that disagree by more than this percentage represent no
+ * single period, so the pair decides nothing. The same 5% band ForgeKernel
+ * admits a paired re-measure with (`_PAIRED_SPREAD_MAX`), quoted relative to the
+ * mid-point of the two ratios.
+ */
+export const PAIR_SPREAD_MAX_PCT = 5;
+
+/** The reference is burned in until this much wall clock has passed (at least one run). */
+export const BURN_IN_MS_DEFAULT = 4000;
+export const BURN_IN_MS_MAX = 120000;
+
+/** The burn-in cap: a slow kernel must not spend the run's budget warming up. */
+/** A bench command is a process; 2000 runs covers a 2 ms command for the full 4 s. */
+export const BURN_IN_MAX_RUNS = 2000;
+
+/** Fewer usable ratios than this is one draw, not a pair. */
+export const PAIR_MIN_RATIOS = 2;
+
 const HASH_FUNCTION = `hash_file() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | awk '{print $1}'
@@ -684,6 +714,12 @@ export function renderBenchmarkScript(contract: KernelContract, sha: string): st
 # are recorded only when the bench command prints them (METRIC device_ms=,
 # METRIC host_enqueue_ms=). A host-free basis (cuda_graph, cupti_kernel_span)
 # needs a runner that clocks the device: that arrives with the runner, not here.
+#
+# When the contract names a referenceCommand, the reference rides this job:
+# burn-in with the kernel under test, then four measured windows in the order
+# ref, kernel, kernel, ref, two per-cell ratios and their spread. The guard and
+# geomean_speedup below still read the cross-run baseline; the pair is what a
+# keep rests on when it exists.
 set -euo pipefail
 
 CONTRACT_SHA=${shQuote(sha)}
@@ -695,6 +731,13 @@ WARMUP=${contract.warmup}
 GUARD_PCT=${shQuote(String(contract.guardPct))}
 BENCH_CMD=${shQuote(contract.benchmarkCommand)}
 BASELINE_FILE='.kernel/baseline.tsv'
+# 1 only when the contract names a reference; 0 leaves every window as it was.
+PAIRING_ENABLED=${contract.referenceCommand === null ? "0" : "1"}
+REF_CMD=${shQuote(contract.referenceCommand ?? "")}
+BURN_IN_MS=${contract.burnInMs}
+BURN_IN_MAX_RUNS=${BURN_IN_MAX_RUNS}
+PAIR_MIN_RATIOS=${PAIR_MIN_RATIOS}
+PAIR_SPREAD_MAX_PCT=${PAIR_SPREAD_MAX_PCT}
 # The cell table: one row per cell, one row per group (see kernel_contract).
 CELLS=(${cellsArray(contract)})
 ${groupSelect(contract)}
@@ -730,6 +773,18 @@ CELL_JSON=()
 HOST_ENQUEUE_VALUES=()
 DEVICE_VALUES=()
 WARNINGS=()
+
+# --- same-job pairing state ------------------------------------------------
+# pairing is always written: absent is a legal, loudly labelled state (a
+# task with no referenceCommand keeps its cross-run baseline). PAIR_RATIOS
+# carries the two ratios of every cell, PAIR_SPREAD_PCT the worst per-cell
+# spread — the worst, not an average: a cell whose two draws disagree is enough
+# to say the pair covers no single period.
+PAIRING_STATE='absent'
+PAIR_RATIOS=()
+PAIR_SPREAD_PCT=''
+PAIR_FAILED_CELLS=0
+BURN_IN_DONE=0
 
 json_escape() {
   local s="$1"
@@ -866,9 +921,119 @@ median_of() {
   printf '%s\\n' "$@" | sort -g | awk '{ a[NR]=$1 } END { if (NR==0) exit 1; if (NR%2) print a[(NR+1)/2]; else printf "%.10g\\n", (a[NR/2]+a[NR/2+1])/2 }'
 }
 
+# Median of the numbers one window collected, so there is one median in the file.
+file_median() {
+  local v
+  local -a vals=()
+  [[ -s "$1" ]] || return 1
+  while IFS= read -r v; do
+    [[ -n "$v" ]] || continue
+    vals+=("$v")
+  done < "$1"
+  [[ \${#vals[@]} -gt 0 ]] || return 1
+  median_of \${vals[@]+"\${vals[@]}"}
+}
+
+mean_of() {
+  [[ $# -gt 0 ]] || return 1
+  printf '%s\\n' "$@" | awk '{ s+=$1; n++ } END { if (n==0) exit 1; printf "%.10g\\n", s/n }'
+}
+
+geomean_file() {
+  [[ -s "$1" ]] || return 1
+  awk '{ if ($1 <= 0) bad=1; s+=log($1); n++ } END { if (bad || n==0) exit 1; printf "%.10g\\n", exp(s/n) }' "$1"
+}
+
+# One pair's ratio: ref/kernel when lower is better, kernel/ref when higher, so
+# the number means the same thing as geomean_speedup — above 1 the kernel wins.
+pair_ratio() {
+  [[ $# -eq 2 ]] || return 1
+  awk -v r="$1" -v k="$2" -v d="$DIRECTION" 'BEGIN { if (r <= 0 || k <= 0) exit 1; if (d == "lower") printf "%.10g\\n", r/k; else printf "%.10g\\n", k/r }'
+}
+
+# The first window of a job reads 3-5% fast (a cold boost) and later windows
+# drift thermally, so the opening window must not land on one side of the pair.
+# Burn in with the kernel under test until the clock has moved on: at least one
+# run, at most BURN_IN_MAX_RUNS, and the numbers are thrown away.
+burn_in() {
+  local cid="$1" gname="$2" start runs now
+  # 0 means no burn-in: the loop body would otherwise run once before the
+  # deadline check, and "off" must not cost a run.
+  [[ $BURN_IN_MS -le 0 ]] && return 0
+  start=$(now_ms)
+  runs=0
+  while [[ $runs -lt $BURN_IN_MAX_RUNS ]]; do
+    if ! eval "$BENCH_CMD" >/dev/null 2>&1; then
+      WARNINGS+=("burn-in run $((runs+1)) failed in cell $cid group $gname; the measured windows decide on their own")
+      break
+    fi
+    runs=$(( runs + 1 ))
+    now=$(now_ms)
+    [[ $(( now - start )) -ge $BURN_IN_MS ]] && break
+  done
+  # A cap that binds before the deadline means the bench is faster than 2000 runs
+  # per burn-in: the windows may still carry a cold-start bias, and that is said.
+  if [[ $(( now - start )) -lt $BURN_IN_MS ]]; then
+    WARNINGS+=("burn-in stopped at the ${BURN_IN_MAX_RUNS}-run cap after $(( now - start )) ms of the \${BURN_IN_MS} ms wanted in cell $cid group $gname; the first window may still read fast")
+  fi
+  return 0
+}
+
+# One measured window: WARMUP untimed runs, then REPEATS timed runs, then the
+# median of what they printed, left in the variable named by the last argument.
+# The median is returned by name, not on stdout: a command substitution would run
+# the window in a subshell and the device/enqueue figures it collects (they belong
+# to this shell) would vanish with it. role is kernel for the side the reading's
+# device and enqueue figures belong to: the reference's numbers must not enter
+# the host-bound ratio, which is a claim about the kernel under test.
+measure_window() {
+  local cmd="$1" out="$2" role="$3" cid="$4" gname="$5" outvar="$6"
+  local raw value reported median w r
+  for ((w=0; w<WARMUP; w++)); do
+    if ! eval "$cmd" >/dev/null 2>&1; then
+      echo "benchmark failed during warmup in cell $cid group $gname (warmup $((w+1))/$WARMUP)" >&2
+      return 1
+    fi
+  done
+  : > "$out"
+  for ((r=0; r<REPEATS; r++)); do
+    if ! raw=$(eval "$cmd" 2>&1); then
+      echo "benchmark failed in cell $cid group $gname:" >&2
+      printf '%s\\n' "$raw" >&2
+      return 1
+    fi
+    if [[ $raw =~ METRIC[[:space:]]+[A-Za-z0-9_.]+=([0-9.eE+-]+) ]]; then
+      value="\${BASH_REMATCH[1]}"
+    else
+      value=$(printf '%s\\n' "$raw" | grep -oE '[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?' | tail -1 || true)
+    fi
+    if [[ -z "\${value:-}" ]]; then
+      echo "benchmark in cell $cid group $gname printed no number" >&2
+      printf '%s\\n' "$raw" >&2
+      return 1
+    fi
+    printf '%s\\n' "$value" >> "$out"
+
+    # Only the task can say how long the device ran and how long the host took
+    # to enqueue; take its numbers as reported and median them over the run.
+    if [[ "$role" == 'kernel' ]]; then
+      reported=$(printf '%s\\n' "$raw" | grep -oE 'METRIC[[:space:]]+[A-Za-z0-9_.]+=[0-9.eE+-]+' || true)
+      while IFS=' ' read -r tag pair; do
+        [[ "$tag" == 'METRIC' ]] || continue
+        case "\${pair%%=*}" in
+          host_enqueue_ms) HOST_ENQUEUE_VALUES+=("\${pair#*=}") ;;
+          device_ms) DEVICE_VALUES+=("\${pair#*=}") ;;
+        esac
+      done <<< "$reported"
+    fi
+  done
+  median=$(file_median "$out") || return 1
+  printf -v "$outvar" '%s' "$median"
+}
+
 emit_reading() {
   local finished end_ms delta shell_ms host_json device_json ratio_json verdict reason
-  local gpu_json cells_json warnings_json tail_json item sep w
+  local gpu_json cells_json warnings_json tail_json pairing_json ratios r sep2 item sep w n
 
   finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   gpu_probe 'end'
@@ -950,6 +1115,23 @@ emit_reading() {
   if [[ -n "$host_json" ]]; then tail_json="\${tail_json},\\"hostEnqueueMs\\":\${host_json}"; fi
   if [[ -n "$device_json" ]]; then tail_json="\${tail_json},\\"deviceMs\\":\${device_json}"; fi
 
+  # The pairing claims. pairing is always written — absent says the contract
+  # named no reference and the cross-run baseline is all this reading has. The
+  # ratios and the spread appear only when a pair was actually taken, so a
+  # reader never sees an empty array standing in for a measurement.
+  pairing_json=",\\"pairing\\":$(json_string "$PAIRING_STATE")"
+  if [[ \${#PAIR_RATIOS[@]} -gt 0 ]]; then
+    ratios=''
+    sep2=''
+    for r in "\${PAIR_RATIOS[@]}"; do
+      if n=$(json_number "$r"); then ratios="\${ratios}\${sep2}\${n}"; sep2=','; fi
+    done
+    if [[ -n "$ratios" ]]; then pairing_json="\${pairing_json},\\"pairRatios\\":[\${ratios}]"; fi
+  fi
+  if [[ -n "$PAIR_SPREAD_PCT" ]]; then
+    if n=$(json_number "$PAIR_SPREAD_PCT"); then pairing_json="\${pairing_json},\\"pairSpreadPct\\":\${n}"; fi
+  fi
+
   warnings_json=''
   sep=''
   for w in \${WARNINGS[@]+"\${WARNINGS[@]}"}; do
@@ -968,6 +1150,7 @@ emit_reading() {
     "$ratio_json" \\
     "$(json_string "$verdict")"
   if [[ -n "$reason" ]]; then printf ',"hostBoundReason":%s' "$(json_string "$reason")"; fi
+  printf '%s' "$pairing_json"
   printf ',"startedAt":%s,"finishedAt":%s' "$(json_string "$STARTED_AT")" "$(json_string "$finished")"
   if [[ -n "$NVIDIA_SMI_VERSION" ]]; then printf ',"nvidiaSmi":%s' "$(json_string "$NVIDIA_SMI_VERSION")"; fi
   printf ',"warnings":[%s]}\\n' "$warnings_json"
@@ -996,9 +1179,19 @@ mkdir -p "$(dirname "$BASELINE_FILE")"
 tmp=$(mktemp)
 group_tmp=$(mktemp)
 ratio_file=$(mktemp)
-trap 'rm -f "$tmp" "$group_tmp" "$ratio_file"' EXIT
+# The windows of the pair: one group's numbers each, and one file per cell and
+# side so the cell aggregate is a geomean over its groups like every other one.
+pair_win=$(mktemp)
+ref1_cell=$(mktemp)
+ref2_cell=$(mktemp)
+k1_cell=$(mktemp)
+k2_cell=$(mktemp)
+trap 'rm -f "$tmp" "$group_tmp" "$ratio_file" "$pair_win" "$ref1_cell" "$ref2_cell" "$k1_cell" "$k2_cell"' EXIT
 failures=0
 new_baseline=()
+
+# Median of the last window, by name: measure_window leaves it here.
+W_MEDIAN=''
 
 BASIS_SOURCE='shell-wall'
 VISIBLE="\${CUDA_VISIBLE_DEVICES:-}"
@@ -1012,6 +1205,13 @@ ${EXPORTS}
   safe=$(printf '%s' "$cid" | tr -c 'A-Za-z0-9' '_')
   select_groups "$cid"
   : > "$group_tmp"
+  # A cell that loses one reference window loses its whole pair: an average over
+  # one side would be a fabricated reading, so the kernel metrics stand alone.
+  cell_ref_failed=0
+  : > "$ref1_cell"
+  : > "$ref2_cell"
+  : > "$k1_cell"
+  : > "$k2_cell"
 
   # Cells x groups: one measurement per data set. KERNEL_GROUP is exported per
   # group so the command can build that data set itself.
@@ -1022,45 +1222,56 @@ ${EXPORTS}
     gsafe=$(printf '%s' "$gname" | tr -c 'A-Za-z0-9' '_')
 ${GROUP_EXPORTS}
 
-    for ((w=0; w<WARMUP; w++)); do
-      if ! eval "$BENCH_CMD" >/dev/null 2>&1; then
-        echo "benchmark failed during warmup in cell $cid group $gname (warmup $((w+1))/$WARMUP)" >&2
-        exit 1
+    # How many runs informed this group's number: one window normally, two when
+    # a reference rides the run (the mean of the two kernel windows).
+    gsamples=$REPEATS
+    if [[ "$PAIRING_ENABLED" != '1' ]]; then
+      # No reference in this contract: one window, exactly as before.
+      measure_window "$BENCH_CMD" "$tmp" 'kernel' "$cid" "$gname" W_MEDIAN || exit 1
+      gmedian="$W_MEDIAN"
+    else
+      gsamples=$(( REPEATS * 2 ))
+      if [[ "$BURN_IN_DONE" == '0' ]]; then
+        burn_in "$cid" "$gname"
+        BURN_IN_DONE=1
       fi
-    done
 
-    : > "$tmp"
-    for ((r=0; r<REPEATS; r++)); do
-      if ! raw=$(eval "$BENCH_CMD" 2>&1); then
-        echo "benchmark failed in cell $cid group $gname:" >&2
-        printf '%s\\n' "$raw" >&2
-        exit 1
+      # ref, kernel, kernel, ref — four windows, in that order, per cell x group.
+      ref1=''
+      ref2=''
+      if [[ "$cell_ref_failed" == '0' ]]; then
+        if measure_window "$REF_CMD" "$pair_win" 'ref' "$cid" "$gname" W_MEDIAN; then
+          ref1="$W_MEDIAN"
+        else
+          cell_ref_failed=1
+          WARNINGS+=("reference window 1 failed in cell $cid group $gname; cell $cid takes no paired ratio")
+        fi
       fi
-      if [[ $raw =~ METRIC[[:space:]]+[A-Za-z0-9_.]+=([0-9.eE+-]+) ]]; then
-        value="\${BASH_REMATCH[1]}"
-      else
-        value=$(printf '%s\\n' "$raw" | grep -oE '[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?' | tail -1 || true)
+      measure_window "$BENCH_CMD" "$tmp" 'kernel' "$cid" "$gname" W_MEDIAN || exit 1
+      k1="$W_MEDIAN"
+      measure_window "$BENCH_CMD" "$pair_win" 'kernel' "$cid" "$gname" W_MEDIAN || exit 1
+      k2="$W_MEDIAN"
+      # Both kernel windows count as this group's samples.
+      cat "$pair_win" >> "$tmp"
+      if [[ "$cell_ref_failed" == '0' ]]; then
+        if measure_window "$REF_CMD" "$pair_win" 'ref' "$cid" "$gname" W_MEDIAN; then
+          ref2="$W_MEDIAN"
+        else
+          cell_ref_failed=1
+          WARNINGS+=("reference window 2 failed in cell $cid group $gname; no half pair is taken for cell $cid")
+        fi
       fi
-      [[ -n "\${value:-}" ]] || {
-        echo "benchmark in cell $cid group $gname printed no number" >&2
-        printf '%s\\n' "$raw" >&2
-        exit 1
-      }
-      printf '%s\\n' "$value" >> "$tmp"
 
-      # Only the task can say how long the device ran and how long the host took
-      # to enqueue; take its numbers as reported and median them over the run.
-      reported=$(printf '%s\\n' "$raw" | grep -oE 'METRIC[[:space:]]+[A-Za-z0-9_.]+=[0-9.eE+-]+' || true)
-      while IFS=' ' read -r tag pair; do
-        [[ "$tag" == 'METRIC' ]] || continue
-        case "\${pair%%=*}" in
-          host_enqueue_ms) HOST_ENQUEUE_VALUES+=("\${pair#*=}") ;;
-          device_ms) DEVICE_VALUES+=("\${pair#*=}") ;;
-        esac
-      done <<< "$reported"
-    done
-
-    gmedian=$(sort -g "$tmp" | awk '{ a[NR]=$1 } END { if (NR==0) exit 1; if (NR%2) print a[(NR+1)/2]; else printf "%.10g\\n", (a[NR/2]+a[NR/2+1])/2 }')
+      # Each side keeps the mean of its two window medians (the kernel's mean is
+      # what this cell reports; the reference's feeds the ratio).
+      gmedian=$(mean_of "$k1" "$k2") || exit 1
+      if [[ "$cell_ref_failed" == '0' ]]; then
+        printf '%s\\n' "$ref1" >> "$ref1_cell"
+        printf '%s\\n' "$ref2" >> "$ref2_cell"
+        printf '%s\\n' "$k1" >> "$k1_cell"
+        printf '%s\\n' "$k2" >> "$k2_cell"
+      fi
+    fi
     printf 'METRIC %s_%s_%s=%s\\n' "$METRIC_NAME" "$safe" "$gsafe" "$gmedian"
 
     gspread=''
@@ -1071,7 +1282,7 @@ ${GROUP_EXPORTS}
     if [[ -z "$gmedian_json" ]]; then
       WARNINGS+=("cell $cid group $gname has no JSON-safe median (raw: $gmedian); the group is missing from this reading")
     else
-      cell_json="{\\"id\\":$(json_string "$cid"),\\"group\\":$(json_string "$gname"),\\"metric\\":$(json_string "\${METRIC_NAME}_\${safe}_\${gsafe}"),\\"median\\":\${gmedian_json},\\"samples\\":\${REPEATS}"
+      cell_json="{\\"id\\":$(json_string "$cid"),\\"group\\":$(json_string "$gname"),\\"metric\\":$(json_string "\${METRIC_NAME}_\${safe}_\${gsafe}"),\\"median\\":\${gmedian_json},\\"samples\\":\${gsamples}"
       if [[ -n "$gspread" ]] && spread_json=$(json_number "$gspread"); then
         cell_json="\${cell_json},\\"spreadPct\\":\${spread_json}"
       fi
@@ -1085,11 +1296,49 @@ ${GROUP_EXPORTS}
   # groups at 10/10/100 read as 21.5, not as 10). It is still the name
   # cellMetricName returns. A non-positive group value has no geomean, so the
   # cell refuses to produce one rather than round it to zero.
-  cell_value=$(awk '{ if ($1 <= 0) bad=1; s+=log($1); n++ } END { if (bad || n==0) exit 1; printf "%.10g\\n", exp(s/n) }' "$group_tmp") || {
+  cell_value=$(geomean_file "$group_tmp") || {
     echo "cell $cid has a non-positive group value; a geomean cannot be taken over $(tr '\\n' ' ' < "$group_tmp")" >&2
     exit 1
   }
   printf 'METRIC %s_%s=%s\\n' "$METRIC_NAME" "$safe" "$cell_value"
+
+  # Two ratios per cell, one per pair: ref1/k1 and ref2/k2 (inverted when higher
+  # is better). The aggregates over the cell's groups go in first, so a ratio is
+  # a cell-level number like geomean_speedup, not a lucky group's.
+  if [[ "$PAIRING_ENABLED" == '1' ]]; then
+    if [[ "$cell_ref_failed" == '1' ]]; then
+      PAIR_FAILED_CELLS=$(( PAIR_FAILED_CELLS + 1 ))
+    else
+      ref1c=$(geomean_file "$ref1_cell" || true)
+      ref2c=$(geomean_file "$ref2_cell" || true)
+      k1c=$(geomean_file "$k1_cell" || true)
+      k2c=$(geomean_file "$k2_cell" || true)
+      r1=''
+      r2=''
+      if [[ -n "$ref1c" && -n "$k1c" && -n "$ref2c" && -n "$k2c" ]]; then
+        r1=$(pair_ratio "$ref1c" "$k1c" || true)
+        r2=$(pair_ratio "$ref2c" "$k2c" || true)
+      fi
+      if [[ -z "$r1" || -z "$r2" ]]; then
+        PAIR_FAILED_CELLS=$(( PAIR_FAILED_CELLS + 1 ))
+        WARNINGS+=("cell $cid has no paired ratio: a reference or kernel aggregate was not positive")
+      else
+        PAIR_RATIOS+=("$r1" "$r2")
+        # Spread relative to the mid-point of the two ratios, not to the smaller
+        # one: the mean is symmetric in the two draws and does not blow the
+        # percentage up when the faster ratio happens to be the denominator.
+        # (ForgeKernel divides by the min; that is stricter by at most a factor
+        # of two at a disagreement where both already refuse the pair.)
+        spread=$(awk -v a="$r1" -v b="$r2" 'BEGIN { m=(a+b)/2; if (m <= 0) exit 1; d=(a>b)?a-b:b-a; printf "%.10g", d/m*100 }' || true)
+        if [[ -n "$spread" ]]; then
+          PAIR_SPREAD_PCT=$(awk -v cur="\${PAIR_SPREAD_PCT:-0}" -v s="$spread" 'BEGIN { printf "%.10g", (s>cur)?s:cur }')
+          if awk -v s="$spread" -v lim="$PAIR_SPREAD_MAX_PCT" 'BEGIN { exit (s > lim) ? 0 : 1 }'; then
+            WARNINGS+=("cell $cid's two paired ratios ($r1, $r2) spread \${spread}% (> \${PAIR_SPREAD_MAX_PCT}%): they represent no single period, so the pair is inadmissible")
+          fi
+        fi
+      fi
+    fi
+  fi
 
   if [[ $baseline_run -eq 1 ]]; then
     new_baseline+=("$cid|$cell_value")
@@ -1113,6 +1362,34 @@ done
 
 if [[ \${#DEVICE_VALUES[@]} -gt 0 || \${#HOST_ENQUEUE_VALUES[@]} -gt 0 ]]; then
   BASIS_SOURCE='task-reported'
+fi
+
+# --- pairing admission ------------------------------------------------------
+# mirrored only when every cell mirrored and gave two ratios that agree inside
+# the band. Otherwise the block says inadmissible and names why: a pair that
+# decides nothing must not print a speedup a reader could quote. The cross-run
+# geomean_speedup and the guard below are untouched by any of this.
+if [[ "$PAIRING_ENABLED" == '1' ]]; then
+  pair_count=\${#PAIR_RATIOS[@]}
+  pair_reason=''
+  if [[ "$PAIR_FAILED_CELLS" -gt 0 ]]; then
+    pair_reason="$PAIR_FAILED_CELLS cell(s) lost a reference window"
+  elif [[ "$pair_count" -lt "$PAIR_MIN_RATIOS" ]]; then
+    pair_reason="$pair_count usable paired ratio(s), at least $PAIR_MIN_RATIOS are needed"
+  elif awk -v s="\${PAIR_SPREAD_PCT:-0}" -v lim="$PAIR_SPREAD_MAX_PCT" 'BEGIN { exit (s > lim) ? 0 : 1 }'; then
+    pair_reason="the two ratios spread \${PAIR_SPREAD_PCT}% (> \${PAIR_SPREAD_MAX_PCT}%)"
+  fi
+  if [[ -z "$pair_reason" ]]; then
+    PAIRING_STATE='mirrored'
+    paired=$(printf '%s\\n' "\${PAIR_RATIOS[@]}" | awk '{ s+=log($1); n++ } END { if (n==0) exit 1; printf "%.10g\\n", exp(s/n) }')
+    printf 'METRIC paired_speedup=%s\\n' "$paired"
+  else
+    PAIRING_STATE='inadmissible'
+    case "$pair_reason" in
+      *spread*) ;; # the cell-level warning already names the spread and its numbers
+      *) WARNINGS+=("pairing is inadmissible: $pair_reason") ;;
+    esac
+  fi
 fi
 
 if [[ $baseline_run -eq 1 ]]; then

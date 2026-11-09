@@ -14,6 +14,11 @@
  * data sets produces several entries under one cell id, and the per-cell
  * aggregate stays a `METRIC` line rather than a second reading entry.
  *
+ * `pairing` / `pairRatios` / `pairSpreadPct` say whether a same-job reference
+ * rode the run and whether its two ratios agreed. They are additive and
+ * optional: a reading written before pairing existed still parses, and the
+ * parser refuses an unknown state by name instead of guessing one.
+ *
  * The parser is strict on purpose. A record here may be the only evidence a
  * promotion claim rests on, so a truncated block, a body that is not JSON, an
  * unknown `schemaVersion`, or a verdict that contradicts its ratio is refused
@@ -39,6 +44,16 @@ export type BasisSource = "task-reported" | "shell-wall";
 
 export const BASIS_SOURCE_VALUES = ["task-reported", "shell-wall"] as const satisfies readonly BasisSource[];
 export const HOST_BOUND_VERDICTS = ["host_bound", "ok", "unmeasured"] as const satisfies readonly HostBoundVerdict[];
+
+/**
+ * Whether a same-job reference rode the run and whether its two ratios agreed.
+ * `absent` is legal (a contract with no `referenceCommand` keeps a labelled
+ * cross-run baseline); `inadmissible` means the reference did ride the run but
+ * the pair decides nothing, and the reading's warnings say why.
+ */
+export type Pairing = "mirrored" | "inadmissible" | "absent";
+
+export const PAIRING_VALUES = ["mirrored", "inadmissible", "absent"] as const satisfies readonly Pairing[];
 
 /** One `nvidia-smi` sample. Anything the driver reports as `[N/A]` is absent. */
 export interface GpuSample {
@@ -99,6 +114,22 @@ export interface KernelReading {
   hostBoundReason?: string;
   startedAt: string;
   finishedAt: string;
+  /**
+   * Written by the generated script when the contract names a reference; absent
+   * on a reading taken before pairing existed (the field is additive, so
+   * `schemaVersion` stays 1). The parser never invents it.
+   */
+  pairing?: Pairing;
+  /**
+   * Two ratios per cell, in cell order: `ref1/k1` then `ref2/k2` (inverted when
+   * higher is better). Never one on its own — half a pair is not a pair.
+   */
+  pairRatios?: number[];
+  /**
+   * Worst per-cell spread of a cell's two ratios, as a percentage of their
+   * mid-point. Above 5% the pair is `inadmissible`.
+   */
+  pairSpreadPct?: number;
   /** The `nvidia-smi --version` line, when the tool was there to ask. */
   nvidiaSmi?: string;
   warnings: string[];
@@ -259,6 +290,25 @@ function readingIssues(record: Record<string, unknown>): string[] {
 
   if (record.hostBoundReason !== undefined && typeof record.hostBoundReason !== "string") {
     issues.push("hostBoundReason must be a string when present");
+  }
+
+  // The paired reading. An unknown state is refused by name rather than ignored:
+  // a reader that guessed would have to decide on its own whether a keep rested
+  // on a same-job ratio or on nothing.
+  if (record.pairing !== undefined && !(PAIRING_VALUES as readonly unknown[]).includes(record.pairing)) {
+    issues.push(`pairing must be one of ${PAIRING_VALUES.join(", ")}, got ${JSON.stringify(record.pairing ?? null)}`);
+  }
+  if (record.pairRatios !== undefined) {
+    if (!Array.isArray(record.pairRatios)) {
+      issues.push("pairRatios must be an array of numbers when present");
+    } else {
+      for (const [index, ratio] of record.pairRatios.entries()) {
+        if (!isFiniteNumber(ratio)) issues.push(`pairRatios[${index}] is not a number`);
+      }
+    }
+  }
+  if (record.pairSpreadPct !== undefined && !isFiniteNumber(record.pairSpreadPct)) {
+    issues.push("pairSpreadPct must be a number when present");
   }
   if (typeof record.startedAt !== "string" || record.startedAt === "") issues.push("startedAt is missing");
   if (typeof record.finishedAt !== "string" || record.finishedAt === "") issues.push("finishedAt is missing");

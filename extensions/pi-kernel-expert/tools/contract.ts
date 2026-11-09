@@ -111,6 +111,12 @@ export function registerContractTool(pi: ExtensionAPI): void {
             "Shell command for the same-job reference implementation, measured in the same run. Must differ from benchmark_command.",
         }),
       ),
+      burn_in_ms: Type.Optional(
+        Type.Number({
+          description:
+            "Wall-clock burn-in before the first measured window when pairing, in ms (0 disables it). Default: 4000. The first window of a job reads 3-5% fast, so a burn-in keeps that bias off one side.",
+        }),
+      ),
       force: Type.Optional(
         Type.Boolean({ description: "Regenerate even when artifacts exist. Requires /goal allow-benchmark in sealed mode." }),
       ),
@@ -158,6 +164,7 @@ export function registerContractTool(pi: ExtensionAPI): void {
         basis: params.basis,
         harnessGlobs: params.harness_globs,
         referenceCommand: params.reference_command,
+        burnInMs: params.burn_in_ms,
         generator: GENERATOR,
       };
 

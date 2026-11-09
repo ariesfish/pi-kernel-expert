@@ -123,6 +123,29 @@ test("an empty or non-string group is refused, not ignored", () => {
   assert.match(parseRefused(block(numeric)), /cells\[0\]\.group must be a non-empty string/);
 });
 
+test("a pairing value this build does not know is refused by name", () => {
+  const reason = parseRefused(block(reading({ pairing: "mirror" })));
+  assert.match(reason, /pairing must be one of mirrored, inadmissible, absent/);
+  assert.match(reason, /"mirror"/);
+});
+
+test("the paired fields round-trip, and a ratio that is not a number is refused", () => {
+  const paired = parseOk(block(reading({ pairing: "mirrored", pairRatios: [1.002, 0.998], pairSpreadPct: 0.4 })));
+  assert.equal(paired.pairing, "mirrored");
+  assert.deepEqual(paired.pairRatios, [1.002, 0.998]);
+  assert.equal(paired.pairSpreadPct, 0.4);
+  assert.equal(READING_SCHEMA_VERSION, 1, "the paired fields are additive, not a new schema");
+
+  // A reading written before pairing existed still parses, and claims nothing.
+  const before = parseOk(block(reading()));
+  assert.equal(before.pairing, undefined);
+  assert.equal(before.pairRatios, undefined);
+
+  assert.match(parseRefused(block(reading({ pairRatios: [1, "2"] }))), /pairRatios\[1\] is not a number/);
+  assert.match(parseRefused(block(reading({ pairRatios: 1 }))), /pairRatios must be an array of numbers/);
+  assert.match(parseRefused(block(reading({ pairSpreadPct: "0.4" }))), /pairSpreadPct must be a number/);
+});
+
 test("a truncated block is refused by name", () => {
   const text = `${READING_START_MARKER}\n{"schemaVersion":1,"contractSha":"b"`;
   const reason = parseRefused(text);

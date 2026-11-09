@@ -18,6 +18,7 @@ import {
   parseReadingBlock,
   type HostBoundVerdict,
   type KernelReading,
+  type Pairing,
 } from "./reading.ts";
 import {
   applyForce,
@@ -29,11 +30,13 @@ import {
 } from "./refusals.ts";
 
 /**
- * Whether a same-job reference rode this run. Written by T-006's producer; a
- * reading without the field is `absent`, which is legal and loudly labelled —
- * a missing reference is the normal state of an existing task, not a defect.
+ * Whether a same-job reference rode this run, re-exported from the reading so a
+ * ledger reader needs one type. `mirrored` means the two pairs agreed inside the
+ * band; `inadmissible` means they did not and the reading's warnings say why;
+ * absent on a reading from a contract with no referenceCommand, which is the
+ * normal state of an existing task, not a defect.
  */
-export type Pairing = "mirrored" | "absent";
+export type { Pairing };
 
 /**
  * What the reading can support, never defaulted to a pass. `measured` means the
@@ -439,12 +442,12 @@ export function resolveReading(
 
 /**
  * The ledger copy of a reading: the fields a later reader needs to re-judge the
- * claim without the original log. `pairing` is read off the record when the
- * producer writes it (T-006); today it does not, so the honest value is `absent`.
+ * claim without the original log. `pairing` is the producer's own word — the
+ * typed field, never a re-derived guess; a reading written before the field
+ * existed is `absent` and says so.
  */
 export function summarizeReading(reading: KernelReading): ReadingEvidence {
-  const extras = reading as unknown as Record<string, unknown>;
-  const pairing: Pairing = extras.pairing === "mirrored" ? "mirrored" : "absent";
+  const pairing: Pairing = reading.pairing ?? "absent";
   return {
     contractSha: reading.contractSha,
     basis: reading.basis,

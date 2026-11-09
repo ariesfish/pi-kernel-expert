@@ -674,3 +674,181 @@ test("a contract this build did not write — cells without groups — is refuse
   assert.match(outcome.errors[0], /regenerate with kernel_contract/);
   assert.equal(fs.existsSync(workspacePaths(root).contract), false);
 });
+
+// --- same-job pairing: the reference rides the run --------------------------
+
+/**
+ * A workspace whose kernel and reference stubs append their own name to
+ * `calls.log`, so the order the script measures them in is readable afterwards.
+ * One boundary cell: one `default` group, so one window sequence per run.
+ */
+function pairWorkspace({ kernelBody, refBody, cells, burnInMs = 0 } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-pair-"));
+  initWorkspace(root);
+  fs.writeFileSync(
+    path.join(root, "kernel.sh"),
+    kernelBody ?? '#!/usr/bin/env bash\nset -euo pipefail\nprintf "%s\\n" kernel >> calls.log\necho 10\n',
+  );
+  fs.writeFileSync(
+    path.join(root, "ref.sh"),
+    refBody ?? '#!/usr/bin/env bash\nset -euo pipefail\nprintf "%s\\n" ref >> calls.log\necho 10\n',
+  );
+  const normalized = normalizeContract({
+    ...BASE,
+    benchmarkCommand: "bash kernel.sh",
+    referenceCommand: "bash ref.sh",
+    burnInMs,
+    repeats: 2,
+    warmup: 0,
+    cells: cells ?? [{ id: "a", dtype: "bf16", boundary: true }],
+  });
+  assert.deepEqual(normalized.errors, []);
+  const written = writeContractFiles({ root, contract: normalized.contract });
+  assert.equal(written.ok, true);
+  return { root, paths: workspacePaths(root) };
+}
+
+/** A stub that logs itself and answers differently on each invocation. */
+function countingRef(body) {
+  return [
+    "#!/usr/bin/env bash",
+    "set -euo pipefail",
+    'printf "%s\\n" ref >> calls.log',
+    'n=$(cat ref.count 2>/dev/null || echo 0)',
+    "n=$(( n + 1 ))",
+    'printf "%s\\n" "$n" > ref.count',
+    body,
+    "",
+  ].join("\n");
+}
+
+function callLog(root) {
+  return fs.readFileSync(path.join(root, "calls.log"), "utf8").split("\n").filter(Boolean);
+}
+
+test("with a referenceCommand the run burns in, then measures ref, kernel, kernel, ref", () => {
+  // A stub that costs ~5 ms per run, so a 80 ms burn-in buys ~16 kernel runs.
+  const slow = '#!/usr/bin/env bash\nset -euo pipefail\nprintf "%s\\n" kernel >> calls.log\nsleep 0.005\necho 10\n';
+  const { root, paths } = pairWorkspace({ kernelBody: slow, burnInMs: 80 });
+  const result = runScript(paths.benchmarkScript, root);
+  assert.equal(result.code, 0, result.stderr);
+
+  const log = callLog(root);
+  // Two runs per window (REPEATS=2, WARMUP=0), four windows, mirrored order.
+  assert.deepEqual(log.slice(-8), ["ref", "ref", "kernel", "kernel", "kernel", "kernel", "ref", "ref"]);
+
+  // Everything before the mirror is the burn-in, and it is the kernel under test.
+  const burnIn = log.slice(0, -8);
+  assert.ok(burnIn.length >= 2, `a 80 ms burn-in over 5 ms runs buys several, got ${burnIn.length}`);
+  assert.ok(burnIn.length <= 2000, `the burn-in is capped at 2000 runs, got ${burnIn.length}`);
+  assert.ok(
+    burnIn.every((name) => name === "kernel"),
+    `the burn-in uses the kernel under test: ${burnIn.join(",")}`,
+  );
+});
+
+test("burnInMs 0 skips the burn-in and says nothing, so a short bench is not a warning", () => {
+  const { root, paths } = pairWorkspace();
+  const result = runScript(paths.benchmarkScript, root);
+  assert.equal(result.code, 0, result.stderr);
+  const log = callLog(root);
+  assert.equal(log.length, 8, "the four windows only: no burn-in run");
+  const parsed = parseReadingBlock(result.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.equal(parsed.reading.pairing, "mirrored");
+});
+
+test("identical reference and kernel stubs give mirrored pairing, two ratios of 1, spread 0", () => {
+  const { root, paths } = pairWorkspace();
+  const result = runScript(paths.benchmarkScript, root);
+  assert.equal(result.code, 0, result.stderr);
+
+  const parsed = parseReadingBlock(result.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.equal(parsed.reading.pairing, "mirrored");
+  assert.equal(parsed.reading.pairRatios.length, 2, "one ratio per pair");
+  for (const ratio of parsed.reading.pairRatios) {
+    assert.ok(Math.abs(ratio - 1) < 1e-9, `a self-ratio is 1, got ${ratio}`);
+  }
+  assert.equal(parsed.reading.pairSpreadPct, 0);
+  // The paired ratio is a METRIC line of its own, next to the cross-run geomean.
+  assert.match(result.stdout, /^METRIC paired_speedup=1$/m);
+  assert.match(result.stdout, /^METRIC geomean_speedup=1$/m);
+  assert.ok(
+    result.stdout.indexOf("METRIC paired_speedup") < result.stdout.indexOf("METRIC geomean_speedup"),
+    "the pair is printed before the cross-run geomean",
+  );
+});
+
+test("a reference that fails its second window yields no half pair, and the kernel metrics stand", () => {
+  const { root, paths } = pairWorkspace({
+    // Window 1 (two runs) answers; window 2 refuses.
+    refBody: countingRef('if [[ $n -gt 2 ]]; then echo "reference blew up" >&2; exit 1; fi\necho 10'),
+  });
+  const result = runScript(paths.benchmarkScript, root);
+  assert.equal(result.code, 0, result.stderr);
+
+  const parsed = parseReadingBlock(result.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.equal(parsed.reading.pairing, "inadmissible");
+  assert.equal(parsed.reading.pairRatios, undefined, "no mean over one side, and no half pair");
+  assert.equal(parsed.reading.pairSpreadPct, undefined);
+  assert.equal(parsed.reading.cells.length, 1, "the kernel's own windows still produced a reading");
+  assert.equal(parsed.reading.cells[0].median, 10);
+  assert.match(result.stdout, /^METRIC latency_us_a_default=10$/m);
+  assert.doesNotMatch(result.stdout, /paired_speedup/, "an inadmissible pair prints no speedup");
+  assert.ok(
+    parsed.reading.warnings.some((warning) => /reference window 2 failed/.test(warning)),
+    `the warning should name the failed window: ${JSON.stringify(parsed.reading.warnings)}`,
+  );
+});
+
+test("two ratios more than 5% apart are inadmissible, and the warning names the spread", () => {
+  const { root, paths } = pairWorkspace({
+    // 10, 10 for the first window and 13, 13 for the second: ratios 1 and 1.3.
+    refBody: countingRef('if [[ $n -le 2 ]]; then echo 10; else echo 13; fi'),
+  });
+  const result = runScript(paths.benchmarkScript, root);
+  assert.equal(result.code, 0, result.stderr);
+
+  const parsed = parseReadingBlock(result.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.equal(parsed.reading.pairing, "inadmissible");
+  assert.deepEqual(parsed.reading.pairRatios, [1, 1.3], "both ratios are kept as evidence");
+  // |1 - 1.3| / mean(1, 1.3) * 100 = 26.087%
+  assert.ok(
+    parsed.reading.pairSpreadPct > 26 && parsed.reading.pairSpreadPct < 26.1,
+    `spread ${parsed.reading.pairSpreadPct}`,
+  );
+  const warning = parsed.reading.warnings.find((entry) => /spread/.test(entry));
+  assert.ok(warning, `a warning must name the spread: ${JSON.stringify(parsed.reading.warnings)}`);
+  assert.match(warning, /26\.0/);
+  assert.match(warning, /cell a/);
+  assert.doesNotMatch(result.stdout, /paired_speedup/);
+});
+
+test("a contract with no referenceCommand reports pairing absent and changes nothing else", () => {
+  const { root, paths } = readingWorkspace();
+  const result = runScript(paths.benchmarkScript, root);
+  assert.equal(result.code, 0, result.stderr);
+
+  const parsed = parseReadingBlock(result.stdout);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  assert.equal(parsed.reading.pairing, "absent");
+  assert.equal(parsed.reading.pairRatios, undefined, "no pair was taken, so no ratios are claimed");
+  assert.equal(parsed.reading.pairSpreadPct, undefined);
+  assert.doesNotMatch(result.stdout, /paired_speedup/);
+  assert.doesNotMatch(result.stdout, /burn-in|ref\.sh/, "the absent path measures one window per group");
+
+  // The METRIC lines are exactly the ones the cross-run baseline always printed.
+  const metricLines = result.stdout.split("\n").filter((line) => /^METRIC\s+/.test(line));
+  assert.deepEqual(metricLines, [
+    "METRIC latency_us_m1024_typical=1.5",
+    "METRIC latency_us_m1024_zero_block=1.5",
+    "METRIC latency_us_m1024_tail=1.5",
+    "METRIC latency_us_m1024=1.5",
+    "METRIC latency_us_m4096_default=1.5",
+    "METRIC latency_us_m4096=1.5",
+    "METRIC geomean_speedup=1",
+  ]);
+});

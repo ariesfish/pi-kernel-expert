@@ -98,7 +98,7 @@ async function setup({
   });
   assert.deepEqual(normalized.errors, []);
   const written = writeContractFiles({ root, contract: normalized.contract });
-  assert.equal(written.ok, true);
+  assert.equal(written.ok, true, written.ok ? "" : written.errors.join("\n"));
 
   fs.writeFileSync(path.join(root, "kernel", "attn.cu"), "v2\n");
   const fingerprint = await diffFingerprint({ exec: processExec(), root, scopeGlobs });
@@ -504,12 +504,30 @@ test("a reading passed as a path to the run log is accepted, and the ledger keep
   assert.equal(ledgerLine.verdict, "measured");
 });
 
-test("pairing is copied from the reading when the producer writes it", async () => {
+test("pairing is copied from the reading's typed field, and an inadmissible pair is not laundered into absent", async () => {
   const ctx = await setup();
-  const outcome = await recordCandidate(keepInput(ctx, { reading: readingText(readingRecord(ctx, { pairing: "mirrored" })) }));
+  const outcome = await recordCandidate(
+    keepInput(ctx, {
+      reading: readingText(readingRecord(ctx, { pairing: "mirrored", pairRatios: [1.004, 0.999], pairSpreadPct: 0.5 })),
+    }),
+  );
   assert.equal(outcome.ok, true, outcome.ok ? "" : outcome.errors.join("\n"));
   assert.equal(outcome.record.pairing, "mirrored");
+  assert.equal(outcome.record.reading.pairing, "mirrored", "the ledger copy keeps the producer's word");
   assert.equal(outcome.record.verdict, "measured");
+
+  const admitted = readCandidates(ctx.root);
+  assert.equal(admitted[0].pairing, "mirrored");
+
+  const spread = await recordCandidate(
+    keepInput(ctx, {
+      description: "a pair that did not agree",
+      reading: readingText(readingRecord(ctx, { pairing: "inadmissible", pairRatios: [1, 1.3], pairSpreadPct: 26.1 })),
+    }),
+  );
+  assert.equal(spread.ok, true, spread.ok ? "" : spread.errors.join("\n"));
+  assert.equal(spread.record.pairing, "inadmissible");
+  assert.match(formatCandidateOutcome(spread), /pairing inadmissible/);
 });
 
 test("force_with_reason accepts a run-level defect and the record lists what it forced", async () => {
