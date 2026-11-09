@@ -154,3 +154,95 @@ test("the freeze payload file matches the returned payload", () => {
   const onDisk = JSON.parse(fs.readFileSync(workspacePaths(root).freezePayload, "utf8"));
   assert.deepEqual(onDisk, outcome.result.freeze);
 });
+
+test("a written contract declares schemaVersion 2, basis device, and the generated harness globs", () => {
+  const contract = built();
+  assert.equal(contract.schemaVersion, 2);
+  assert.equal(contract.basis, "device");
+  assert.deepEqual(contract.harnessGlobs, ["goal.sh", "goal.checks.sh"]);
+  assert.equal(contract.referenceCommand, null);
+
+  const json = contractJson(contract);
+  assert.match(json, /"schemaVersion": 2/);
+  assert.match(json, /"basis": "device"/);
+  assert.match(json, /"harnessGlobs": \[\s*"goal\.sh",\s*"goal\.checks\.sh"\s*\]/);
+  assert.doesNotMatch(json, /"version": 1/, "a v1 `version` key must not survive into v2");
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-contract-"));
+  initWorkspace(root);
+  const outcome = writeContractFiles({ root, contract });
+  assert.equal(outcome.ok, true);
+  const onDisk = fs.readFileSync(workspacePaths(root).contract, "utf8");
+  assert.match(onDisk, /"schemaVersion": 2/);
+  assert.match(onDisk, /"basis": "device"/);
+});
+
+test("the basis round-trips as e2e and refuses anything else by name", () => {
+  const e2e = built({ basis: "e2e" });
+  assert.equal(e2e.basis, "e2e");
+  const reparsed = JSON.parse(contractJson(e2e));
+  assert.equal(reparsed.basis, "e2e");
+
+  const refused = normalizeContract({ ...BASE, basis: "host" });
+  assert.equal(refused.contract, undefined);
+  assert.match(refused.errors.join("\n"), /basis must be "device" or "e2e", got "host"/);
+});
+
+test("a reference command equal to the benchmark command is refused naming both fields", () => {
+  const refusals = [
+    { benchmarkCommand: "python bench.py --cell X", referenceCommand: "python bench.py --cell X" },
+    { benchmarkCommand: "bash bench.sh", referenceCommand: "  bash bench.sh  " },
+  ];
+  for (const overrides of refusals) {
+    const result = normalizeContract({ ...BASE, ...overrides });
+    assert.equal(result.contract, undefined);
+    const text = result.errors.join("\n");
+    assert.match(text, /referenceCommand and benchmarkCommand are the same command/);
+    assert.match(text, /referenceCommand/);
+    assert.match(text, /benchmarkCommand/);
+    assert.match(text, /a self-reference is not a reference/);
+  }
+
+  const distinct = built({ referenceCommand: "python ref.py --cell X" });
+  assert.equal(distinct.referenceCommand, "python ref.py --cell X");
+});
+
+test("an omitted harnessGlobs warns about a comparator the command runs", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-harness-"));
+  fs.writeFileSync(path.join(root, "bench.py"), "print(1)\n");
+  fs.writeFileSync(path.join(root, "compare.py"), "print(0)\n");
+
+  const result = normalizeContract(
+    {
+      ...BASE,
+      benchmarkCommand: "python bench.py --cell X",
+      checkCommand: "python compare.py | tee check.log",
+    },
+    { root },
+  );
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.contract.harnessGlobs, ["goal.sh", "goal.checks.sh"]);
+  const text = result.warnings.join("\n");
+  assert.match(text, /bench\.py \(called by benchmarkCommand\)/);
+  assert.match(text, /compare\.py \(called by checkCommand\)/);
+  assert.match(text, /no harnessGlobs entry covers it/);
+
+  const covered = normalizeContract(
+    { ...BASE, benchmarkCommand: "python bench.py --cell X", harnessGlobs: ["bench.py"] },
+    { root },
+  );
+  assert.deepEqual(covered.warnings, [], "an explicit harnessGlobs is not second-guessed");
+  assert.doesNotMatch(covered.warnings.join("\n"), /bench\.py/);
+});
+
+test("the freeze payload carries the basis, the harness globs, and the reference", () => {
+  const contract = built({ basis: "e2e", harnessGlobs: ["bench.py"], referenceCommand: "python ref.py" });
+  const payload = freezePayload(contract);
+  assert.equal(payload.basis, "e2e");
+  assert.deepEqual(payload.harness_globs, ["bench.py"]);
+  assert.equal(payload.reference_command, "python ref.py");
+
+  const withoutReference = freezePayload(built());
+  assert.equal(withoutReference.reference_command, null);
+  assert.deepEqual(withoutReference.harness_globs, ["goal.sh", "goal.checks.sh"]);
+});

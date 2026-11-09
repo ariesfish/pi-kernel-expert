@@ -246,6 +246,46 @@ test("unsafe run ids and non-numeric metrics are refused", async () => {
   assert.match(badMetric.errors.join("\n"), /must be a finite number/);
 });
 
+test("readContract refuses a v1 contract and an unversioned one instead of upgrading", async () => {
+  const ctx = await setup();
+  const file = path.join(ctx.root, "kernel.contract.json");
+  const current = JSON.parse(fs.readFileSync(file, "utf8"));
+  const REFUSAL = "kernel.contract.json is schema v1 (or unversioned); regenerate with kernel_contract";
+
+  fs.writeFileSync(file, `${JSON.stringify({ ...current, schemaVersion: 1 }, null, 2)}\n`);
+  const v1 = readContract(ctx.root);
+  assert.equal(v1.ok, false);
+  assert.equal(v1.reason, REFUSAL, "a v1 contract is refused in one line, naming the file");
+
+  const { schemaVersion, ...unversioned } = current;
+  fs.writeFileSync(file, `${JSON.stringify({ ...unversioned, version: 1 }, null, 2)}\n`);
+  const old = readContract(ctx.root);
+  assert.equal(old.ok, false);
+  assert.equal(old.reason, REFUSAL, "an unversioned contract is refused, never guessed at");
+
+  const recorded = await recordCandidate(keepInput(ctx));
+  assert.equal(recorded.ok, false);
+  assert.equal(recorded.errors[0], REFUSAL, "the recorder surfaces the reader's refusal unchanged");
+});
+
+test("readContract refuses a v2 contract that lost its basis or harnessGlobs", async () => {
+  const ctx = await setup();
+  const file = path.join(ctx.root, "kernel.contract.json");
+  const current = JSON.parse(fs.readFileSync(file, "utf8"));
+
+  const { basis, ...noBasis } = current;
+  fs.writeFileSync(file, `${JSON.stringify(noBasis, null, 2)}\n`);
+  const missingBasis = readContract(ctx.root);
+  assert.equal(missingBasis.ok, false);
+  assert.match(missingBasis.reason, /kernel\.contract\.json has no valid basis \(got null\); regenerate with kernel_contract/);
+
+  const { harnessGlobs, ...noHarness } = current;
+  fs.writeFileSync(file, `${JSON.stringify(noHarness, null, 2)}\n`);
+  const missingHarness = readContract(ctx.root);
+  assert.equal(missingHarness.ok, false);
+  assert.match(missingHarness.reason, /kernel\.contract\.json has no harnessGlobs; regenerate with kernel_contract/);
+});
+
 test("a corrupt contract is a refusal, not a crash", async () => {
   const ctx = await setup();
   fs.writeFileSync(path.join(ctx.root, "kernel.contract.json"), "{not json");

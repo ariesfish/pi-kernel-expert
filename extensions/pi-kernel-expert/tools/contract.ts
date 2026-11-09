@@ -43,6 +43,8 @@ export function registerContractTool(pi: ExtensionAPI): void {
       "The benchmark's first run records .kernel/baseline.tsv and reports geomean_speedup=1; later runs compare against it.",
       "Pass the returned payload to freeze_criteria, and use metric_name geomean_speedup with direction higher.",
       "goal.sh and goal.checks.sh are protected by pi-goal in sealed mode; regenerating needs force and /goal allow-benchmark.",
+      "If the check or benchmark command runs a file of your own (a .py comparator, a bench harness), add it to harness_globs: the default only protects the two generated scripts.",
+      "Set basis to e2e only when the command times the whole host call; a device-basis number and an e2e-basis number are never comparable.",
     ],
     parameters: Type.Object({
       objective: Type.String({ description: "One sentence: what this task optimizes." }),
@@ -73,6 +75,24 @@ export function registerContractTool(pi: ExtensionAPI): void {
       checks_timeout_seconds: Type.Optional(Type.Number({ description: "Timeout for the check criterion. Default: 900." })),
       scope_globs: Type.Optional(Type.Array(Type.String())),
       test_globs: Type.Optional(Type.Array(Type.String())),
+      basis: Type.Optional(
+        Type.Union([Type.Literal("device"), Type.Literal("e2e")], {
+          description:
+            'What the benchmark times: "device" (kernel device time) or "e2e" (whole host call). Default: device.',
+        }),
+      ),
+      harness_globs: Type.Optional(
+        Type.Array(Type.String(), {
+          description:
+            'Paths a diff may not touch (the comparator, the bench harness). Default: ["goal.sh", "goal.checks.sh"] — add the comparator or it stays writable.',
+        }),
+      ),
+      reference_command: Type.Optional(
+        Type.String({
+          description:
+            "Shell command for the same-job reference implementation, measured in the same run. Must differ from benchmark_command.",
+        }),
+      ),
       force: Type.Optional(
         Type.Boolean({ description: "Regenerate even when artifacts exist. Requires /goal allow-benchmark in sealed mode." }),
       ),
@@ -117,10 +137,13 @@ export function registerContractTool(pi: ExtensionAPI): void {
         checksTimeoutSeconds: params.checks_timeout_seconds,
         scopeGlobs: params.scope_globs,
         testGlobs: params.test_globs,
+        basis: params.basis,
+        harnessGlobs: params.harness_globs,
+        referenceCommand: params.reference_command,
         generator: GENERATOR,
       };
 
-      const normalized = normalizeContract(input);
+      const normalized = normalizeContract(input, { root });
       if (!normalized.contract) {
         return {
           content: [
@@ -151,12 +174,18 @@ export function registerContractTool(pi: ExtensionAPI): void {
       }
 
       const { sha, freeze, written: files } = written.result;
+      const warnings = normalized.warnings;
       const text = [
         `Contract frozen for ${normalized.contract.cells.length} cell(s).`,
         `kernel.contract.json sha256 ${sha}`,
+        `basis ${normalized.contract.basis}  harness ${normalized.contract.harnessGlobs.join(", ")}`,
+        normalized.contract.referenceCommand
+          ? `reference ${normalized.contract.referenceCommand}`
+          : "reference none (a cross-run baseline stays legal, labelled `pairing: absent`)",
         "",
         "written:",
         ...files.map((file) => `- ${path.relative(root, file)}`),
+        ...(warnings.length > 0 ? ["", "warnings:", ...warnings.map((warning) => `- ${warning}`)] : []),
         "",
         "Next:",
         "1. Pass kernel-freeze.json to freeze_criteria (one human confirmation).",
@@ -170,7 +199,7 @@ export function registerContractTool(pi: ExtensionAPI): void {
 
       return {
         content: [{ type: "text" as const, text }],
-        details: { sha, written: files, freeze },
+        details: { sha, written: files, freeze, warnings },
       };
     },
   });

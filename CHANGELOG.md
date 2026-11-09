@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking**: `kernel.contract.json` is now schema v2. A v1 or unversioned
+  contract is refused at read time with "regenerate with kernel_contract";
+  there is no migration. See `docs/adr/0006-contract-v2-reading-provenance.md`.
+- The contract records how the number was taken (`basis`: `device` | `e2e`),
+  which files make it (`harnessGlobs`, default `goal.sh` + `goal.checks.sh`),
+  and an optional same-job reference (`referenceCommand`). `kernel_contract`
+  warns when a command runs a file no harness glob covers.
+- Contract artifacts are written through temp files and renamed, contract last,
+  so an interrupted regeneration cannot leave a contract beside scripts whose
+  embedded sha disagrees with it.
+
 ## [0.4.0] - 2026-11-07
 
 ### Added

@@ -1,7 +1,25 @@
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
+import * as path from "node:path";
 
 import { workspacePaths } from "../workspace/layout.ts";
+
+/** The schema this build writes and the only one it reads. */
+export const CONTRACT_SCHEMA_VERSION = 2;
+
+/**
+ * How the number was taken: `device` means the kernel's own device time, `e2e`
+ * means the whole host-to-device call. A comparison across bases is meaningless.
+ */
+export type Basis = "device" | "e2e";
+
+export const BASIS_VALUES = ["device", "e2e"] as const satisfies readonly Basis[];
+
+/**
+ * What the generated scripts already protect. The task's own comparator is not
+ * here by design: it cannot be guessed, so the task must add it.
+ */
+export const DEFAULT_HARNESS_GLOBS = ["goal.sh", "goal.checks.sh"] as const;
 
 export interface CellInput {
   id: string;
@@ -26,6 +44,9 @@ export interface ContractInput {
   checksTimeoutSeconds?: number;
   scopeGlobs?: string[];
   testGlobs?: string[];
+  basis?: Basis;
+  harnessGlobs?: string[];
+  referenceCommand?: string;
   generator?: string;
 }
 
@@ -35,7 +56,7 @@ export interface Cell extends Required<Omit<CellInput, "boundary" | "vars">> {
 }
 
 export interface KernelContract {
-  version: 1;
+  schemaVersion: 2;
   objective: string;
   checkCommand: string;
   benchmarkCommand: string;
@@ -50,6 +71,10 @@ export interface KernelContract {
   checksTimeoutSeconds: number;
   scopeGlobs: string[];
   testGlobs: string[];
+  basis: Basis;
+  harnessGlobs: string[];
+  /** `null` when the task has no same-job reference; a self-reference is refused. */
+  referenceCommand: string | null;
   generator: string;
 }
 
@@ -63,9 +88,19 @@ const FORBIDDEN_IN_VALUE = /[|\n\r,]/;
 export interface NormalizeResult {
   contract?: KernelContract;
   errors: string[];
+  /** Non-blocking findings, e.g. a harness file no glob covers. */
+  warnings: string[];
 }
 
-export function normalizeContract(input: ContractInput): NormalizeResult {
+export interface NormalizeOptions {
+  /**
+   * Task root. When given and the caller omitted `harnessGlobs`, the commands
+   * are scanned for relative paths that exist on disk but no glob covers.
+   */
+  root?: string;
+}
+
+export function normalizeContract(input: ContractInput, options: NormalizeOptions = {}): NormalizeResult {
   const errors: string[] = [];
 
   if (!input.objective?.trim()) errors.push("objective is required");
@@ -156,28 +191,128 @@ export function normalizeContract(input: ContractInput): NormalizeResult {
   const scopeGlobs = cleanGlobs(input.scopeGlobs, "scopeGlobs", errors);
   const testGlobs = cleanGlobs(input.testGlobs, "testGlobs", errors);
 
-  if (errors.length > 0) return { errors };
-  return {
-    contract: {
-      version: 1,
-      objective: input.objective.trim(),
-      checkCommand: input.checkCommand.trim(),
-      benchmarkCommand: input.benchmarkCommand.trim(),
-      cells,
-      tolerance: { rtol: tolerance.rtol, atol: tolerance.atol },
-      metricName,
-      direction,
-      repeats,
-      warmup,
-      guardPct,
-      noiseFloorPct,
-      checksTimeoutSeconds,
-      scopeGlobs,
-      testGlobs,
-      generator: input.generator?.trim() || "pi-kernel-expert",
-    },
-    errors: [],
+  const basis = input.basis ?? "device";
+  if (basis !== "device" && basis !== "e2e") {
+    errors.push(`basis must be "device" or "e2e", got ${JSON.stringify(input.basis)}`);
+  }
+
+  const harnessGlobs =
+    input.harnessGlobs === undefined
+      ? [...DEFAULT_HARNESS_GLOBS]
+      : cleanGlobs(input.harnessGlobs, "harnessGlobs", errors);
+  if (input.harnessGlobs !== undefined && harnessGlobs.length === 0) {
+    errors.push(
+      `harnessGlobs must name at least one protected path; omit it to keep the default (${DEFAULT_HARNESS_GLOBS.join(", ")})`,
+    );
+  }
+
+  const benchmarkCommand = input.benchmarkCommand?.trim() ?? "";
+  const referenceCommand = input.referenceCommand?.trim() || null;
+  if (referenceCommand !== null && referenceCommand === benchmarkCommand) {
+    errors.push(
+      `referenceCommand and benchmarkCommand are the same command ("${referenceCommand}"); a self-reference is not a reference`,
+    );
+  }
+
+  if (errors.length > 0) return { errors, warnings: [] };
+  const contract: KernelContract = {
+    schemaVersion: CONTRACT_SCHEMA_VERSION,
+    objective: input.objective.trim(),
+    checkCommand: input.checkCommand.trim(),
+    benchmarkCommand: input.benchmarkCommand.trim(),
+    cells,
+    tolerance: { rtol: tolerance.rtol, atol: tolerance.atol },
+    metricName,
+    direction,
+    repeats,
+    warmup,
+    guardPct,
+    noiseFloorPct,
+    checksTimeoutSeconds,
+    scopeGlobs,
+    testGlobs,
+    basis,
+    harnessGlobs,
+    referenceCommand,
+    generator: input.generator?.trim() || "pi-kernel-expert",
   };
+  const warnings =
+    input.harnessGlobs === undefined && options.root
+      ? uncoveredHarnessWarnings(contract, options.root)
+      : [];
+  return { contract, errors: [], warnings };
+}
+
+/**
+ * Cheap catch for "the comparator is writable": the default globs only cover
+ * the generated scripts, so any other relative path a command invokes and that
+ * exists on disk is named. A warning, never an error — the file may be a
+ * vendored read-only helper the user trusts.
+ */
+export function uncoveredHarnessWarnings(contract: KernelContract, root: string): string[] {
+  const warnings: string[] = [];
+  const seen = new Set<string>();
+  const commands: Array<[string, string]> = [
+    ["benchmarkCommand", contract.benchmarkCommand],
+    ["checkCommand", contract.checkCommand],
+  ];
+  for (const [field, command] of commands) {
+    for (const token of commandTokens(command)) {
+      if (seen.has(token)) continue;
+      seen.add(token);
+      const absolute = path.join(root, token);
+      if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) continue;
+      if (contract.harnessGlobs.some((glob) => globMatches(glob, token))) continue;
+      warnings.push(
+        `${token} (called by ${field}) exists but no harnessGlobs entry covers it; add it so a diff cannot edit that harness`,
+      );
+    }
+  }
+  return warnings;
+}
+
+/** Relative path-looking words in a command line; flags and shell syntax are skipped. */
+function commandTokens(command: string): string[] {
+  return command
+    .split(/[\s|;]+/)
+    .map((token) => token.replace(/^['"]|['"]$/g, ""))
+    .filter((token) => token !== "")
+    .filter((token) => !token.startsWith("-"))
+    .filter((token) => !/[$`=()*<>]/.test(token))
+    .filter((token) => !token.startsWith("/") && !token.endsWith("/"))
+    .map((token) => token.replace(/^\.\//, ""));
+}
+
+/** Enough glob for harness paths: `*`, `?`, and `**`. */
+function globMatches(glob: string, relativePath: string): boolean {
+  return globToRegExp(glob.replace(/^\.\//, "")).test(relativePath);
+}
+
+function globToRegExp(glob: string): RegExp {
+  let source = "";
+  for (let index = 0; index < glob.length; index += 1) {
+    const char = glob[index];
+    if (char === "*") {
+      if (glob[index + 1] === "*") {
+        index += 1;
+        if (glob[index + 1] === "/") {
+          index += 1;
+          source += "(?:.*/)?";
+        } else {
+          source += ".*";
+        }
+      } else {
+        source += "[^/]*";
+      }
+      continue;
+    }
+    if (char === "?") {
+      source += "[^/]";
+      continue;
+    }
+    source += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(`^${source}$`);
 }
 
 function cleanGlobs(value: string[] | undefined, label: string, errors: string[]): string[] {
@@ -220,6 +355,10 @@ export interface FreezePayload {
   criteria: FreezeCriterion[];
   test_globs: string[];
   scope_globs: string[];
+  basis: Basis;
+  harness_globs: string[];
+  /** Recorded even when there is none, so the payload always states the pairing. */
+  reference_command: string | null;
 }
 
 /** Exactly one blocking metric criterion, as pi-goal requires. */
@@ -248,6 +387,9 @@ export function freezePayload(contract: KernelContract): FreezePayload {
     ],
     test_globs: contract.testGlobs,
     scope_globs: contract.scopeGlobs,
+    basis: contract.basis,
+    harness_globs: contract.harnessGlobs,
+    reference_command: contract.referenceCommand,
   };
 }
 
@@ -282,12 +424,22 @@ export function writeContractFiles(options: {
   }
 
   const freeze = freezePayload(options.contract);
-  fs.writeFileSync(paths.contract, json);
-  fs.writeFileSync(paths.benchmarkScript, renderBenchmarkScript(options.contract, sha));
-  fs.writeFileSync(paths.checksScript, renderChecksScript(options.contract, sha));
-  fs.writeFileSync(paths.freezePayload, `${JSON.stringify(freeze, null, 2)}\n`);
-  for (const script of [paths.benchmarkScript, paths.checksScript]) {
-    fs.chmodSync(script, 0o755);
+  // Write every file to a sibling temp path first, then rename. A crash leaves
+  // either the old artifact set or the new one, never a half-written contract
+  // whose scripts disagree with its sha.
+  try {
+    writeFileAtomic(paths.benchmarkScript, renderBenchmarkScript(options.contract, sha), 0o755);
+    writeFileAtomic(paths.checksScript, renderChecksScript(options.contract, sha), 0o755);
+    writeFileAtomic(paths.freezePayload, `${JSON.stringify(freeze, null, 2)}\n`);
+    writeFileAtomic(paths.contract, json);
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [
+        `could not write the contract artifacts: ${error instanceof Error ? error.message : String(error)}`,
+        `check the workspace is writable at ${options.root}; nothing was committed to disk by this call`,
+      ],
+    };
   }
 
   return {
@@ -298,6 +450,25 @@ export function writeContractFiles(options: {
       freeze,
     },
   };
+}
+
+function writeFileAtomic(file: string, contents: string, mode?: number): void {
+  const temporary = path.join(
+    path.dirname(file),
+    `.${path.basename(file)}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 10)}`,
+  );
+  try {
+    fs.writeFileSync(temporary, contents, mode === undefined ? undefined : { mode });
+    if (mode !== undefined) fs.chmodSync(temporary, mode);
+    fs.renameSync(temporary, file);
+  } catch (error) {
+    try {
+      fs.unlinkSync(temporary);
+    } catch {
+      // the temp file may never have existed; the original error is the useful one
+    }
+    throw error;
+  }
 }
 
 function shQuote(value: string): string {
