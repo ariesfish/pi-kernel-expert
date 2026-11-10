@@ -1,6 +1,8 @@
 # Issue Tracker: Local Files (`.dev/`)
 
-This repo tracks issues as plain files under `.dev/` — per-developer process memory. `/.dev/` is gitignored: it is one developer's in-flight working set, never the shared record. The durable record is the merged code, commits, and `docs/adr/`.
+This repo tracks issues as plain files under `.dev/` and **tracks them in git**: one owner, more than one machine. A ticket graph that exists on one laptop is not a tracker, and this repo's evidence (`runs/`) is only reviewable if it travels. The shared record is still the merged code, commits, and `docs/adr/`; `.dev/` is how the work was found.
+
+Three things stay ignored even so: `.dev/worktrees/` (physical git worktrees), `.dev/**/*.sqlite` (agent state), and `.dev/**/node_modules/`.
 
 ## Layout: feature-first
 

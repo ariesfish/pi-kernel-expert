@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 2,
+  "objective": "SAXPY y[i] = a*x[i] + y[i] over fp32 must match the CPU reference within atol 1e-6 on the typical, zero_block and tail data sets, at a device time the bench actually measured.",
+  "checkCommand": "bash check.sh",
+  "benchmarkCommand": "/root/pkex/ws-t005/bench --n 1048576 --sleep-ms 2",
+  "cells": [
+    {
+      "id": "saxpy",
+      "dtype": "fp32",
+      "vars": {},
+      "boundary": false,
+      "groups": [
+        {
+          "name": "typical",
+          "intent": "random fp32 in [-1, 1) for x and y, a=2.5; the ordinary data path",
+          "seed": 12345
+        },
+        {
+          "name": "zero_block",
+          "intent": "a quarter of x is exactly zero with y non-zero; fails a zero-input fast path that stores zero instead of leaving y",
+          "seed": 12345
+        },
+        {
+          "name": "tail",
+          "intent": "N+37 elements, so the last partial 256-thread block is exercised",
+          "seed": 12345
+        }
+      ]
+    }
+  ],
+  "tolerance": {
+    "rtol": 0.00001,
+    "atol": 0.000001
+  },
+  "metricName": "latency_us",
+  "direction": "lower",
+  "repeats": 5,
+  "warmup": 2,
+  "guardPct": 5,
+  "noiseFloorPct": 2,
+  "checksTimeoutSeconds": 900,
+  "scopeGlobs": [],
+  "testGlobs": [],
+  "basis": "device",
+  "harnessGlobs": [
+    "goal.sh",
+    "goal.checks.sh",
+    "check.sh",
+    "kernel.cu",
+    "bench.cu",
+    "bench_bad.py"
+  ],
+  "referenceCommand": null,
+  "calibrateCommand": null,
+  "burnInMs": 4000,
+  "generator": "pi-kernel-expert"
+}

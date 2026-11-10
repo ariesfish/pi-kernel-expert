@@ -1,0 +1,3 @@
+parser: ok — basis=device ratio=0.46000893655 verdict=ok
+contract: reading d3191f6eb124 / file d3191f6eb124 — same contract
+refusals: 0

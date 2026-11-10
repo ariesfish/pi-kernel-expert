@@ -1,0 +1,39 @@
+== shell ==
+host:     h200-7
+user:     root  HOME=/root
+interactive: no-tty
+PATH:     /usr/local/cuda-13.0/bin:/opt/nvidia/nsight-compute/2025.3.1:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+CUDA_VISIBLE_DEVICES: <unset>
+== toolchain ==
+nvcc:     Cuda compilation tools, release 13.0, V13.0.88
+nvcc at:  /usr/local/cuda-13.0/bin/nvcc
+ncu:      Version 2025.3.1.0 (build 36398880) (public-release)
+ncu at:   /usr/local/cuda-13.0/bin/ncu
+ncu@opt:  Version 2025.3.1.0 (build 36398880) (public-release)  [/opt/nvidia/nsight-compute/2025.3.1/ncu]
+== torch (pkex venv) ==
+python:   Python 3.12.14 (main, Aug 14 2026, 15:34:45) [Clang 22.1.3 ] [/root/pkex/venv/bin/python]
+torch:    2.14.1+cu130
+torch.version.cuda: 13.0
+torch.cuda.is_available(): True
+device_count: 8
+device[0]: NVIDIA H200 139.8 GiB sm_90
+device[1]: NVIDIA H200 139.8 GiB sm_90
+device[2]: NVIDIA H200 139.8 GiB sm_90
+device[3]: NVIDIA H200 139.8 GiB sm_90
+device[4]: NVIDIA H200 139.8 GiB sm_90
+device[5]: NVIDIA H200 139.8 GiB sm_90
+device[6]: NVIDIA H200 139.8 GiB sm_90
+device[7]: NVIDIA H200 139.8 GiB sm_90
+smoke:    matmul 64x64 -> (64, 64) torch.float32 finite=True
+== gpus (nvidia-smi) ==
+gpu0  NVIDIA H200  used 124414 MiB  free 18743 MiB   util 100 %   clocks.sm 1500 MHz
+gpu1  NVIDIA H200  used 124606 MiB  free 18551 MiB   util 100 %   clocks.sm 1470 MHz
+gpu2  NVIDIA H200  used 124560 MiB  free 18597 MiB   util 100 %   clocks.sm 1515 MHz
+gpu3  NVIDIA H200  used 124528 MiB  free 18629 MiB   util 100 %   clocks.sm 1665 MHz
+gpu4  NVIDIA H200  used 124536 MiB  free 18621 MiB   util 100 %   clocks.sm 1560 MHz
+gpu5  NVIDIA H200  used 124514 MiB  free 18643 MiB   util 100 %   clocks.sm 1470 MHz
+gpu6  NVIDIA H200  used 124560 MiB  free 18597 MiB   util 100 %   clocks.sm 1635 MHz
+gpu7  NVIDIA H200  used 124080 MiB  free 19077 MiB   util 100 %   clocks.sm 1575 MHz
+gpus seen by nvidia-smi: 8
+== verdict ==
+RESULT: ok — nvcc, ncu, torch(/root/pkex/venv/bin/python) and CUDA devices all present

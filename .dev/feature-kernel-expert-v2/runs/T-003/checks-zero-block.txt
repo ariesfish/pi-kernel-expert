@@ -1,0 +1,6 @@
+FAIL cell saxpy group zero_block pass 1:
+verify n=1048576 group=zero_block impl=fast a=2.5 seed=12345 tol=1e-06
+max_diff=0.9999853373
+check.sh: group zero_block mismatched the CPU reference (exit 1)
+note: cell saxpy group zero_block printed no max_diff; its precision row is n/a and is not compared — a non-numeric check is not evidence of precision
+checks failed: 1 cell/group pair(s); a pair that passes once and fails twice may be order-dependent

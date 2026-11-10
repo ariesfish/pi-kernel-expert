@@ -1,0 +1,4 @@
+parser: ok — basis=device ratio=1.0013705979 verdict=host_bound
+contract: reading 8b57f932b00d / file 8b57f932b00d — same contract
+refusals: 1
+host-bound (charged to the candidate): hostBoundRatio 1.0013705979 on a device basis: the timed window is mostly the host path, so this speedup measures dispatch, not the kernel. Check the four host causes, in order: recompile/JIT per call, python-side allocation, extra launches, synchronize inside the call. Fix: thin the host path — build the arguments and outputs once, launch once, and drop any synchronize inside the timed call — then re-run goal.sh; the same kernel behind a thinner host path is the number to keep

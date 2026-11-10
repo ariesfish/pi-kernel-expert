@@ -1,0 +1,23 @@
+== shell ==
+host:     h200-7
+user:     root  HOME=/root
+interactive: no-tty
+PATH:     /nonexistent/cuda/bin:/nonexistent/nsight:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+CUDA_VISIBLE_DEVICES: <unset>
+== toolchain ==
+MISSING: nvcc (not found under /nonexistent/cuda/bin)
+MISSING: ncu (not found under /nonexistent/nsight)
+== torch (pkex venv) ==
+MISSING: torch (no interpreter at /nonexistent/python (run: uv venv --python 3.12 ~/pkex/venv))
+== gpus (nvidia-smi) ==
+gpu0  NVIDIA H200  used 124414 MiB  free 18743 MiB   util 100 %   clocks.sm 1680 MHz
+gpu1  NVIDIA H200  used 124606 MiB  free 18551 MiB   util 100 %   clocks.sm 1575 MHz
+gpu2  NVIDIA H200  used 124560 MiB  free 18597 MiB   util 100 %   clocks.sm 1605 MHz
+gpu3  NVIDIA H200  used 124528 MiB  free 18629 MiB   util 100 %   clocks.sm 1680 MHz
+gpu4  NVIDIA H200  used 124536 MiB  free 18621 MiB   util 100 %   clocks.sm 1605 MHz
+gpu5  NVIDIA H200  used 124514 MiB  free 18643 MiB   util 100 %   clocks.sm 1605 MHz
+gpu6  NVIDIA H200  used 124560 MiB  free 18597 MiB   util 100 %   clocks.sm 1560 MHz
+gpu7  NVIDIA H200  used 124080 MiB  free 19077 MiB   util 100 %   clocks.sm 1620 MHz
+gpus seen by nvidia-smi: 8
+== verdict ==
+RESULT: incomplete — 3 missing item(s): nvcc ncu torch

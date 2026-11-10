@@ -1,0 +1,8 @@
+METRIC latency_us_saxpy_typical=4.573
+METRIC latency_us_saxpy_zero_block=4.558
+METRIC latency_us_saxpy_tail=4.438
+METRIC latency_us_saxpy=4.522594047
+METRIC geomean_speedup=1.046633503
+=== KERNEL READING ===
+{"schemaVersion":1,"contractSha":"f0f2258bde7addac140e37884ba7c21b2a2195e8c9310f4ed2158a61d6ca61a3","basis":"device","basisSource":"task-reported","gpu":{"available":true,"name":"NVIDIA H200","index":3,"visible":"3","start":{"clocksSmMhz":345,"clocksMemMhz":3201,"utilPct":0,"foreignProcessMiB":0,"clocksMaxSmMhz":1980},"loaded":{"clocksSmMhz":1980,"clocksMemMhz":3201,"utilPct":2,"foreignProcessMiB":0,"clocksMaxSmMhz":1980},"end":{"clocksSmMhz":1980,"clocksMemMhz":3201,"utilPct":0,"foreignProcessMiB":0,"clocksMaxSmMhz":1980}},"cells":[{"id":"saxpy","group":"typical","metric":"latency_us_saxpy_typical","median":4.573,"samples":5,"spreadPct":3.28012245791},{"id":"saxpy","group":"zero_block","metric":"latency_us_saxpy_zero_block","median":4.558,"samples":5,"spreadPct":3.57612988153},{"id":"saxpy","group":"tail","metric":"latency_us_saxpy_tail","median":4.438,"samples":5,"spreadPct":2.88418206399}],"shellMs":13928,"hostEnqueueMs":0.002083,"deviceMs":0.00455,"hostBoundRatio":0.457802197802,"hostBoundVerdict":"ok","pairing":"absent","startedAt":"2026-11-09T09:40:14Z","finishedAt":"2026-11-09T09:40:28Z","clockLocked":{"declaredSmMhz":1500,"declaredMemMhz":3201,"observedSmMhz":1980,"held":false},"hostEnqueueSamples":15,"deviceSamples":15,"nvidiaSmi":"NVIDIA-SMI version  : 580.178.04","warnings":["clock lock declared at 1500 MHz but the loaded sample read 1980 MHz: the lock did not hold, so this reading's clocks are not the ones the contract names"]}
+=== END KERNEL READING ===

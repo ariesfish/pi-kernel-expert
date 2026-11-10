@@ -1,0 +1,40 @@
+{
+  "objective": "SAXPY y[i] = a*x[i] + y[i] over fp32 must match the CPU reference within atol 1e-6 on the typical, zero_block and tail data sets, at a device time the bench actually measured.",
+  "criteria": [
+    {
+      "id": "M1",
+      "statement": "geomean speedup over the recorded baseline across 1 matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; 3 group(s) in the matrix)",
+      "kind": "metric",
+      "blocking": true,
+      "metric": {
+        "name": "geomean_speedup",
+        "direction": "higher",
+        "unit": "x"
+      }
+    },
+    {
+      "id": "C1",
+      "statement": "every matrix cell matches the reference on every input group, on two consecutive passes",
+      "kind": "command",
+      "blocking": true,
+      "check": {
+        "command": "bash goal.checks.sh",
+        "expect": "exit0",
+        "timeoutSeconds": 900
+      }
+    }
+  ],
+  "test_globs": [],
+  "scope_globs": [],
+  "basis": "device",
+  "harness_globs": [
+    "goal.sh",
+    "goal.checks.sh",
+    "check.sh",
+    "kernel.cu",
+    "bench.cu",
+    "bench_bad.py"
+  ],
+  "reference_command": null,
+  "burn_in_ms": 4000
+}

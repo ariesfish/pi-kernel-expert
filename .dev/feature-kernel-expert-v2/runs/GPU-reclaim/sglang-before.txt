@@ -1,0 +1,10 @@
+=== captured before shutdown ===
+ 491573  491571  5-02:13:27 /tmp/lockgen/.venv/bin/python -m zlinfer.launch_server --model-path /data/cache/hub/models--deepseek-ai--DeepSeek-V4.1-Flash-1017/snapshots/1bae0e1088993b9b82de08f59de5be5a34e42170 --served-model-name dsv41-flash --trust-remote-code --host 0.0.0.0 --port 30090 --tp 8 --ep-size 8 --mem-fraction-static 0.85 --max-running-requests 64 --chunked-prefill-size 8192 --max-prefill-tokens 8192 --fp8-gemm-backend deep_gemm --moe-runner-backend deep_gemm --disable-flashinfer-autotune --no-enable-decoder-swa-bounded-replay --cuda-graph-backend-decode disabled --cuda-graph-backend-prefill disabled --watchdog-timeout 3600 --moe-a2a-backend deepep --deepep-mode normal --enable-two-batch-overlap
+--- cwd:
+/root
+--- env (selected):
+PYTHONPATH=/root/zlinfer/engine/py
+PATH=/tmp/lockgen/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+--- schedulers:
+ 491750 sglang::scheduler_TP0_EP0
+ 491757 sglang::scheduler_TP7_EP7
