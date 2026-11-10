@@ -18,6 +18,7 @@ export interface WorkspacePaths {
   docs: string;
   draft: string;
   plan: string;
+  milestone: string;
   profile: string;
   runs: string;
   candidates: string;
@@ -37,6 +38,7 @@ export function workspacePaths(root: string): WorkspacePaths {
     docs,
     draft: path.join(docs, "draft.md"),
     plan: path.join(docs, "plan.md"),
+    milestone: path.join(docs, "milestone.md"),
     profile: path.join(root, "profile"),
     runs: path.join(root, "runs"),
     candidates: path.join(root, "candidates.jsonl"),
@@ -68,6 +70,7 @@ export function initWorkspace(root: string): InitResult {
   const files: Array<[string, string]> = [
     [paths.draft, renderDraftTemplate()],
     [paths.plan, renderPlanTemplate()],
+    [paths.milestone, renderMilestoneTemplate()],
     [paths.candidates, ""],
   ];
   for (const [file, body] of files) {
@@ -124,6 +127,61 @@ export function renderPlanTemplate(): string {
     "<What makes the loop stop: promotion met, budget exhausted, or an explicit blocker.>",
     "",
   ].join("\n");
+}
+
+/**
+ * The milestone template. Every slot is a `<...>` placeholder on purpose: the
+ * validator refuses each one *by name*, so the first thing the tool tells a new
+ * task is which of its plan rows is still a form. A template that validated
+ * would be a plan nobody wrote and everybody trusted.
+ */
+export function renderMilestoneTemplate(): string {
+  return `# Milestone
+
+## 1. Problem and Target
+<What is slow, measured where, and the number this task has to move.>
+
+## 2. Contract
+- basis: <device or e2e>
+- cells: <the cell ids from kernel.contract.json>
+- groups: <one per cell, or default when the cell has none>
+
+## 3. DAG and Phase Order
+<Why this order. M0 first, because its gate is what unblocks the rest.>
+A gate line's [VERIFY: ...] class is followed by its pointer (profile:RUN, or
+cell-group:CELL/GROUP), and the pointer is resolved against profile/ and the
+contract — so it has to name something that exists.
+
+### M0 Contract
+- tile: <elements per block, threads, elements per thread>
+- smem: <none, or the inventory and its stages>
+- warp roles: <which warps do what>
+- register budget: <registers per thread, and what breaks if it moves>
+- issue order: <the inner loop, in order>
+- accumulator precision: <fp32, tf32, fp16, ...>
+
+### M0 Architecture
+#### D0.1 <the first decision, as a verb phrase>
+- Action: <what changes>
+- Purpose: <why, in terms of the limiter this kernel is bound by>
+- Trigger: <the observable that says it is time, never a category>
+- Cost: <effort, and what it costs in registers or smem>
+- Depends on: none
+
+### M0 Gate
+- <the number that moves, and by how much> [VERIFY: ncu-direct]
+- <what must stay correct> [VERIFY: correctness]
+- <the mechanism that landed, which is why the number moved> [VERIFY: mechanism]
+
+## 4. Dead Ends
+- <D ids> | <reason, with the number that killed it> | <evidence pointer>
+
+## 5. Global Gate
+<Which cells and groups the gate covers, and what it does not cover.>
+
+## 6. Rules
+<What a candidate may not change in this task.>
+`;
 }
 
 /** Headings present in the document, normalized for comparison. */

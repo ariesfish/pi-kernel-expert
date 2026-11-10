@@ -44,6 +44,7 @@ kernel-shaped artifacts and the evidence. Do not re-implement the loop in prose.
 | 1. Contract | `kernel_init` | `docs/draft.md`, `docs/plan.md`, `profile/`, `candidates.jsonl`, `.kernel/` |
 | 2. Plan draft | fill `docs/draft.md`; `kernel_wiki` for background | baseline, risks, ranked directions, exact commands, evidence required |
 | 3. Executable plan | fill `docs/plan.md` | steps, evidence per step, stop conditions |
+| 3b. Milestone | fill `docs/milestone.md` (template from `kernel_init`); `kernel_milestone` to validate, `lock: true` once M0 holds | addressable decisions `D<m>.<n>`, typed gate lines, dead ends, and a frozen M0 contract |
 | 4. Freeze | `kernel_contract` → `freeze_criteria` | `kernel.contract.json`, `goal.sh`, `goal.checks.sh`, `kernel-freeze.json` |
 | 5. Baseline | `run_goal` → `log_goal` (keep) | `.kernel/baseline.tsv`, `goal.jsonl` |
 | 6. Candidate | edit → `run_goal` → `log_goal` | run entry + commit on keep, reverted attempt on reject |
@@ -113,6 +114,18 @@ higher`.
 9. **Cite knowledge as knowledge.** A kernel-wiki page id and confidence
    (`verified` > `source-reported` > `inferred` > `experimental`) supports a
    direction or a diagnosis, never a measurement.
+10. **The milestone is the plan's address.** A keep names the decision it
+    implements (`milestone_decision: "D0.3"`, or a `+` joined bundle). An id the
+    milestone does not have is refused, and so is a bundle the plan recorded as
+    a dead end unless `precondition` says what changed. `force_with_reason`
+    never buys attribution.
+11. **M0 is frozen once it is locked.** `kernel_milestone lock: true` freezes the
+    `### M0 Contract` block; after that an edit is refused as `m0-thawed` and the
+    way through is `unlock: true` with a reason, which lands in `## 4. Dead Ends`.
+12. **A plateau is diagnosed, not retried.** Three consecutive rejects means the
+    plan's reading is wrong somewhere: run `kernel-diagnose`, record its
+    `### Diagnosis <id>` block, then edit the milestone yourself. A diagnosis
+    never gates — it is what the plan learned.
 
 ## Reading a failure
 
@@ -137,6 +150,15 @@ higher`.
 | `kernel_candidate`: `precision-regression` says `e_ref is unmeasured` | nobody ran the calibration, so there is no ruler | `bash goal.checks.sh --calibrate`, or `force_with_reason` once and the ledger records it |
 | `kernel_candidate`: `profile-stale` | code changed after profiling | re-profile this diff |
 | `kernel_candidate`: metric not present | the claim cites a metric the report lacks | cite one that exists, or report the absence |
+| `kernel_candidate`: `decision-missing` | a keep that names no decision, while the milestone has decisions | pass `milestone_decision` with the id this change implements |
+| `kernel_candidate`: `decision-unknown` | the id is not in `docs/milestone.md` | add the decision first, or name the decision the change really implements |
+| `kernel_candidate`: `milestone-stale` | the milestone moved after you read it | re-read it and pass the current sha |
+| `kernel_candidate`: `dead-end-bundle` | the bundle is a recorded dead end and no precondition was given | say what is different, or implement one of the pair |
+| `kernel_milestone`: a `route-placeholder` per line you have not written | `kernel_init`'s template, which is meant to be refused | fill each named slot; the refusal names them all in one pass |
+| `kernel_milestone`: `m0-thawed` | the M0 contract changed after the lock | restore it, or `unlock: true` with a reason that lands in Dead Ends |
+| `kernel_milestone`: `gate-citation-unresolved` | a gate line cites a run or a cell/group that is not there | profile it, or cite one that exists; the message names the lookup path |
+| `kernel_milestone`: `gate-cites-knowledge` | a wiki page used as proof | move the citation to the decision's Purpose or Trigger; a page cannot measure this card |
+| `kernel_milestone`: `diagnosis-measurement` / `diagnosis-citation` | the diagnosis has no runnable command, or a citation that does not open | write one command plus the outcomes it separates, and cite lines that exist |
 
 ## Profiling discipline
 

@@ -188,7 +188,7 @@ T-015 workspace integration + kernel-flow skill  (after T-010)
 T-016 real-workspace evidence (plan-1, plan-2)   (after T-013, T-014)
 ```
 
-Frontier: **T-015** (T-010..T-014 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced). T-016 needs a real workspace and comes after T-015.
+Frontier: **T-016** (T-010..T-015 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced). T-016 is the real-workspace evidence pass.
 
 Adjacent, done outside the ticket graph: the corpus moved to `ariesfish/kernel-wiki`
 (`1571a54`, ADR 0007) — skill name compliant, sanitised at source, page ids frozen. That is what
@@ -322,6 +322,11 @@ T-012's `wiki:` citations now resolve against.
   placeholders the validator refuses); `kernel_contract` warns when the milestone is missing or has
   no decision row; `skills/kernel-flow/SKILL.md` gains the milestone step, the refusal table rows, and
   the plateau→diagnosis move.
+- **Closed 2026-11-10**: `renderMilestoneTemplate` + `WorkspacePaths.milestone`; the template refuses
+  with 17 named placeholders in one pass; `kernel_contract` warns (missing / empty / still-template)
+  and freezes anyway; the candidate binding treats a template as a form, not a plan, so a keep
+  against it is a degradation rather than a `decision-missing` refusal. `kernel-flow` gained step 3b,
+  three hard rules and nine failure rows. Evidence: `runs/plan-3/`.
 - **Acceptance criteria**:
   - [check: `npm test`] — `kernel_init` on an empty workspace creates a milestone that the validator
     refuses (placeholders), and the refusal names every placeholder; `kernel_contract` warns without

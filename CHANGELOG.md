@@ -73,6 +73,15 @@
   the typed `[VERIFY: …]` gate lines. It reports every refusal in one pass with
   the rule, the row, and the fix, and never writes the file except to record an
   unlock.
+- **The workspace carries a plan.** `kernel_init` writes `docs/milestone.md`
+  from a template whose every slot is a `<...>` placeholder, and `kernel_milestone`
+  refuses it by naming all of them in one pass — a template that validated would
+  be a plan nobody wrote. `kernel_contract` warns when the milestone is missing,
+  empty, or still the template, and freezes anyway: a single obvious change is a
+  legal task. The candidate binding treats a template as a form, not a plan, so a
+  keep against it names no decision and says so.
+- `kernel-flow` gained the milestone step, the milestone/decision/M0/plateau hard
+  rules, and nine failure rows for the refusals this round added.
 - **A plateau produces a diagnosis, not another candidate.** The
   `### Diagnosis <id>` block carries four lines — `class`
   (`missing-decision` | `wrong-decision` | `measurement-defect` |

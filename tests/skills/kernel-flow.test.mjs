@@ -45,6 +45,11 @@ test("the skill names the vendored profiling skill and the KernelWiki tool", () 
   assert.match(SKILL, /`kernel_wiki`/);
   assert.match(SKILL, /`kernel_profile`/);
   assert.match(SKILL, /`kernel_candidate`/);
+  assert.match(SKILL, /`kernel_milestone`/);
+  assert.match(SKILL, /`kernel-diagnose`/);
+  assert.match(SKILL, /milestone_decision/);
+  assert.match(SKILL, /m0-thawed/);
+  assert.match(SKILL, /gate-cites-knowledge/);
 });
 
 test("the description carries both language triggers and the exclusions", () => {

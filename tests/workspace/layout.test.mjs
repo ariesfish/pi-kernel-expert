@@ -36,14 +36,14 @@ function fillDraft(root) {
 test("init creates the workspace files and leaves an existing file alone", () => {
   const root = tempWorkspace();
   const first = initWorkspace(root);
-  assert.deepEqual(first.created.sort(), ["candidates.jsonl", "docs/draft.md", "docs/plan.md"]);
+  assert.deepEqual(first.created.sort(), ["candidates.jsonl", "docs/draft.md", "docs/milestone.md", "docs/plan.md"]);
   assert.ok(fs.existsSync(workspacePaths(root).profile));
   assert.ok(fs.existsSync(workspacePaths(root).kernelDir));
 
   fs.writeFileSync(workspacePaths(root).draft, "mine\n");
   const second = initWorkspace(root);
   assert.deepEqual(second.created, []);
-  assert.deepEqual(second.existing.sort(), ["candidates.jsonl", "docs/draft.md", "docs/plan.md"]);
+  assert.deepEqual(second.existing.sort(), ["candidates.jsonl", "docs/draft.md", "docs/milestone.md", "docs/plan.md"]);
   assert.equal(fs.readFileSync(workspacePaths(root).draft, "utf8"), "mine\n");
 });
 

@@ -1,0 +1,108 @@
+
+========================================================================
+1. kernel_init on an empty workspace
+========================================================================
+Kernel task workspace: /Users/ariesfish/Projects/github/dev-skills/pi-kernel-expert/.dev/feature-kernel-expert-v2/runs/plan-3/.work
+created: docs/draft.md, docs/plan.md, docs/milestone.md, candidates.jsonl
+kept existing: none
+contract will live at /Users/ariesfish/Projects/github/dev-skills/pi-kernel-expert/.dev/feature-kernel-expert-v2/runs/plan-3/.work/kernel.contract.json
+
+Draft/plan sections still need real content before a contract can be frozen:
+- docs/draft.md › Baseline and validation: section still holds the generated placeholder
+- docs/draft.md › Risks and unknowns: section still holds the generated placeholder
+- docs/draft.md › Candidate directions: section still holds the generated placeholder
+- docs/draft.md › First steps: section still holds the generated placeholder
+- docs/draft.md › Validation and evaluation commands: section still holds the generated placeholder
+- docs/draft.md › Evidence required: section still holds the generated placeholder
+- docs/plan.md › Steps: section still holds the generated placeholder
+- docs/plan.md › Evidence per step: section still holds the generated placeholder
+- docs/plan.md › Stop conditions: section still holds the generated placeholder
+
+warning: not a git repository. pi-goal needs git to commit keeps and revert rejects.
+
+========================================================================
+2. the milestone template it wrote (docs/milestone.md, first 24 lines)
+========================================================================
+# Milestone
+
+## 1. Problem and Target
+<What is slow, measured where, and the number this task has to move.>
+
+## 2. Contract
+- basis: <device or e2e>
+- cells: <the cell ids from kernel.contract.json>
+- groups: <one per cell, or default when the cell has none>
+
+## 3. DAG and Phase Order
+<Why this order. M0 first, because its gate is what unblocks the rest.>
+A gate line's [VERIFY: ...] class is followed by its pointer (profile:RUN, or
+cell-group:CELL/GROUP), and the pointer is resolved against profile/ and the
+contract — so it has to name something that exists.
+
+### M0 Contract
+- tile: <elements per block, threads, elements per thread>
+- smem: <none, or the inventory and its stages>
+- warp roles: <which warps do what>
+- register budget: <registers per thread, and what breaks if it moves>
+- issue order: <the inner loop, in order>
+- accumulator precision: <fp32, tf32, fp16, ...>
+
+========================================================================
+3. kernel_milestone on the untouched template
+========================================================================
+docs/milestone.md — refused: 17 problem(s), each with the rule, the row, and the fix:
+1. route-placeholder D0.1: the heading still holds the placeholder "<the first decision, as a verb phrase>" — a form row is not a decision. Fix: name what changes, e.g. "#### D0.1 Double-buffer the smem tile"
+2. route-placeholder D0.1: "Action" still holds the placeholder "<what changes>" (line 27); a row nobody filled is a decision nobody made. Fix: write the one line it stands for, or delete D0.1 — a placeholder that validates is worse than no decision
+3. route-placeholder D0.1: "Purpose" still holds the placeholder "<why, in terms of the limiter this kernel is bound by>" (line 28); a row nobody filled is a decision nobody made. Fix: write the one line it stands for, or delete D0.1 — a placeholder that validates is worse than no decision
+4. route-placeholder D0.1: "Trigger" still holds the placeholder "<the observable that says it is time, never a category>" (line 29); a row nobody filled is a decision nobody made. Fix: write the one line it stands for, or delete D0.1 — a placeholder that validates is worse than no decision
+5. route-placeholder D0.1: "Cost" still holds the placeholder "<effort, and what it costs in registers or smem>" (line 30); a row nobody filled is a decision nobody made. Fix: write the one line it stands for, or delete D0.1 — a placeholder that validates is worse than no decision
+6. route-placeholder M0 Gate:1: the gate line still holds the placeholder "<the number that moves, and by how much>" (line 34); a gate that names nothing proves nothing. Fix: write what would prove it, e.g. "- device_ms halves on m1024/typical [VERIFY: ncu-direct profile:run1]"
+7. route-placeholder M0 Gate:2: the gate line still holds the placeholder "<what must stay correct>" (line 35); a gate that names nothing proves nothing. Fix: write what would prove it, e.g. "- device_ms halves on m1024/typical [VERIFY: ncu-direct profile:run1]"
+8. route-placeholder M0 Gate:3: the gate line still holds the placeholder "<the mechanism that landed, which is why the number moved>" (line 36); a gate that names nothing proves nothing. Fix: write what would prove it, e.g. "- device_ms halves on m1024/typical [VERIFY: ncu-direct profile:run1]"
+9. route-placeholder Dead Ends:1: the dead-end row still holds the placeholder "<D ids> | <reason, with the number that killed it> | <evidence pointer>"; a banned combination with no reason bans nothing. Fix: write it as "- <D ids> | <reason> | <evidence pointer>"
+10. route-placeholder 1. Problem and Target: line 4 still holds the placeholder "<What is slow, measured where, and the number this task has to move.>"; the section says nothing yet. Fix: write what the section is for in the words of this task, or remove the line
+11. route-placeholder 2. Contract: line 7 still holds the placeholder "- basis: <device or e2e>"; the section says nothing yet. Fix: write what the section is for in the words of this task, or remove the line
+12. route-placeholder 2. Contract: line 8 still holds the placeholder "- cells: <the cell ids from kernel.contract.json>"; the section says nothing yet. Fix: write what the section is for in the words of this task, or remove the line
+13. route-placeholder 2. Contract: line 9 still holds the placeholder "- groups: <one per cell, or default when the cell has none>"; the section says nothing yet. Fix: write what the section is for in the words of this task, or remove the line
+14. route-placeholder 3. DAG and Phase Order: line 12 still holds the placeholder "<Why this order. M0 first, because its gate is what unblocks the rest.>"; the section says nothing yet. Fix: write what the section is for in the words of this task, or remove the line
+15. route-placeholder 4. Dead Ends: line 39 still holds the placeholder "- <D ids> | <reason, with the number that killed it> | <evidence pointer>"; the section says nothing yet. Fix: write what the section is for in the words of this task, or remove the line
+16. route-placeholder 5. Global Gate: line 42 still holds the placeholder "<Which cells and groups the gate covers, and what it does not cover.>"; the section says nothing yet. Fix: write what the section is for in the words of this task, or remove the line
+17. route-placeholder 6. Rules: line 45 still holds the placeholder "<What a candidate may not change in this task.>"; the section says nothing yet. Fix: write what the section is for in the words of this task, or remove the line
+
+========================================================================
+4. kernel_contract with the template still in place (warns, does not refuse)
+========================================================================
+Contract frozen for 1 cell(s), 3 input group(s).
+kernel.contract.json sha256 b50b29f33763e251cbe872f7ef3564bc16c5960a47d7991a23a4d4da0c0a27f9
+groups a=typical,zero_block,tail
+basis device  harness goal.sh, goal.checks.sh, .kernel/calibration.json, .kernel/precision.tsv, .kernel/baseline.tsv
+reference none (a cross-run baseline stays legal, labelled `pairing: absent`)
+calibration none (the check's max_diff has no ruler, so the precision gate stays unarmed)
+
+written:
+- kernel.contract.json
+- goal.sh
+- goal.checks.sh
+- kernel-freeze.json
+
+warnings:
+- docs/milestone.md is still kernel_init's template (1 placeholder decision(s) named D0.1): fill it before a keep is recorded, or the keep will name no decision.
+
+Next:
+1. Pass kernel-freeze.json to freeze_criteria (one human confirmation).
+2. Use metric_name geomean_speedup with direction higher for init_goal/experiments.
+3. Run goal.sh once to record the baseline; it reports geomean_speedup=1 and writes .kernel/baseline.tsv.
+4. Later runs compare per cell, refuse a regression beyond the guard, and emit the geomean.
+
+kernel.contract.json written: true
+
+========================================================================
+5. kernel_contract with no milestone at all
+========================================================================
+- no docs/milestone.md: the contract is frozen but the plan is not addressable, so keeps cannot name a decision. kernel_init writes the template; kernel_milestone validates it and freezes M0.
+
+Next:
+1. Pass kernel-freeze.json to freeze_criteria (one human confirmation).
+2. Use metric_name geomean_speedup with direction higher for init_goal/experiments.
+3. Run goal.sh once to record the baseline; it reports geomean_speedup=1 and writes .kernel/baseline.tsv.
+4. Later runs compare per cell, refuse a regression beyond the guard, and emit the geomean.

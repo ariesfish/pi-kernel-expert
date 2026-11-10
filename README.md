@@ -162,8 +162,12 @@ table, and a GPU benchmark checklist.
 
 ## Validate the plan
 
-If a task keeps `docs/milestone.md`, `kernel_milestone` validates it as an
-addressable plan: the seven sections, the phases `M0..Mk` and their order, every
+`kernel_init` writes `docs/milestone.md` as a template: every slot a `<...>`
+placeholder, which the validator refuses by name. `kernel_contract` warns when
+the milestone is missing or still the template, and freezes anyway — a single
+obvious change is a legal task, and a warning is not a gate.
+
+`kernel_milestone` validates it as an addressable plan: the seven sections, the phases `M0..Mk` and their order, every
 decision's five-tuple (`Action`, `Purpose`, `Trigger`, `Cost`, `Depends on`)
 with its `⇐`/`⊗`/`⇒` edges, the typed `[VERIFY: …]` gate lines, and the
 dead-end rows. It reports every refusal in one pass — rule, row, and fix — and

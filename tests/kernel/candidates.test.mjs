@@ -634,7 +634,7 @@ test("a keep with profile evidence and no wiki field warns instead of refusing",
   // this fixture, so the keep names no decision — a degradation, not a refusal).
   assert.equal(outcome.warnings.length, 2);
   assert.match(outcome.warnings.join("\n"), /has profile evidence \(run1\) and a bottleneck claim but no wiki entry/);
-  assert.match(outcome.warnings.join("\n"), /no docs\/milestone\.md in this workspace/);
+  assert.match(outcome.warnings.join("\n"), /still kernel_init's template/);
   assert.match(formatCandidateOutcome(outcome), /warning\(s\):/);
 
   const answered = await recordCandidate(

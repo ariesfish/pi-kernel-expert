@@ -90,12 +90,12 @@
 - [ ] **[judgment: the user]** that the brief asks a question worth answering — now against
       runs/plan-1/diagnosis/reviewer.v2.md (the written block validates clean)
 
-## T-015 (ready-for-agent, blocked: T-010) — workspace + skill
-- [ ] `kernel_init` writes the milestone template
-- [ ] `kernel_contract` warns when missing/empty
-- [ ] kernel-flow skill: step, refusal rows, plateau move
+## T-015 (closed 2026-11-10) — workspace + skill
+- [x] `kernel_init` writes the milestone template (17 placeholders, all named on refusal)
+- [x] `kernel_contract` warns when missing/empty/still-template, freezes anyway
+- [x] kernel-flow skill: step 3b, three hard rules, nine failure rows
 
-## T-016 (blocked: T-013, T-014) — real evidence
+## T-016 (ready-for-agent, blocked: T-013, T-014, T-015) — real evidence
 - [ ] runs/plan-1 refused→accepted + diagnosis
 - [ ] runs/plan-2 M0 thaw
 - [ ] tests + typecheck green

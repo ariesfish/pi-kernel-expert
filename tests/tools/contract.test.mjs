@@ -5,7 +5,7 @@ import * as path from "node:path";
 import test from "node:test";
 
 import kernelExpertExtension from "../../extensions/pi-kernel-expert/index.ts";
-import { fakePi } from "../helpers/fake-host.mjs";
+import { fakeCommandContext, fakePi } from "../helpers/fake-host.mjs";
 import {
   DRAFT_HEADINGS,
   PLAN_HEADINGS,
@@ -54,7 +54,7 @@ test("kernel_init creates the workspace and warns about a draft that is still pl
   const tool = pi.tools.get("kernel_init");
   const result = await tool.execute("id", {}, undefined, undefined, ctx);
   const text = result.content[0].text;
-  assert.match(text, /created: docs\/draft\.md, docs\/plan\.md, candidates\.jsonl/);
+  assert.match(text, /created: docs\/draft\.md, docs\/plan\.md, docs\/milestone\.md, candidates\.jsonl/);
   assert.match(text, /still need real content/);
   assert.match(text, /not a git repository/);
   assert.equal(fs.existsSync(path.join(root, "docs", "draft.md")), true);
@@ -170,8 +170,11 @@ test("kernel_contract defaults the basis and warns about a comparator no glob co
   assert.match(text, /basis device {2}harness goal\.sh, goal\.checks\.sh/);
   assert.match(text, /warnings:/);
   assert.match(text, /bench\.py \(called by benchmarkCommand\) exists but no harnessGlobs entry covers it/);
-  assert.equal(result.details.warnings.length, 1);
+  // Two warnings: the uncovered comparator, and the milestone that kernel_init
+  // writes as a template — a contract with no addressable plan is worth saying.
+  assert.equal(result.details.warnings.length, 2);
   assert.match(result.details.warnings[0], /bench\.py/);
+  assert.match(result.details.warnings[1], /still kernel_init's template/);
 
   const contract = JSON.parse(fs.readFileSync(workspacePaths(root).contract, "utf8"));
   assert.equal(contract.basis, "device");
@@ -278,4 +281,23 @@ test("kernel_contract refuses a cell with too few groups or a group without an i
   );
   assert.match(noIntent.content[0].text, /\(group "zero_block" of cell "a"\) has no intent/);
   assert.equal(fs.existsSync(workspacePaths(root).contract), false);
+});
+
+test("a contract without a milestone, or with an empty one, warns and still freezes", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-contract-nom-"));
+  const pi = fakePi();
+  kernelExpertExtension(pi);
+  await pi.tools.get("kernel_init").execute("id", {}, undefined, undefined, fakeCommandContext({ cwd: root }).ctx);
+  fill(root);
+  fs.rmSync(path.join(root, "docs", "milestone.md"));
+
+  const { ctx } = fakeCommandContext({ cwd: root });
+  const first = await pi.tools.get("kernel_contract").execute("id", CONTRACT_PARAMS, undefined, undefined, ctx);
+  assert.match(first.content[0].text, /no docs\/milestone\.md/);
+  const contract = workspacePaths(root).contract;
+  assert.ok(fs.existsSync(contract), "the warning never blocks the freeze");
+
+  fs.writeFileSync(path.join(root, "docs", "milestone.md"), "# Milestone\n\n## 1. Problem and Target\nreal text\n\n## 2. Contract\n- basis: device\n");
+  const second = await pi.tools.get("kernel_contract").execute("id", { ...CONTRACT_PARAMS, force: true }, undefined, undefined, ctx);
+  assert.match(second.content[0].text, /has no decision rows/);
 });

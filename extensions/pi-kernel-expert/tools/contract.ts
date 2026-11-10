@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { Type } from "typebox";
 
@@ -7,6 +8,7 @@ import {
   writeContractFiles,
   type ContractInput,
 } from "../kernel/contract.ts";
+import { isPlaceholder, parseMilestone } from "../kernel/milestone.ts";
 import { readPackageVersion } from "../support/knowledge.ts";
 import { packageRootFrom } from "../support/paths.ts";
 import {
@@ -45,6 +47,35 @@ const CellSchema = Type.Object({
     }),
   ),
 });
+
+/**
+ * The contract is the shape matrix; the milestone is the plan that says which
+ * decisions the loop will take. Freezing one without the other is legal — plenty
+ * of tasks are a single obvious change — so this warns and never refuses. What
+ * it will not do is stay silent: a contract with no addressable plan is a loop
+ * that records keeps nothing points at.
+ */
+function milestoneWarnings(root: string): string[] {
+  const file = path.join(root, "docs", "milestone.md");
+  if (!fs.existsSync(file)) {
+    return [
+      "no docs/milestone.md: the contract is frozen but the plan is not addressable, so keeps cannot name a decision. kernel_init writes the template; kernel_milestone validates it and freezes M0.",
+    ];
+  }
+  const { model } = parseMilestone(fs.readFileSync(file, "utf8"));
+  if (model.decisions.length === 0) {
+    return ["docs/milestone.md has no decision rows: a milestone with no decisions is a plan nobody can act on. Write #### D<m>.<n> rows, then kernel_milestone."];
+  }
+  const placeholders = model.decisions.filter(
+    (decision) => isPlaceholder(decision.name) || decision.rows.some((row) => isPlaceholder(row.value)),
+  );
+  if (placeholders.length === model.decisions.length) {
+    return [
+      `docs/milestone.md is still kernel_init's template (${placeholders.length} placeholder decision(s) named ${placeholders.map((decision) => decision.id).join(", ")}): fill it before a keep is recorded, or the keep will name no decision.`,
+    ];
+  }
+  return [];
+}
 
 export function registerContractTool(pi: ExtensionAPI): void {
   pi.registerTool({
@@ -220,7 +251,7 @@ export function registerContractTool(pi: ExtensionAPI): void {
       }
 
       const { sha, freeze, written: files } = written.result;
-      const warnings = normalized.warnings;
+      const warnings = [...normalized.warnings, ...milestoneWarnings(root)];
       const contract = normalized.contract;
       const groupCount = contract.cells.reduce((total, cell) => total + cell.groups.length, 0);
       const groupSummary = contract.cells

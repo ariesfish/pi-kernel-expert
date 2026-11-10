@@ -54,6 +54,42 @@ The probe holds.
 One rule.
 `;
 
+/** Exactly what `kernel_init` writes: every slot a placeholder. */
+const TEMPLATE = `# Milestone
+
+## 1. Problem and Target
+<What is slow.>
+
+## 2. Contract
+- basis: <device or e2e>
+
+## 3. DAG and Phase Order
+<Why this order.>
+
+### M0 Contract
+- tile: <elements per block>
+
+### M0 Architecture
+#### D0.1 <the first decision, as a verb phrase>
+- Action: <what changes>
+- Purpose: <why>
+- Trigger: <the observable>
+- Cost: <effort>
+- Depends on: none
+
+### M0 Gate
+- <the number that moves> [VERIFY: ncu-direct]
+
+## 4. Dead Ends
+- <D ids> | <reason> | <evidence>
+
+## 5. Global Gate
+<Coverage.>
+
+## 6. Rules
+<What a candidate may not change.>
+`;
+
 function workspace(text = MILESTONE) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-bind-"));
   fs.mkdirSync(path.join(root, "docs"));
@@ -144,4 +180,15 @@ test("no milestone is a declared degradation: no decision, no refusal, and the r
   assert.equal(result.record.milestoneDecision, null);
   assert.equal(result.record.milestoneSha, null);
   assert.match(result.note, /no docs\/milestone\.md/);
+});
+
+test("the kernel_init template is a form, not a plan: a keep against it names no decision", () => {
+  const root = workspace();
+  fs.writeFileSync(path.join(root, "docs", "milestone.md"), TEMPLATE);
+  const snapshot = readMilestoneSnapshot(root);
+  assert.equal(snapshot.template, true);
+  const result = checkMilestoneBinding({ snapshot, requested: "D0.1", declaredSha: null, precondition: null });
+  assert.deepEqual(result.refusals, []);
+  assert.equal(result.record.milestoneDecision, null);
+  assert.match(result.note, /still kernel_init's template/);
 });

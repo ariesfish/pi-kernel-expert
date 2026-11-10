@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { MILESTONE_RELATIVE_PATH, parseMilestone } from "./milestone.ts";
+import { MILESTONE_RELATIVE_PATH, isPlaceholder, parseMilestone } from "./milestone.ts";
 import { bindingRefusal, type Refusal } from "./refusals.ts";
 import { milestoneSha } from "./milestone-lock.ts";
 
@@ -39,6 +39,13 @@ export interface MilestoneSnapshot {
   sha: string;
   decisions: string[];
   deadEnds: DeadEnd[];
+  /**
+   * The file is still `kernel_init`'s template: a placeholder in any decision
+   * heading or row, or no decision at all. A template is a form, and a form is
+   * not a plan — binding a candidate to `D0.1 <the first decision>` would record
+   * attribution to a sentence nobody wrote.
+   */
+  template: boolean;
 }
 
 export interface MilestoneBindingRecord {
@@ -64,8 +71,17 @@ export function readMilestoneSnapshot(workspace: string): MilestoneSnapshot | nu
     return null;
   }
   const { model } = parseMilestone(text);
+  const unfilled =
+    model.decisions.length === 0 ||
+    model.decisions.some(
+      (decision) =>
+        isPlaceholder(decision.name) ||
+        decision.rows.some((row) => isPlaceholder(row.value)) ||
+        decision.unknownRows.some((row) => isPlaceholder(row.value)),
+    );
   return {
     sha: milestoneSha(text),
+    template: unfilled,
     decisions: model.decisions.map((decision) => decision.id),
     deadEnds: model.deadEnds.map((row) => ({
       raw: row,
@@ -106,6 +122,14 @@ export function checkMilestoneBinding(options: {
       record: { milestoneDecision: requested === "" ? null : requested, milestoneSha: null, precondition: precondition || null },
       refusals: [],
       note: `no ${MILESTONE_RELATIVE_PATH} in this workspace, so this candidate names no decision: the plan is the attribution, and a workspace without one records lineage only.`,
+    };
+  }
+
+  if (snapshot.template) {
+    return {
+      record: { milestoneDecision: null, milestoneSha: null, precondition: null },
+      refusals: [],
+      note: `${MILESTONE_RELATIVE_PATH} is still kernel_init's template: ${snapshot.decisions.length === 0 ? "it has no decisions" : `its ${snapshot.decisions.join(", ")} are placeholders`}, so this candidate names no decision. kernel_milestone names every placeholder to fill.`,
     };
   }
 
