@@ -19,6 +19,7 @@ import {
   type WikiEntryProblem,
   type WorkspacePrefill,
 } from "../kernel/wiki-entry.ts";
+import { readCorpusIndex } from "../kernel/corpus-index.ts";
 import { agentLayout } from "../support/paths.ts";
 
 /** Directories whose files an entry may not name — the task's own source and docs. */
@@ -221,41 +222,14 @@ function buildNotes(
 }
 
 /**
- * Every `id:` in the cached corpus, or `null` when it is not cached. `null` is a
+ * The page ids of the cached corpus, or `null` when it is not cached. `null` is a
  * declared degradation: the entry is still validated, and the report says which
- * check did not run.
+ * check did not run. One reader answers both this and the milestone's "does this
+ * citation resolve?", so the two cannot disagree about what the corpus holds.
  */
 export function readCorpusPageIds(corpusDir: string): string[] | null {
-  const wikiDir = path.join(corpusDir, "wiki");
-  if (!fs.existsSync(wikiDir) || !fs.statSync(wikiDir).isDirectory()) return null;
-  const ids: string[] = [];
-  walkMarkdown(wikiDir, (file) => {
-    const id = frontmatterId(fs.readFileSync(file, "utf8"));
-    if (id !== null && !ids.includes(id)) ids.push(id);
-  });
-  return ids.sort();
-}
-
-function walkMarkdown(dir: string, visit: (file: string) => void): void {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkMarkdown(full, visit);
-      continue;
-    }
-    if (entry.isFile() && entry.name.endsWith(".md")) visit(full);
-  }
-}
-
-function frontmatterId(text: string): string | null {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  if (lines[0]?.trim() !== "---") return null;
-  for (let index = 1; index < lines.length; index += 1) {
-    if (lines[index].trim() === "---") return null;
-    const match = /^id:\s*(.+)$/.exec(lines[index]);
-    if (match) return match[1].trim().replace(/^["']|["']$/g, "");
-  }
-  return null;
+  const index = readCorpusIndex(corpusDir);
+  return index === null ? null : index.pages.map((page) => page.id);
 }
 
 /**

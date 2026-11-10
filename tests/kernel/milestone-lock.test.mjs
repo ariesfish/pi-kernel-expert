@@ -164,6 +164,19 @@ function workspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-expert-lock-"));
   fs.mkdirSync(path.join(root, "docs"));
   fs.writeFileSync(path.join(root, "docs", "milestone.md"), MILESTONE);
+  // The fixture cites profile:run1, profile:run2 and m1024/typical; the tool
+  // resolves pointers now, so the workspace has to be able to answer.
+  for (const run of ["run1", "run2"]) {
+    fs.mkdirSync(path.join(root, "profile", run), { recursive: true });
+    fs.writeFileSync(path.join(root, "profile", run, "summary.json"), JSON.stringify({ runId: run }));
+  }
+  fs.writeFileSync(
+    path.join(root, "kernel.contract.json"),
+    JSON.stringify({
+      schemaVersion: 2,
+      cells: [{ id: "m1024", dtype: "fp16", groups: [{ name: "typical", intent: "the reported shape" }] }],
+    }),
+  );
   return root;
 }
 

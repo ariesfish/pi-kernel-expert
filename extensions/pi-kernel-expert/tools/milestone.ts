@@ -3,6 +3,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { Type } from "typebox";
 
+import { agentLayout } from "../support/paths.ts";
+import { type CorpusIndex, readCorpusIndex } from "../kernel/corpus-index.ts";
+import type { KernelContract } from "../kernel/contract.ts";
 import {
   MILESTONE_LOCK_RELATIVE_PATH,
   type MilestoneLock,
@@ -33,6 +36,41 @@ function refusal(rule: string, text: string, details: Record<string, unknown> = 
     content: [{ type: "text" as const, text: `${rule}: ${text}` }],
     details: { ok: false, refusals: [{ rule, text }], ...details },
   };
+}
+
+/** The runs under `profile/` that hold a summary: a pointer resolves to one of these. */
+function readProfileRunIds(workspace: string): string[] {
+  const dir = path.join(workspace, "profile");
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(dir, entry.name, "summary.json")))
+    .map((entry) => entry.name)
+    .sort();
+}
+
+/** The workspace contract as written; `null` when absent or unreadable. */
+function readWorkspaceContract(workspace: string): KernelContract | null {
+  const file = path.join(workspace, "kernel.contract.json");
+  if (!fs.existsSync(file)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as KernelContract;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The pinned corpus, or `null` when it is not cached. `null` is passed on as a
+ * fact — "the corpus was looked for and is not there" — so a citation can be
+ * reported as unresolved-by-absence rather than quietly accepted.
+ */
+function readCorpus(): CorpusIndex | null {
+  try {
+    return readCorpusIndex(agentLayout().kernelWikiDir, "");
+  } catch {
+    return null;
+  }
 }
 
 /** A lock file that exists but does not parse is a bypass, not an unlocked milestone. */
@@ -183,9 +221,22 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
         };
       }
 
-      const problems = validateMilestone(model, { lock });
-      if (problems.length > 0 || parseProblems.length > 0) {
-        const all = problems.length > 0 ? problems : parseProblems;
+      const corpus = readCorpus();
+      const problems = validateMilestone(model, {
+        lock,
+        contract: readWorkspaceContract(workspace) ?? null,
+        profileRunIds: readProfileRunIds(workspace),
+        corpus,
+      });
+      const refusals = problems.filter((problem) => problem.severity === "refusal");
+      const warnings = problems.filter((problem) => problem.severity === "warning");
+      const warningBlock =
+        warnings.length === 0
+          ? []
+          : [`${warnings.length} warning(s), recorded and not refused:`, formatMilestoneProblems(warnings)];
+
+      if (refusals.length > 0 || parseProblems.length > 0) {
+        const all = refusals.length > 0 ? refusals : parseProblems;
         return {
           content: [
             {
@@ -193,10 +244,11 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
               text: [
                 `${label} — refused: ${all.length} problem(s), each with the rule, the row, and the fix:`,
                 formatMilestoneProblems(all),
+                ...warningBlock,
               ].join("\n"),
             },
           ],
-          details: { path: file, refusals: all, ok: false },
+          details: { path: file, refusals: all, warnings, ok: false, corpus: corpus === null ? null : corpus.pages.length },
         };
       }
 
@@ -238,7 +290,12 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
         ? `M0 Contract frozen at ${lock.m0ContractSha.slice(0, 12)} since ${lock.lockedAt}; unchanged.`
         : `No M0 lock (${MILESTONE_LOCK_RELATIVE_PATH} absent): the block may still change. Lock it with lock: true.`;
       return {
-        content: [{ type: "text" as const, text: [`${label} — clean.`, lockNote, formatMilestoneSummary(model)].join("\n") }],
+        content: [
+          {
+            type: "text" as const,
+            text: [`${label} — clean.`, lockNote, ...warningBlock, formatMilestoneSummary(model)].join("\n"),
+          },
+        ],
         details: {
           path: file,
           ok: true,
@@ -250,6 +307,8 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
             lines: gate.lines.map((line) => ({ row: line.row, verify: line.verify, pointer: line.pointer })),
           })),
           deadEnds: model.deadEnds.length,
+          warnings,
+          corpus: corpus === null ? null : corpus.pages.length,
           lock: lock ? { sha: lock.m0ContractSha, lockedAt: lock.lockedAt } : null,
         },
       };

@@ -178,6 +178,13 @@ issue order, accumulator precision — go in `### M0 Contract`, one
 kernel_milestone({ lock: true })
 ```
 
+Gate lines cite measurements (`profile:<run>`, `cell-group:<cell>/<group>`) and
+those pointers are resolved against `profile/` and the contract: a line that
+cites a run nobody profiled is refused, with the path that was looked in.
+Decisions cite knowledge (`wiki:<page-id>#<confidence>`) and never measure: a
+citation on a gate line is refused. When the corpus is not cached the citations
+are shape-checked and the report says so, naming `kernel_bootstrap`.
+
 From then on the block is byte-identical or the file is refused as `m0-thawed`,
 naming the item that moved. To change M0 on purpose, `unlock: true` with a
 reason: it lands in `## 4. Dead Ends` as a diagnosis, so a thaw is a decision

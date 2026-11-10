@@ -391,10 +391,30 @@ function toolHost(root) {
   return { tool, ctx };
 }
 
+/**
+ * A workspace whose gate-line pointers resolve: the fixture cites `profile:run1`,
+ * `profile:run2` and `m1024/typical`, and the tool now asks the profile directory
+ * and the contract whether those exist. A milestone that cites a run nobody
+ * profiled is refused, which is the point.
+ */
 function workspaceWith(text) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "kernel-milestone-"));
   fs.mkdirSync(path.join(root, "docs"), { recursive: true });
   fs.writeFileSync(path.join(root, MILESTONE_RELATIVE_PATH), text);
+  for (const run of ["run1", "run2"]) {
+    fs.mkdirSync(path.join(root, "profile", run), { recursive: true });
+    fs.writeFileSync(path.join(root, "profile", run, "summary.json"), JSON.stringify({ runId: run }));
+  }
+  fs.writeFileSync(
+    path.join(root, "kernel.contract.json"),
+    JSON.stringify({
+      schemaVersion: 2,
+      cells: [
+        { id: "m1024", dtype: "fp16", groups: [{ name: "typical", intent: "the reported shape" }] },
+        { id: "m4096", dtype: "fp16", groups: [{ name: "tail", intent: "the ragged tail" }] },
+      ],
+    }),
+  );
   return root;
 }
 

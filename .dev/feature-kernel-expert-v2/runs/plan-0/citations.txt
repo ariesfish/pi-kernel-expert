@@ -1,0 +1,57 @@
+corpus: /Users/ariesfish/.pi/agent/kernel-expert/cache/kernel-wiki@3c41f99bde5d029690c15cc68cb47e56841b36ee
+        53 pages, 46 labelled, 7 unlabelled
+
+
+1. a real page id from the fetched corpus, labelled source-reported
+  clean
+
+2. a real page the corpus never labelled, cited without a label
+  [warning] wiki-citation-unlabelled D0.1 Purpose
+      `wiki:pattern-memory-bound` resolves to wiki/patterns/memory-bound.md, and that page carries no confidence label in the corpus. Citing it without one is honest; inventing one would not be.
+
+3. the same unlabelled page with a label the citer supplies
+  clean
+
+4. an id no page has
+  [refusal] wiki-citation-unresolved D0.1 Purpose
+      `wiki:no-such-page#verified` names no page: the corpus at /Users/ariesfish/.pi/agent/kernel-expert/cache/kernel-wiki@3c41f99bde5d029690c15cc68cb47e56841b36ee (53 pages, pin 3c41f99bde5d) has no id no-such-page.
+
+5. a fifth confidence word
+  [refusal] wiki-citation-unknown D0.1 Purpose
+      "probably" is not a confidence label: the four are verified, source-reported, inferred, experimental. The label is a claim about how the page knows, so a fifth word is a claim nobody defined.
+
+6. an id that is not kebab-case
+  [refusal] wiki-citation-unknown D0.1 Purpose
+      "Pattern_Memory_Bound" is not a kebab-case page id. Page ids are frozen because they are the citation contract: a citation that cannot be typed twice is not a citation.
+
+7. knowledge on a gate line
+  [refusal] gate-cites-knowledge M0 Gate:1
+      `wiki:pattern-memory-bound#verified` is a knowledge citation on a gate line: a page cannot measure this kernel, so it cannot prove this line. A gate line cites `profile:` or `cell-group:`; a citation belongs on a decision row's Action, Purpose or Trigger.
+
+8. a citation on Cost instead of Action/Purpose/Trigger
+  [refusal] wiki-citation-misplaced D0.1 Cost
+      `wiki:pattern-memory-bound#verified` sits on Cost: a citation supports a direction, so it belongs on Action, Purpose or Trigger. Cost is what this kernel measured, not what a page says.
+
+9. the corpus was never fetched
+  [warning] knowledge-source-absent milestone
+      1 wiki citation(s) could not be resolved: no corpus is cached at the pinned directory, so the ids were checked for shape only.
+
+10. measurement: a profile run that exists
+  clean
+
+11. measurement: a profile run that does not
+  [refusal] gate-citation-unresolved M0 Gate:1
+      `profile:run2` names no run: the lookup is profile/run2/summary.json and the runs under profile/ are run1.
+
+12. measurement: a cell-group the contract does not have
+  [refusal] gate-citation-unresolved M0 Gate:1
+      `cell-group: m1024/nope` names no group in cell m1024: it has typical.
+
+13. measurement: a PRICED source that names no run
+  [refusal] gate-citation-unresolved M0 Gate:1
+      `profile:run7` names no run: the lookup is profile/run7/summary.json and the runs under profile/ are run1.
+
+14. measurement: a pointer in no namespace
+  [refusal] gate-citation-unresolved M0 Gate:1
+      the [VERIFY: …] pointer "run1" is in no citation namespace: a gate line cites `profile:<run>` or `cell-group:<cell>/<group>`, one per line, so a reader can find what it points at.
+

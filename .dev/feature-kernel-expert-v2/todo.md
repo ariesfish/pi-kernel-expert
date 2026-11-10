@@ -69,13 +69,13 @@
 - [x] unlock requires a reason (≥16 chars), recorded as a Dead Ends row
 - [x] runs/plan-2 evidence: lock, thaw.diff, three refusals, unlock, re-lock
 
-## T-012 (ready-for-agent, blocked: T-010) — citations: measurement vs knowledge
-- [ ] measurement pointers (`profile:`, `cell-group:`) resolve; `gate-citation-unresolved` names pointer + path
-- [ ] `wiki:<id>#<confidence>` on rows only; `gate-cites-knowledge` on a gate line
-- [ ] corpus absent ⇒ row passes, report carries `knowledge-source-absent` naming kernel_bootstrap
-- [ ] one real page id resolved from the fetched corpus
+## T-012 (closed 2026-11-10) — citations: measurement vs knowledge
+- [x] measurement pointers (`profile:`, `cell-group:`) resolve; `gate-citation-unresolved` names pointer + path
+- [x] `wiki:<id>#<confidence>` on rows only; `gate-cites-knowledge` on a gate line, `wiki-citation-misplaced` on Cost
+- [x] corpus absent ⇒ row passes, report carries `knowledge-source-absent` naming kernel_bootstrap
+- [x] one real page id resolved from the fetched corpus (migration-wgmma-to-tcgen05, source-reported)
 
-## T-013 (blocked: T-010) — candidate names its decision
+## T-013 (ready-for-agent, blocked: T-010) — candidate names its decision
 - [ ] `decision` + `milestoneSha` on the record
 - [ ] `decision-unknown`, `milestone-stale`, `dead-end-bundle` (not forceable)
 - [ ] `precondition` accepted and recorded

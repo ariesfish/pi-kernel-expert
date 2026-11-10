@@ -26,6 +26,7 @@
  * the gate line, and the line is judged on its shape alone.
  */
 import type { KernelContract } from "./contract.ts";
+import { CONFIDENCE_LABELS, type CorpusIndex, findCorpusPage } from "./corpus-index.ts";
 import { type MilestoneLock, diffM0Block, m0ContractBlock } from "./milestone-lock.ts";
 
 /** The plan file, per task workspace. */
@@ -98,6 +99,13 @@ export const MILESTONE_RULE_IDS = [
   "trigger-is-category",
   "phase-order",
   "m0-thawed",
+  "gate-citation-unresolved",
+  "gate-cites-knowledge",
+  "wiki-citation-unknown",
+  "wiki-citation-unresolved",
+  "wiki-citation-misplaced",
+  "wiki-citation-unlabelled",
+  "knowledge-source-absent",
 ] as const;
 
 export type MilestoneRuleId = (typeof MILESTONE_RULE_IDS)[number];
@@ -106,8 +114,17 @@ export type MilestoneRuleId = (typeof MILESTONE_RULE_IDS)[number];
  * One refusal. `message` starts with the rule id, then the row id, then what is
  * wrong and the fix, so it can be printed or asserted as one line.
  */
+export type Severity = "refusal" | "warning";
+
 export interface Problem {
   rule: MilestoneRuleId;
+  /**
+   * A refusal stops the file; a warning is recorded and the file stands. Only
+   * two things warn, and both are absences the caller cannot fix by editing the
+   * milestone: a page the corpus never labelled, and a corpus that is not
+   * cached. Everything else refuses.
+   */
+  severity: Severity;
   /** The row it is charged to: `D0.2`, `M0 Gate:3`, `M0`, `milestone`, a section label. */
   row: string;
   /** What is wrong, without the rule and the row. */
@@ -247,6 +264,13 @@ export interface MilestoneContext {
   profileRunIds?: readonly string[];
   /** `.kernel/milestone.lock.json`, already parsed. Absent means the milestone is unlocked. */
   lock?: MilestoneLock | null;
+  /**
+   * The cached corpus. `undefined` means the caller did not look; `null` means
+   * it looked and found nothing, which is reported as `knowledge-source-absent`.
+   * Not looking and finding nothing are different facts, and only one of them
+   * is the caller's fault.
+   */
+  corpus?: CorpusIndex | null;
 }
 
 export function renderMilestone(model: MilestoneModel): string {
@@ -465,6 +489,8 @@ export function validateMilestone(model: MilestoneModel, ctx: MilestoneContext =
     ...categoryTriggers(model),
     ...phaseOrder(model),
     ...m0Thawed(model, ctx.lock),
+    ...gateCitations(model, ctx),
+    ...wikiCitations(model, ctx),
   ];
 }
 
@@ -860,8 +886,254 @@ function phaseOrder(model: MilestoneModel): Problem[] {
   return problems;
 }
 
-function makeProblem(rule: MilestoneRuleId, row: string, what: string, fix: string): Problem {
-  return { rule, row, what, fix, message: `${rule} ${row}: ${what} Fix: ${fix}` };
+/**
+ * 11. A gate line cites a measurement, and a measurement has an address: a run
+ * under `profile/`, or a cell and group in the contract. A pointer that names
+ * nothing is worse than no pointer, because it reads like evidence.
+ *
+ * `undefined` in the context means the caller did not look (`profileRunIds` not
+ * passed, `contract` not read), and an unasked question is not a refusal.
+ */
+function gateCitations(model: MilestoneModel, ctx: MilestoneContext): Problem[] {
+  const problems: Problem[] = [];
+  for (const line of model.gates.flatMap((block) => block.lines)) {
+    const pointers: Array<{ where: string; token: string }> = [];
+    if (line.pointer !== null && line.pointer.trim() !== "") {
+      pointers.push({ where: "[VERIFY: …]", token: line.pointer.trim() });
+    }
+    const priced = line.priced?.source.trim() ?? "";
+    if (priced !== "") pointers.push({ where: "[PRICED: …]", token: priced });
+
+    for (const { where, token } of pointers) {
+      // A wiki citation in the pointer position is `gate-cites-knowledge`'s to
+      // charge; two refusals for one defect is a reader puzzling over which to fix.
+      if (/^wiki:/.test(token)) continue;
+      const parsed = parseMeasurementPointer(token);
+      if (!parsed) {
+        // A prose price (`measured on the sm90 box`) is not a pointer and is not
+        // resolved; a *shaped* pointer that names nothing is the refusal below.
+        if (where === "[PRICED: …]" && !looksLikePointer(token)) continue;
+        problems.push(
+          makeProblem(
+            "gate-citation-unresolved",
+            line.row,
+            `the ${where} pointer ${JSON.stringify(token)} is in no citation namespace: a gate line cites \`profile:<run>\` or \`cell-group:<cell>/<group>\`, one per line, so a reader can find what it points at.`,
+            "cite the profile run that holds the reading, or the cell and group in the contract, or drop the pointer and let [VERIFY: correctness] carry the line.",
+          ),
+        );
+        continue;
+      }
+      const resolved = resolveMeasurement(parsed, ctx);
+      if (resolved === null) continue;
+      problems.push(makeProblem("gate-citation-unresolved", line.row, resolved.what, resolved.fix));
+    }
+  }
+  return problems;
+}
+
+interface ParsedPointer {
+  kind: "profile" | "cell-group";
+  /** `run1`, or `m1024/typical`. */
+  target: string;
+}
+
+/** `profile:<run>`, `cell-group:<cell>/<group>`, and T-010's `cell/group:` spelling. */
+function parseMeasurementPointer(token: string): ParsedPointer | null {
+  const profile = /^profile:\s*([A-Za-z0-9][A-Za-z0-9_.-]*)$/.exec(token);
+  if (profile) return { kind: "profile", target: profile[1] };
+  const cellGroup = /^(?:cell-group|cell\/group):\s*([A-Za-z0-9][A-Za-z0-9_.-]*)\s*\/\s*([A-Za-z0-9][A-Za-z0-9_.-]*)$/.exec(token);
+  if (cellGroup) return { kind: "cell-group", target: `${cellGroup[1]}/${cellGroup[2]}` };
+  return null;
+}
+
+function looksLikePointer(token: string): boolean {
+  return /^(profile|cell-group|cell\/group):/.test(token);
+}
+
+/** null when it resolves or the question was not asked; the refusal text otherwise. */
+function resolveMeasurement(pointer: ParsedPointer, ctx: MilestoneContext): { what: string; fix: string } | null {
+  if (pointer.kind === "profile") {
+    const runs = ctx.profileRunIds;
+    if (runs === undefined) return null;
+    if (runs.includes(pointer.target)) return null;
+    const existing = runs.length === 0 ? "none exist" : runs.join(", ");
+    return {
+      what: `\`profile:${pointer.target}\` names no run: the lookup is profile/${pointer.target}/summary.json and the runs under profile/ are ${existing}.`,
+      fix: "run the profile for those cells and groups (kernel_profile) and cite the run it writes, or cite a run that exists.",
+    };
+  }
+  const contract = ctx.contract;
+  if (contract === undefined) return null;
+  const [cellId, groupName] = pointer.target.split("/");
+  const cells = contract ? contract.cells.map((cell) => cell.id) : [];
+  if (!contract) {
+    return {
+      what: `\`cell-group: ${pointer.target}\` cannot be resolved because there is no kernel.contract.json in this workspace.`,
+      fix: "write the contract (kernel_contract) so cells and groups have an address, then cite the cell and group.",
+    };
+  }
+  const cell = contract.cells.find((entry) => entry.id === cellId);
+  if (!cell) {
+    return {
+      what: `\`cell-group: ${pointer.target}\` names no cell: the contract has ${cells.length === 0 ? "no cells" : cells.join(", ")}.`,
+      fix: "cite a cell the contract defines, or add the cell to the contract if the reading needs a new one.",
+    };
+  }
+  const groups = cell.groups.map((group) => group.name);
+  if (!groups.includes(groupName)) {
+    return {
+      what: `\`cell-group: ${pointer.target}\` names no group in cell ${cellId}: it has ${groups.length === 0 ? "no groups" : groups.join(", ")}.`,
+      fix: "cite a group the cell defines, or add the group with its intent to the contract if the reading covers a new data set.",
+    };
+  }
+  return null;
+}
+
+/** One `wiki:<id>#<label>` as written. */
+interface WikiCitation {
+  row: string;
+  line: number;
+  raw: string;
+  id: string;
+  /** null when the citation carried no label. */
+  confidence: string | null;
+  onGate: boolean;
+  /** `Action`, `Purpose`, `Trigger`, or a key that is none of them. */
+  key: string | null;
+}
+
+const WIKI_CITATION = /wiki:([^\s()\[\]{},;]+)/g;
+const CITE_ON = ["Action", "Purpose", "Trigger"] as const;
+
+function scanCitations(text: string): Array<{ id: string; confidence: string | null; raw: string }> {
+  const found: Array<{ id: string; confidence: string | null; raw: string }> = [];
+  for (const match of text.matchAll(WIKI_CITATION)) {
+    const token = match[1].replace(/[.,;:!?]+$/, "");
+    const hash = token.indexOf("#");
+    found.push({
+      raw: match[0],
+      id: hash === -1 ? token : token.slice(0, hash),
+      confidence: hash === -1 ? null : token.slice(hash + 1),
+    });
+  }
+  return found;
+}
+
+/**
+ * 12. Knowledge has its own namespace and its own places: a decision's Action,
+ * Purpose or Trigger. It never appears on a gate line, because a page cannot
+ * measure this card's kernel, and a gate that cites a page is a gate nobody
+ * passed. The shape is always checked; the corpus is asked only when it is
+ * cached, and its absence is a warning that names `kernel_bootstrap`.
+ */
+function wikiCitations(model: MilestoneModel, ctx: MilestoneContext): Problem[] {
+  const citations: WikiCitation[] = [];
+  for (const block of model.gates) {
+    for (const line of block.lines) {
+      for (const found of scanCitations(line.raw)) {
+        citations.push({ ...found, row: line.row, line: line.line, onGate: true, key: null });
+      }
+    }
+  }
+  for (const decision of model.decisions) {
+    for (const row of decision.rows) {
+      for (const found of scanCitations(row.value)) {
+        citations.push({ ...found, row: `${decision.id} ${row.key}`, line: row.line, onGate: false, key: row.key });
+      }
+    }
+  }
+  if (citations.length === 0) return [];
+
+  const problems: Problem[] = [];
+  for (const citation of citations) {
+    if (citation.onGate) {
+      problems.push(
+        makeProblem(
+          "gate-cites-knowledge",
+          citation.row,
+          `\`${citation.raw}\` is a knowledge citation on a gate line: a page cannot measure this kernel, so it cannot prove this line. A gate line cites \`profile:\` or \`cell-group:\`; a citation belongs on a decision row's Action, Purpose or Trigger.`,
+          "move the citation to the decision whose Purpose or Trigger this direction came from, and let the gate line cite the run that proves it.",
+        ),
+      );
+      continue;
+    }
+    if (citation.key !== null && !(CITE_ON as readonly string[]).includes(citation.key)) {
+      problems.push(
+        makeProblem(
+          "wiki-citation-misplaced",
+          citation.row,
+          `\`${citation.raw}\` sits on ${citation.key}: a citation supports a direction, so it belongs on Action, Purpose or Trigger. Cost is what this kernel measured, not what a page says.`,
+          "move the citation to the decision's Purpose or Trigger, where a direction is claimed rather than measured.",
+        ),
+      );
+      continue;
+    }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(citation.id)) {
+      problems.push(
+        makeProblem(
+          "wiki-citation-unknown",
+          citation.row,
+          `${JSON.stringify(citation.id)} is not a kebab-case page id. Page ids are frozen because they are the citation contract: a citation that cannot be typed twice is not a citation.`,
+          "use the page's own id (lower case words joined by single dashes); queries/index.md in the corpus lists them.",
+        ),
+      );
+      continue;
+    }
+    if (citation.confidence !== null && !(CONFIDENCE_LABELS as readonly string[]).includes(citation.confidence)) {
+      problems.push(
+        makeProblem(
+          "wiki-citation-unknown",
+          citation.row,
+          `${JSON.stringify(citation.confidence)} is not a confidence label: the four are ${CONFIDENCE_LABELS.join(", ")}. The label is a claim about how the page knows, so a fifth word is a claim nobody defined.`,
+          `cite one of ${CONFIDENCE_LABELS.join(", ")}, or drop the label and record that the page carries none.`,
+        ),
+      );
+      continue;
+    }
+    const corpus = ctx.corpus;
+    if (corpus === undefined) continue;
+    if (corpus === null) continue;
+    const page = findCorpusPage(corpus, citation.id);
+    if (!page) {
+      problems.push(
+        makeProblem(
+          "wiki-citation-unresolved",
+          citation.row,
+          `\`${citation.raw}\` names no page: the corpus at ${corpus.dir} (${corpus.pages.length} pages${corpus.pin === "" ? "" : `, pin ${corpus.pin.slice(0, 12)}`}) has no id ${citation.id}.`,
+          "check the id against the corpus's own queries/index.md, or drop the citation: an id nobody can look up is a note to self.",
+        ),
+      );
+      continue;
+    }
+    if (page.confidence === null && citation.confidence === null) {
+      problems.push(
+        makeProblem(
+          "wiki-citation-unlabelled",
+          citation.row,
+          `\`${citation.raw}\` resolves to ${page.path}, and that page carries no confidence label in the corpus. Citing it without one is honest; inventing one would not be.`,
+          "leave the label off and weigh the page accordingly, or cite a page the corpus labels.",
+          "warning",
+        ),
+      );
+    }
+  }
+
+  if (ctx.corpus === null) {
+    problems.push(
+      makeProblem(
+        "knowledge-source-absent",
+        "milestone",
+        `${citations.length} wiki citation(s) could not be resolved: no corpus is cached at the pinned directory, so the ids were checked for shape only.`,
+        "run kernel_bootstrap to fetch the pinned corpus, then validate again: a citation that was never looked up is not a resolved one.",
+        "warning",
+      ),
+    );
+  }
+  return problems;
+}
+
+function makeProblem(rule: MilestoneRuleId, row: string, what: string, fix: string, severity: Severity = "refusal"): Problem {
+  return { rule, severity, row, what, fix, message: `${rule} ${row}: ${what} Fix: ${fix}` };
 }
 
 function normalizeKey(key: string): string {

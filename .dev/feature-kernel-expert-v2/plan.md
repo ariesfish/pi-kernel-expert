@@ -188,7 +188,7 @@ T-015 workspace integration + kernel-flow skill  (after T-010)
 T-016 real-workspace evidence (plan-1, plan-2)   (after T-013, T-014)
 ```
 
-Frontier: **T-012**, **T-013** (T-010 closed 2026-11-10, `b7f9b19`; T-011 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced).
+Frontier: **T-013** (T-010 closed 2026-11-10, `b7f9b19`; T-011 and T-012 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced).
 
 Adjacent, done outside the ticket graph: the corpus moved to `ariesfish/kernel-wiki`
 (`1571a54`, ADR 0007) — skill name compliant, sanitised at source, page ids frozen. That is what
@@ -249,6 +249,11 @@ T-012's `wiki:` citations now resolve against.
     against the cached corpus happens when present, and when absent the report carries
     `knowledge-source-absent` naming `kernel_bootstrap` instead of refusing. The corpus at
     `~/.pi/agent/kernel-expert/cache/KernelWiki@<pin>` is the resolver's only source.
+- **Closed 2026-11-10**: `kernel/corpus-index.ts` (one reader for page ids and labels, also used by
+  `kernel_wiki_candidate`) + two rule families in `milestone.ts`; `Problem` gained `severity`, so a
+  warning no longer reads as a refusal. 13 tests, 14 evidence cases against the real corpus.
+  A gate line was charged twice for one defect (knowledge in the pointer position) — fixed before
+  the evidence run.
 - **Acceptance criteria**:
   - [check: `npm test`] — each measurement class: one accepted fixture, one unresolved; each
     confidence label accepted on a row; a `wiki:` pointer on a gate line refused with

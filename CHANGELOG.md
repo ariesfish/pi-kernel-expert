@@ -73,6 +73,20 @@
   the typed `[VERIFY: …]` gate lines. It reports every refusal in one pass with
   the rule, the row, and the fix, and never writes the file except to record an
   unlock.
+- **Citations resolve, or the line is refused.** Two namespaces, kept apart:
+  measurement (`profile:<run>`, `cell-group:<cell>/<group>`, also accepted as
+  `cell/group:`) may appear on a gate line and must resolve against `profile/`
+  and the contract — `gate-citation-unresolved` names the pointer and the lookup
+  path, including when a `[PRICED: …]` source is itself a pointer. Knowledge
+  (`wiki:<page-id>#<confidence>`) belongs on a decision's `Action`, `Purpose` or
+  `Trigger`: on a gate line it is `gate-cites-knowledge`, on `Cost` or
+  `Depends on` it is `wiki-citation-misplaced`. Shape is checked always; the
+  cached corpus is asked when it is there (`wiki-citation-unresolved`) and its
+  absence is a `knowledge-source-absent` warning naming `kernel_bootstrap`.
+  A page the corpus never labelled is accepted with a `wiki-citation-unlabelled`
+  warning: 7 of the 53 pinned pages carry no label, and inventing one for them
+  would be worse than recording the absence. Only refusals stop a file; warnings
+  are printed and the file stands.
 - **The M0 contract freezes by hash.** `kernel_milestone lock: true` writes
   `.kernel/milestone.lock.json` — the milestone sha, the `### M0 Contract`
   block's sha, the time, and the block's own text. After that the block is
