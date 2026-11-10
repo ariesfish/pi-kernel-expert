@@ -119,6 +119,7 @@ function model(overrides = {}) {
     conditions: "holds while the tile fits the smem budget and the reduction stays in registers",
     gotchas: "double buffering without a second barrier raced, and only the tail group caught it",
     negative: "a 256-row tile spilled 190 registers and lost 8% instead",
+    reproduce: "```\n$ ./bench --n 16777216 --mode coalesced\nMETRIC device_ms=0.061417\n$ ./bench --n 16777216 --mode strided\nMETRIC device_ms=0.701747\n```",
     ...overrides,
   };
 }
@@ -500,4 +501,29 @@ test("a reading can cite its own contract, so an entry written before the ledger
 
   const wrongContract = validateEntry({ ...base, sources: ["contract:ffffffffffff"] }, ctx);
   assert.deepEqual(wrongContract.map((problem) => problem.rule), ["entry-unverified-source"]);
+});
+
+test("verified needs a Reproduce block a stranger could re-run", () => {
+  const verified = model({ confidence: "verified", sources: ["c1"] });
+
+  const noBlock = validateEntry({ ...verified, reproduce: "" }, CONTEXT);
+  assert.deepEqual(noBlock.map((problem) => problem.rule), ["entry-unreproducible"]);
+  assert.match(noBlock[0].message, /^entry-unreproducible Reproduce: confidence is "verified" and there is no ## Reproduce block/);
+  assert.match(noBlock[0].message, /contract:<sha> resolve only inside the workspace/);
+
+  // A block with prose but no command, or a command but no number, is not checkable.
+  const noCommand = validateEntry({ ...verified, reproduce: "```\nit looked about ten times faster\n```" }, CONTEXT);
+  assert.deepEqual(noCommand.map((problem) => problem.rule), ["entry-unreproducible"]);
+  assert.match(noCommand[0].message, /no command/);
+
+  // A number inside the command is an argument, not a result.
+  const noNumber = validateEntry({ ...verified, reproduce: "```\n$ ./bench --n 16777216\n```" }, CONTEXT);
+  assert.deepEqual(noNumber.map((problem) => problem.rule), ["entry-unreproducible"]);
+  assert.match(noNumber[0].message, /no number/);
+
+  assert.deepEqual(validateEntry(verified, CONTEXT), [], "the fixture's block has both");
+
+  // Only `verified` is held to this: source-reported and inferred do not claim a run.
+  const reported = model({ confidence: "source-reported", sources: ["c1"], reproduce: "" });
+  assert.deepEqual(validateEntry({ ...reported, id: "other-id" }, CONTEXT), []);
 });

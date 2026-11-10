@@ -34,6 +34,8 @@ export interface WikiCandidateRequest {
   conditions: string;
   gotchas: string;
   negative?: string;
+  /** The commands and raw numbers; required when confidence is verified. */
+  reproduce?: string;
   tags?: string[];
   sources?: string[];
   confidence?: Confidence;
@@ -95,6 +97,7 @@ export function writeWikiCandidate(options: WikiCandidateOptions): WikiCandidate
     conditions: options.conditions.trim(),
     gotchas: options.gotchas.trim(),
     negative: (options.negative ?? "").trim(),
+    reproduce: (options.reproduce ?? "").trim(),
   };
 
   const corpusPageIds = readCorpusPageIds(options.corpusDir ?? agentLayout().kernelWikiDir);
@@ -294,7 +297,9 @@ export function registerWikiCandidateTool(pi: ExtensionAPI): void {
       "The tool pre-fills architectures, sources and confidence. Do not pass them unless the workspace has no profile; passing architectures is the only way to proceed without one, and the entry then says the architecture came from you.",
       "Trigger must be an observable (a number or an event on the reference). `when needed`, `as needed`, `optimize`, `tune` and the rest of the milestone's phrase list are refused.",
       "Never name this task's contract cells, goal.sh, goal.checks.sh, or a workspace file in the body: the corpus is shared and the next operator cannot resolve them. A fenced code block is the allow-list.",
-      "Negative readings is where a rejected variation goes; it may be empty, and a reviewer will ask why.",
+      "Negative readings is where a hypothesis a measurement killed goes, with the numbers that killed it; it may be empty, and a reviewer will ask why.",
+      "CHECK EVERY NUMBER against the commands you actually ran, before writing the page. The validator cannot tell a measured number from a plausible one: a plausible sentence in Measured footprint or Negative readings is the one defect this tool cannot catch, and it is the one this corpus exists to prevent. Re-read both sections against the session's command history.",
+      "Pass reproduce: the exact build and run commands plus their raw output (a number on a line the command did not produce). A verified entry is refused without it, because a source token that resolves only inside your workspace is a claim about evidence, not evidence.",
       "Publishing is manual by design: cp into kernel-wiki/wiki/<type>/, run generate-indices.py, commit, bump KERNEL_WIKI_PIN.",
     ],
     parameters: Type.Object({
@@ -312,7 +317,13 @@ export function registerWikiCandidateTool(pi: ExtensionAPI): void {
       cost: Type.Optional(Type.String({ description: "## Measured footprint and cost — registers, smem, extra passes, time." })),
       conditions: Type.String({ description: "## Load-bearing conditions — what must hold for the win to survive." }),
       gotchas: Type.String({ description: "## Gotchas — what bit this run." }),
-      negative: Type.Optional(Type.String({ description: "## Negative readings — what variation was tried and rejected." })),
+      negative: Type.Optional(Type.String({ description: "## Negative readings — the hypothesis a measurement killed, with the numbers that killed it." })),
+      reproduce: Type.Optional(
+        Type.String({
+          description:
+            "## Reproduce — a fenced block with the exact build and run commands and the raw numbers they printed. Required when confidence is verified: a reader cannot re-run a claim they cannot see.",
+        }),
+      ),
       tags: Type.Optional(Type.Array(Type.String(), { description: "Optional tags, e.g. ['tile-scheduling']." })),
       sources: Type.Optional(
         Type.Array(Type.String(), {
@@ -350,6 +361,7 @@ export function registerWikiCandidateTool(pi: ExtensionAPI): void {
         conditions: params.conditions,
         gotchas: params.gotchas,
         negative: params.negative,
+        reproduce: params.reproduce,
         tags: params.tags,
         sources: params.sources,
         confidence: params.confidence as Confidence | undefined,

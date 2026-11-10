@@ -51,7 +51,7 @@ export type EntryType = (typeof ENTRY_TYPES)[number];
 export const CONFIDENCE_VALUES = ["verified", "source-reported", "inferred", "experimental"] as const;
 export type Confidence = (typeof CONFIDENCE_VALUES)[number];
 
-export type EntryField = "mechanism" | "trigger" | "cost" | "conditions" | "gotchas" | "negative";
+export type EntryField = "mechanism" | "trigger" | "cost" | "conditions" | "gotchas" | "negative" | "reproduce";
 
 export interface EntrySectionSpec {
   key: EntryField;
@@ -72,6 +72,7 @@ export const ENTRY_SECTIONS: readonly EntrySectionSpec[] = [
   { key: "conditions", heading: "Load-bearing conditions", required: true },
   { key: "gotchas", heading: "Gotchas", required: true },
   { key: "negative", heading: "Negative readings", required: false },
+  { key: "reproduce", heading: "Reproduce", required: false },
 ];
 
 /** The entry, as a value. Field order is the frontmatter order. */
@@ -90,6 +91,14 @@ export interface WikiEntryModel {
   conditions: string;
   gotchas: string;
   negative: string;
+  /**
+   * The commands and the raw numbers behind this page. Required for `verified`:
+   * a citation a reader cannot resolve — a contract sha in someone's workspace, a
+   * candidate id in a ledger nobody has — is a claim about evidence, not evidence.
+   * A stranger with the same hardware can re-run a command block; nothing else
+   * in the entry is checkable.
+   */
+  reproduce: string;
 }
 
 /**
@@ -118,6 +127,7 @@ export const ENTRY_RULE_IDS = [
   // page with no architecture, which is a page nobody can find.
   "entry-frontmatter",
   "entry-architectures-missing",
+  "entry-unreproducible",
 ] as const;
 
 export type EntryRuleId = (typeof ENTRY_RULE_IDS)[number];
@@ -249,6 +259,7 @@ export function parseEntry(text: string): WikiEntryModel {
     conditions: body("conditions"),
     gotchas: body("gotchas"),
     negative: body("negative"),
+    reproduce: body("reproduce"),
   };
 }
 
@@ -298,6 +309,7 @@ export function validateEntry(entry: WikiEntryModel, ctx: EntryContext = {}): Wi
     ...categoryTrigger(entry),
     ...architectures(entry),
     ...unverifiedSource(entry, ctx),
+    ...unreproducible(entry),
     ...referenceLeak(entry, ctx),
   ];
 }
@@ -487,6 +499,44 @@ function unverifiedSource(entry: WikiEntryModel, ctx: EntryContext): WikiEntryPr
   ];
 }
 
+/**
+ * 8. `verified` means a reader can check it, which means the commands are in the
+ * page. A source token naming something in the author's workspace is a claim
+ * about evidence; the command block is the evidence.
+ */
+function unreproducible(entry: WikiEntryModel): WikiEntryProblem[] {
+  if (entry.confidence !== "verified") return [];
+  const block = fencedBlocks(entry.reproduce).join("\n");
+  if (block.trim() === "") {
+    return [
+      makeProblem(
+        "entry-unreproducible",
+        "Reproduce",
+        `confidence is "verified" and there is no ## Reproduce block: a reader cannot re-run a claim they cannot see. Source tokens such as contract:<sha> resolve only inside the workspace that wrote them.`,
+        `add a fenced block with the exact build and run commands and the raw numbers they printed (device_ms per variant), so someone with the same card can check the page`,
+      ),
+    ];
+  }
+  const COMMAND = /^\s*(\$\s*)?(nvcc|cuda|python3?|bash|\.\/|make|ncu)\b/;
+  const lines = block.split("\n");
+  const commandLines = lines.filter((line) => COMMAND.test(line));
+  const hasCommand = commandLines.length > 0;
+  // A digit on a command line is an argument (`--n 16777216`), not a result: the
+  // number a reader checks has to be on a line the command did not produce.
+  const hasNumber = lines.some((line) => !COMMAND.test(line) && /\d/.test(line));
+  if (!hasCommand || !hasNumber) {
+    return [
+      makeProblem(
+        "entry-unreproducible",
+        "Reproduce",
+        `the ## Reproduce block has ${hasCommand ? "a command" : "no command"} and ${hasNumber ? "a number" : "no number"}; both are needed for the page to be checkable.`,
+        `paste the command line and the raw metric line it printed, e.g. "$ ./bench --n 16777216" then "METRIC device_ms=0.061417"`,
+      ),
+    ];
+  }
+  return [];
+}
+
 /** 6. The corpus is shared across operators; this task's names do not resolve for them. */
 function referenceLeak(entry: WikiEntryModel, ctx: EntryContext): WikiEntryProblem[] {
   const forbidden = forbiddenTokens(ctx);
@@ -518,6 +568,15 @@ function referenceLeak(entry: WikiEntryModel, ctx: EntryContext): WikiEntryProbl
     }
   }
   return problems;
+}
+
+/** The bodies of fenced blocks, without the fences; [] when there are none. */
+function fencedBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  const pattern = /```[^\n]*\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) blocks.push(match[1]);
+  return blocks;
 }
 
 function forbiddenTokens(ctx: EntryContext): Map<string, string> {

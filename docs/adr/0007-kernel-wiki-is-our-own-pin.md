@@ -37,7 +37,7 @@ Maintain the corpus as its own repository, `ariesfish/kernel-wiki`, and keep fet
   an absence it cannot claim — but the normal result is now "0 removed".
 - **Page ids are frozen.** Ids are the citation contract; `migration-wgmma-to-tcgen05` must stay that
   id forever. New pages may be added; an id is never renumbered.
-- **The pin** is `377d4560840dfc09583b887b2c7f2a9487f22cff`; `KERNEL_WIKI_SKILL` becomes
+- **The pin** is `3c41f99bde5d029690c15cc68cb47e56841b36ee`; `KERNEL_WIKI_SKILL` becomes
   `kernel-wiki`, so the cache directory is `kernel-wiki@<pin>` and an older cache is simply not
   found.
 - **Delivery stays as ADR 0002 chose it**: fetched on demand into the agent cache, never bundled
