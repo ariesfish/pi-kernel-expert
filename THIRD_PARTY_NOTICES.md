@@ -27,7 +27,7 @@ is upstream-owned: fix bugs upstream, then re-sync, rather than editing it here.
   frontmatter (`license`, `compatibility`, `metadata`) and carries no
   runtime-specific files; page ids are frozen because ids are
   the citation contract; and the sanitization below happened at the source.
-- Fetched revision: `3c41f99bde5d029690c15cc68cb47e56841b36ee`.
+- Fetched revision: `70530df1cd089103e5bb8d688815bac9dceb8033`.
 - Sanitization: upstream carries 19 files marked `LicenseRef-NvidiaProprietary`;
   they are removed in the copy and listed in its `SANITIZED.yaml`. The fetcher
   still scans every `artifacts/` file for that marker and refuses nothing it

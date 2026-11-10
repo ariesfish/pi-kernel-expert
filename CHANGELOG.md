@@ -4,6 +4,15 @@
 
 ### Changed
 
+- The pinned `kernel-wiki` revision is now `70530df1cd08`. Its query tools are
+  Node.js (`scripts/query.mjs`, `scripts/get_page.mjs`): `kernel_wiki` invokes
+  `node` instead of `python3`, and no Python interpreter is needed on the query
+  path. Python remains the corpus maintenance toolchain there, managed by uv.
+- Tool parameter schemas now use `@earendil-works/pi-schema` instead of
+  TypeBox. The `typebox` dependency is removed. Object schemas are closed by
+  default, so an argument with an undeclared field is rejected rather than
+  ignored.
+
 - The fetched corpus is now **`kernel-wiki`**, our own pinned copy of
   mit-han-lab/KernelWiki (`377d4560840d`), packaged as a standard Agent Skill:
   `CLAUDE.md` became `SCHEMA.md`, the frontmatter declares `license`,

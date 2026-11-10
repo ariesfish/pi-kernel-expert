@@ -1,9 +1,16 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { obj, oneOf, opt, str, type Static } from "@earendil-works/pi-schema";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import { cite, readKbTree, validateIndexes } from "../kernel/kb.ts";
 import { lintKb, readReferenceTokens } from "../kernel/kb-lint.ts";
+
+const ParamsSchema = obj({
+  action: oneOf(["cite", "lint", "index"], { description: "What to do." }),
+  entry: opt(str({ description: "For `cite`: the entry id." })),
+  workspace: opt(str({ description: "Task workspace. Default: current directory." })),
+});
+type Params = Static<typeof ParamsSchema>;
 
 export function registerKbTool(pi: ExtensionAPI): void {
   pi.registerTool({
@@ -19,20 +26,15 @@ export function registerKbTool(pi: ExtensionAPI): void {
       "`lint` before adding an entry: an exact upstream symbol is a retrieval key into pretraining memory, and a line reference nobody can open is a claim nobody can check.",
       "The index is a symptom ledger, not a table of contents: the row's first column is an observable a reader has just seen (`a_reg` is 0 while the budget is the constraint), never a topic.",
     ],
-    parameters: Type.Object({
-      action: Type.Union([Type.Literal("cite"), Type.Literal("lint"), Type.Literal("index")], {
-        description: "What to do.",
-      }),
-      entry: Type.Optional(Type.String({ description: "For `cite`: the entry id." })),
-      workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       _signal,
       _onUpdate,
       ctx,
     ): Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }> {
+      const params = rawParams as Params;
       const workspace = params.workspace ? path.resolve(ctx.cwd, params.workspace) : ctx.cwd;
       const tree = readKbTree(workspace);
 

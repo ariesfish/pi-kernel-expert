@@ -1,7 +1,7 @@
 import type { ExecResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { bool, num, obj, opt, str } from "@earendil-works/pi-schema";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import { agentLayout } from "../support/paths.ts";
 
@@ -24,9 +24,25 @@ export interface WikiParams {
 }
 
 export type WikiInvocation =
-  | { script: "query.py"; args: string[] }
-  | { script: "get_page.py"; args: string[] }
+  | { script: "query.mjs"; args: string[] }
+  | { script: "get_page.mjs"; args: string[] }
   | { error: string };
+
+const ParamsSchema = obj({
+  query: opt(str({ description: "Natural-language search, e.g. 'fuse gate-up dual GEMM on Blackwell'" })),
+  page: opt(str({ description: "Page id or path to fetch, e.g. kernel-flash-attention-4" })),
+  tag: opt(str()),
+  type: opt(str({ description: "page type: hardware, technique, pattern, kernel, language, migration, source-pr, ..." })),
+  repo: opt(str({ description: "upstream repository, e.g. cutlass" })),
+  architecture: opt(str({ description: "sm90, sm100, B200, H100, ..." })),
+  symptom: opt(str()),
+  language: opt(str({ description: "cuda-cpp, cute-dsl, ptx, triton" })),
+  confidence: opt(str()),
+  limit: opt(num({ description: "1-50 results" })),
+  compact: opt(bool({ description: "Compact output. Default: true." })),
+  paths_only: opt(bool()),
+  follow_sources: opt(bool({ description: "With page: expand cited sources." })),
+});
 
 export function buildWikiInvocation(params: WikiParams): WikiInvocation {
   const hasQuery = typeof params.query === "string" && params.query.trim() !== "";
@@ -38,7 +54,7 @@ export function buildWikiInvocation(params: WikiParams): WikiInvocation {
   if (hasPage) {
     const args = [params.page!.trim()];
     if (params.follow_sources) args.push("--follow-sources");
-    return { script: "get_page.py", args };
+    return { script: "get_page.mjs", args };
   }
 
   const args: string[] = [params.query!.trim()];
@@ -63,14 +79,14 @@ export function buildWikiInvocation(params: WikiParams): WikiInvocation {
   }
   if (params.paths_only) args.push("--paths-only");
   if (params.compact !== false) args.push("--compact");
-  return { script: "query.py", args };
+  return { script: "query.mjs", args };
 }
 
 export function formatWikiResult(options: {
   invocation: { script: string; args: string[] };
   result: ExecResult;
 }): string {
-  const command = ["python3", `scripts/${options.invocation.script}`, ...options.invocation.args].join(" ");
+  const command = ["node", `scripts/${options.invocation.script}`, ...options.invocation.args].join(" ");
   const body = options.result.stdout.trim();
   const capped =
     body.length > MAX_OUTPUT_CHARS
@@ -100,27 +116,14 @@ export function registerWikiTool(pi: ExtensionAPI): void {
       "One query per bottleneck or technique question; do not read the whole corpus into context.",
       "A measurement never comes from this tool; measurements come from the target machine only.",
     ],
-    parameters: Type.Object({
-      query: Type.Optional(Type.String({ description: "Natural-language search, e.g. 'fuse gate-up dual GEMM on Blackwell'" })),
-      page: Type.Optional(Type.String({ description: "Page id or path to fetch, e.g. kernel-flash-attention-4" })),
-      tag: Type.Optional(Type.String()),
-      type: Type.Optional(Type.String({ description: "page type: hardware, technique, pattern, kernel, language, migration, source-pr, ..." })),
-      repo: Type.Optional(Type.String({ description: "upstream repository, e.g. cutlass" })),
-      architecture: Type.Optional(Type.String({ description: "sm90, sm100, B200, H100, ..." })),
-      symptom: Type.Optional(Type.String()),
-      language: Type.Optional(Type.String({ description: "cuda-cpp, cute-dsl, ptx, triton" })),
-      confidence: Type.Optional(Type.String()),
-      limit: Type.Optional(Type.Number({ description: "1-50 results" })),
-      compact: Type.Optional(Type.Boolean({ description: "Compact output. Default: true." })),
-      paths_only: Type.Optional(Type.Boolean()),
-      follow_sources: Type.Optional(Type.Boolean({ description: "With page: expand cited sources." })),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       signal,
     ): Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }> {
-      const invocation = buildWikiInvocation(params as WikiParams);
+      const params = rawParams as WikiParams;
+      const invocation = buildWikiInvocation(params);
       if ("error" in invocation) {
         return { content: [{ type: "text" as const, text: invocation.error }], details: {} };
       }
@@ -136,8 +139,9 @@ export function registerWikiTool(pi: ExtensionAPI): void {
           details: {},
         };
       }
+      // Use the interpreter running pi, not whatever `node` PATH resolves to.
       const result = await pi.exec(
-        "python3",
+        process.execPath,
         [`scripts/${invocation.script}`, ...invocation.args],
         { cwd: wikiDir, timeout: 120_000, signal },
       );

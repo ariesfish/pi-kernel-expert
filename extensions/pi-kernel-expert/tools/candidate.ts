@@ -1,8 +1,67 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { bool, map, num, obj, oneOf, opt, str, type Static } from "@earendil-works/pi-schema";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import { formatCandidateOutcome, recordCandidate } from "../kernel/candidates.ts";
+
+const ParamsSchema = obj({
+  workspace: opt(str({ description: "Task workspace. Default: current directory." })),
+  decision: oneOf(["keep", "reject"]),
+  description: str({ description: "What the candidate tried, one or two sentences." }),
+  metrics: opt(
+    map(num(), {
+      description: "Metric values from the run: geomean_speedup and every <metric>_<cell>.",
+    }),
+  ),
+  profile_run: opt(str({ description: "profile/<run_id> holding summary.json." })),
+  bottleneck_claim: opt(str({ description: "The diagnosed limiter, e.g. latency-bound on L1." })),
+  bottleneck_metric: opt(
+    str({ description: "A metric name present in the profile summary that supports the claim." }),
+  ),
+  reason: opt(str({ description: "Required for reject." })),
+  milestone_decision: opt(
+    str({
+      description:
+        "The docs/milestone.md decision this change implements: `D0.3`, or a `+` joined bundle. Required on a keep when a milestone exists; a bundle the plan recorded as a dead end needs precondition.",
+    }),
+  ),
+  milestone_sha: opt(
+    str({
+      description:
+        "The milestone sha you read, as a guard: if docs/milestone.md has moved since, the keep is refused as milestone-stale.",
+    }),
+  ),
+  precondition: opt(
+    str({
+      description:
+        "What is different about a combination the plan already killed. Recorded with the candidate; without it a dead-ended bundle is refused.",
+    }),
+  ),
+  reading: opt(
+    str({
+      description:
+        "The evidence this keep rests on: goal.sh's stdout, the \"=== KERNEL READING ===\" block alone, the block's JSON, or a path to a log holding one. Missing = refused (basis-missing).",
+    }),
+  ),
+  wiki: opt(
+    obj(
+      {
+        id: opt(str({ description: "The kernel_wiki_candidate id this keep produced." })),
+        none: opt(bool({ description: "True when the keep proved no transferable mechanism." })),
+        declined: opt(str({ description: "Why no entry was written; required when declining." })),
+      },
+      {
+        description:
+          "The page this promotion left behind. A keep with profile evidence and a bottleneck claim that omits this warns, never refuses.",
+      },
+    ),
+  ),
+  commit: opt(str({ description: "Commit sha once pi-goal's log_goal keeps the change." })),
+  force_with_reason: opt(
+    str({ description: "Keep below the noise floor, with the reason recorded." }),
+  ),
+});
+type Params = Static<typeof ParamsSchema>;
 
 export function registerCandidateTool(pi: ExtensionAPI): void {
   pi.registerTool({
@@ -22,70 +81,15 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
       "A combination the plan recorded as a dead end is refused unless precondition says what changed. A different precondition is the reason a killed idea becomes worth retrying; a smaller bundle is not.",
       "pi-goal's log_goal is still the thing that commits a keep; this ledger is the lineage on top of it.",
     ],
-    parameters: Type.Object({
-      workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
-      decision: Type.Union([Type.Literal("keep"), Type.Literal("reject")]),
-      description: Type.String({ description: "What the candidate tried, one or two sentences." }),
-      metrics: Type.Optional(
-        Type.Record(Type.String(), Type.Number(), {
-          description: "Metric values from the run: geomean_speedup and every <metric>_<cell>.",
-        }),
-      ),
-      profile_run: Type.Optional(Type.String({ description: "profile/<run_id> holding summary.json." })),
-      bottleneck_claim: Type.Optional(Type.String({ description: "The diagnosed limiter, e.g. latency-bound on L1." })),
-      bottleneck_metric: Type.Optional(
-        Type.String({ description: "A metric name present in the profile summary that supports the claim." }),
-      ),
-      reason: Type.Optional(Type.String({ description: "Required for reject." })),
-      milestone_decision: Type.Optional(
-        Type.String({
-          description:
-            "The docs/milestone.md decision this change implements: `D0.3`, or a `+` joined bundle. Required on a keep when a milestone exists; a bundle the plan recorded as a dead end needs precondition.",
-        }),
-      ),
-      milestone_sha: Type.Optional(
-        Type.String({
-          description:
-            "The milestone sha you read, as a guard: if docs/milestone.md has moved since, the keep is refused as milestone-stale.",
-        }),
-      ),
-      precondition: Type.Optional(
-        Type.String({
-          description:
-            "What is different about a combination the plan already killed. Recorded with the candidate; without it a dead-ended bundle is refused.",
-        }),
-      ),
-      reading: Type.Optional(
-        Type.String({
-          description:
-            "The evidence this keep rests on: goal.sh's stdout, the \"=== KERNEL READING ===\" block alone, the block's JSON, or a path to a log holding one. Missing = refused (basis-missing).",
-        }),
-      ),
-      wiki: Type.Optional(
-        Type.Object(
-          {
-            id: Type.Optional(Type.String({ description: "The kernel_wiki_candidate id this keep produced." })),
-            none: Type.Optional(Type.Boolean({ description: "True when the keep proved no transferable mechanism." })),
-            declined: Type.Optional(Type.String({ description: "Why no entry was written; required when declining." })),
-          },
-          {
-            description:
-              "The page this promotion left behind. A keep with profile evidence and a bottleneck claim that omits this warns, never refuses.",
-          },
-        ),
-      ),
-      commit: Type.Optional(Type.String({ description: "Commit sha once pi-goal's log_goal keeps the change." })),
-      force_with_reason: Type.Optional(
-        Type.String({ description: "Keep below the noise floor, with the reason recorded." }),
-      ),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       signal,
       _onUpdate,
       ctx,
     ): Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }> {
+      const params = rawParams as Params;
       const workspace = params.workspace ? path.resolve(ctx.cwd, params.workspace) : ctx.cwd;
       const outcome = await recordCandidate({
         workspace,

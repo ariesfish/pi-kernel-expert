@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { num, obj, oneOf, opt, str, type Static } from "@earendil-works/pi-schema";
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import { readContract } from "../kernel/candidates.ts";
 import {
@@ -24,6 +24,24 @@ import {
 /** The views, in the order a reader usually wants them. */
 export const VIEWS = ["census", "operands", "serial", "schedule", "live", "struct", "launch"] as const;
 
+const ParamsSchema = obj({
+  view: oneOf(VIEWS, { description: "Which reading to produce." }),
+  dump: opt(str({ description: "Dump file. Default: read stdin." })),
+  workspace: opt(str({ description: "Task workspace. Default: current directory." })),
+  kernel: opt(str({ description: "Kernel name, or a substring of it. Required when the dump holds several." })),
+  metrics: opt(
+    str({
+      description:
+        "For `launch`: a file with the launch__* metrics (ncu details page, or key = value lines). Default: the dump itself, which only works for CSV with those columns.",
+    }),
+  ),
+  budget: opt(
+    num({ description: "For `live`: override the register budget. Default: the contract's M0 budget, if any." }),
+  ),
+  text: opt(str({ description: "The dump inline, for a dump you already hold in context." })),
+});
+type Params = Static<typeof ParamsSchema>;
+
 export function registerSassTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "kernel_sass",
@@ -39,34 +57,15 @@ export function registerSassTool(pi: ExtensionAPI): void {
       "`serial` names ptxas, not the algorithm: a ratio near 1 means the compiler could not prove the accumulator untouched and put a wait between every pair. Do not ban a direction over it.",
       "`live` needs a contract for a verdict band; without one it reports the peak and says no band was applied. Never assume a budget.",
     ],
-    parameters: Type.Object({
-      view: Type.Union(
-        VIEWS.map((view) => Type.Literal(view)),
-        { description: "Which reading to produce." },
-      ),
-      dump: Type.Optional(Type.String({ description: "Dump file. Default: read stdin." })),
-      workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
-      kernel: Type.Optional(
-        Type.String({ description: "Kernel name, or a substring of it. Required when the dump holds several." }),
-      ),
-      metrics: Type.Optional(
-        Type.String({
-          description:
-            "For `launch`: a file with the launch__* metrics (ncu details page, or key = value lines). Default: the dump itself, which only works for CSV with those columns.",
-        }),
-      ),
-      budget: Type.Optional(
-        Type.Number({ description: "For `live`: override the register budget. Default: the contract's M0 budget, if any." }),
-      ),
-      text: Type.Optional(Type.String({ description: "The dump inline, for a dump you already hold in context." })),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       _signal,
       _onUpdate,
       ctx,
     ): Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }> {
+      const params = rawParams as Params;
       const workspace = params.workspace ? path.resolve(ctx.cwd, params.workspace) : ctx.cwd;
       let text = params.text ?? "";
       let source = "<inline>";

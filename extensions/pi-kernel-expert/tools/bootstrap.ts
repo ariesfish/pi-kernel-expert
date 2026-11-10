@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { obj } from "@earendil-works/pi-schema";
 
 import { fetchPinnedCorpus, formatFetchResult } from "../knowledge/fetch.ts";
 import { KERNEL_WIKI_PIN, agentLayout } from "../support/paths.ts";
@@ -16,7 +16,7 @@ export function registerBootstrapTool(pi: ExtensionAPI): void {
       "After an install, ask the human to run /reload so the fetched skill is registered.",
       "A refused fetch is a finding: report the reason and the current revision, never retry with a different revision.",
     ],
-    parameters: Type.Object({}),
+    parameters: obj({}),
     async execute(_toolCallId, _params, signal) {
       const layout = agentLayout();
       const result = await fetchPinnedCorpus({

@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { bool, num, obj, opt, str, type Static } from "@earendil-works/pi-schema";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import { isSafeRunId, readContract } from "../kernel/candidates.ts";
 import { diffFingerprint } from "../kernel/diff.ts";
@@ -9,6 +9,19 @@ import { packageRootFrom } from "../support/paths.ts";
 
 const PACKAGE_ROOT = packageRootFrom(import.meta.url);
 const HELPERS_DIR = path.join(PACKAGE_ROOT, "skills", "ncu-report-skill", "helpers");
+
+const ParamsSchema = obj({
+  workspace: opt(str({ description: "Task workspace. Default: current directory." })),
+  run_id: opt(str({ description: "Directory under profile/. Default: timestamp." })),
+  tag: opt(str({ description: "Analysis tag. Default: full." })),
+  report: opt(str({ description: "Attach an existing .ncu-rep/.ncu-repz instead of collecting." })),
+  command: opt(str({ description: "Command to profile when collecting, run through bash -lc." })),
+  kernel: opt(str({ description: "ncu -k regex selecting the kernel." })),
+  launch_count: opt(num({ description: "ncu -c launch count. Default: 1." })),
+  binary: opt(str({ description: "Profiled binary for inline-aware stall attribution." })),
+  reuse_analysis: opt(bool({ description: "Skip the helpers and parse an existing analysis/ directory." })),
+});
+type Params = Static<typeof ParamsSchema>;
 
 function defaultRunId(now = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -32,26 +45,15 @@ export function registerProfileTool(pi: ExtensionAPI): void {
       "Profile after the change and before committing it: the summary is bound to the diff hash, so any later edit makes it stale.",
       "The summary records measurements; the diagnosis and the ranked fixes belong in the run report and the candidate description.",
     ],
-    parameters: Type.Object({
-      workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
-      run_id: Type.Optional(Type.String({ description: "Directory under profile/. Default: timestamp." })),
-      tag: Type.Optional(Type.String({ description: "Analysis tag. Default: full." })),
-      report: Type.Optional(Type.String({ description: "Attach an existing .ncu-rep/.ncu-repz instead of collecting." })),
-      command: Type.Optional(Type.String({ description: "Command to profile when collecting, run through bash -lc." })),
-      kernel: Type.Optional(Type.String({ description: "ncu -k regex selecting the kernel." })),
-      launch_count: Type.Optional(Type.Number({ description: "ncu -c launch count. Default: 1." })),
-      binary: Type.Optional(Type.String({ description: "Profiled binary for inline-aware stall attribution." })),
-      reuse_analysis: Type.Optional(
-        Type.Boolean({ description: "Skip the helpers and parse an existing analysis/ directory." }),
-      ),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       signal,
       _onUpdate,
       ctx,
     ): Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }> {
+      const params = rawParams as Params;
       const workspace = params.workspace ? path.resolve(ctx.cwd, params.workspace) : ctx.cwd;
       const loaded = readContract(workspace);
       if (!loaded.ok) {

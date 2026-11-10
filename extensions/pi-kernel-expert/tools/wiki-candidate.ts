@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { arr, obj, oneOf, opt, str, type Static } from "@earendil-works/pi-schema";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import { readContract } from "../kernel/candidates.ts";
 import {
@@ -170,7 +170,7 @@ export function formatWikiCandidateOutcome(outcome: WikiCandidateOutcome): strin
   }
   lines.push(`corpus: ${outcome.notes.corpus}`);
   lines.push(
-    `publish (human step, never this tool): cp ${path.join(wikiCandidatesDir("."), `${entry.id}.md`)} into kernel-wiki/wiki/<type>/, run generate-indices.py, commit, bump KERNEL_WIKI_PIN`,
+    `publish (human step, never this tool): cp ${path.join(wikiCandidatesDir("."), `${entry.id}.md`)} into kernel-wiki/wiki/<type>/, run uv run scripts/generate-indices.py, commit, bump KERNEL_WIKI_PIN`,
   );
   return lines.join("\n");
 }
@@ -259,6 +259,34 @@ function workspaceFiles(workspace: string): string[] {
   return files;
 }
 
+const ParamsSchema = obj({
+  workspace: opt(str({ description: "Task workspace. Default: current directory." })),
+  id: str({ description: "kebab-case page id, e.g. double-buffer-smem-tile. Frozen once published." }),
+  title: str({ description: "One sentence naming what the change does." }),
+  type: oneOf(ENTRY_TYPES),
+  mechanism: str({ description: "## Mechanism — what runs differently and why the bottleneck goes." }),
+  trigger: str({ description: "## Trigger — the observable that makes this mechanism due." }),
+  cost: opt(str({ description: "## Measured footprint and cost — registers, smem, extra passes, time." })),
+  conditions: str({ description: "## Load-bearing conditions — what must hold for the win to survive." }),
+  gotchas: str({ description: "## Gotchas — what bit this run." }),
+  negative: opt(str({ description: "## Negative readings — the hypothesis a measurement killed, with the numbers that killed it." })),
+  reproduce: opt(
+    str({
+      description:
+        "## Reproduce — a fenced block with the exact build and run commands and the raw numbers they printed. Required when confidence is verified: a reader cannot re-run a claim they cannot see.",
+    }),
+  ),
+  tags: opt(arr(str(), { description: "Optional tags, e.g. ['tile-scheduling']." })),
+  sources: opt(
+    arr(str(), {
+      description: "Candidate ids or `profile/<run>` pointers this entry rests on. Pre-filled from the workspace.",
+    }),
+  ),
+  confidence: opt(oneOf(CONFIDENCE_VALUES)),
+  architectures: opt(arr(str(), { description: "Only when no profile exists: ['sm90'] / ['sm100']." })),
+});
+type Params = Static<typeof ParamsSchema>;
+
 export function registerWikiCandidateTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "kernel_wiki_candidate",
@@ -274,55 +302,17 @@ export function registerWikiCandidateTool(pi: ExtensionAPI): void {
       "Negative readings is where a hypothesis a measurement killed goes, with the numbers that killed it; it may be empty, and a reviewer will ask why.",
       "CHECK EVERY NUMBER against the commands you actually ran, before writing the page. The validator cannot tell a measured number from a plausible one: a plausible sentence in Measured footprint or Negative readings is the one defect this tool cannot catch, and it is the one this corpus exists to prevent. Re-read both sections against the session's command history.",
       "Pass reproduce: the exact build and run commands plus their raw output (a number on a line the command did not produce). A verified entry is refused without it, because a source token that resolves only inside your workspace is a claim about evidence, not evidence.",
-      "Publishing is manual by design: cp into kernel-wiki/wiki/<type>/, run generate-indices.py, commit, bump KERNEL_WIKI_PIN.",
+      "Publishing is manual by design: cp into kernel-wiki/wiki/<type>/, run `uv run scripts/generate-indices.py`, commit, bump KERNEL_WIKI_PIN.",
     ],
-    parameters: Type.Object({
-      workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
-      id: Type.String({ description: "kebab-case page id, e.g. double-buffer-smem-tile. Frozen once published." }),
-      title: Type.String({ description: "One sentence naming what the change does." }),
-      type: Type.Union([
-        Type.Literal("technique"),
-        Type.Literal("pattern"),
-        Type.Literal("hardware"),
-        Type.Literal("migration"),
-      ]),
-      mechanism: Type.String({ description: "## Mechanism — what runs differently and why the bottleneck goes." }),
-      trigger: Type.String({ description: "## Trigger — the observable that makes this mechanism due." }),
-      cost: Type.Optional(Type.String({ description: "## Measured footprint and cost — registers, smem, extra passes, time." })),
-      conditions: Type.String({ description: "## Load-bearing conditions — what must hold for the win to survive." }),
-      gotchas: Type.String({ description: "## Gotchas — what bit this run." }),
-      negative: Type.Optional(Type.String({ description: "## Negative readings — the hypothesis a measurement killed, with the numbers that killed it." })),
-      reproduce: Type.Optional(
-        Type.String({
-          description:
-            "## Reproduce — a fenced block with the exact build and run commands and the raw numbers they printed. Required when confidence is verified: a reader cannot re-run a claim they cannot see.",
-        }),
-      ),
-      tags: Type.Optional(Type.Array(Type.String(), { description: "Optional tags, e.g. ['tile-scheduling']." })),
-      sources: Type.Optional(
-        Type.Array(Type.String(), {
-          description: "Candidate ids or `profile/<run>` pointers this entry rests on. Pre-filled from the workspace.",
-        }),
-      ),
-      confidence: Type.Optional(
-        Type.Union([
-          Type.Literal("verified"),
-          Type.Literal("source-reported"),
-          Type.Literal("inferred"),
-          Type.Literal("experimental"),
-        ]),
-      ),
-      architectures: Type.Optional(
-        Type.Array(Type.String(), { description: "Only when no profile exists: ['sm90'] / ['sm100']." }),
-      ),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       _signal,
       _onUpdate,
       ctx,
     ): Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }> {
+      const params = rawParams as Params;
       const workspace = params.workspace ? path.resolve(ctx.cwd, params.workspace) : ctx.cwd;
       const outcome = writeWikiCandidate({
         workspace,

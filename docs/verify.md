@@ -172,3 +172,24 @@ with `nvidia-smi -i 3 -lgc 1500` for one run and reset with `-rgc` immediately a
 | Locked run | `clockLocked {declaredSmMhz 1500, declaredMemMhz 3201, observedSmMhz 1500, held: true}`; `gpu.loaded {clocksSmMhz 1500, clocksMaxSmMhz 1980, utilPct 2}`; `hostEnqueueSamples 15`, `deviceSamples 15` |
 | Same contract, unlocked | `observedSmMhz 1980`, `held: false`, warning naming both frequencies |
 | Not detectable | `nvidia-smi` has no "lock in force" field; an undeclared lock is invisible, so the field is absent rather than `held: false` |
+
+## 2026-11-10 — Node query layer and pi-schema tool schemas
+
+Host: same dev box, Node 24.21.0; no GPU, no ncu, no pi-goal install.
+
+| Check | Command | Result |
+|---|---|---|
+| Typecheck | `npm run typecheck` | pass |
+| Unit + integration | `npm test` | 347 pass, 0 fail |
+| Schema shape | `tests/tools/schemas.test.mjs` | every registered tool compiles as plain JSON Schema; no TypeBox `~kind`/`~unsafe` marker; an undeclared argument field is rejected |
+| Corpus fetch at pin | `fetchPinnedCorpus` with `remote` = local kernel-wiki clone, `pin` = `70530df1cd08` | installed, checkout revision equals the pin |
+| Query at pin | `node scripts/query.mjs --tag nvfp4 --type kernel --compact` in the fetched tree | 4 results, including `kernel-nvfp4-gemm` |
+| Page fetch at pin | `node scripts/get_page.mjs kernel-flash-attention-4 --frontmatter-only` | `id: kernel-flash-attention-4`, exit 0 |
+
+### Not covered
+
+- The pin commit exists only in the local kernel-wiki clone. Fetching it from
+  `github.com/ariesfish/kernel-wiki` was not run and will fail until that
+  repository is pushed.
+- Tool arguments were compiled and validated with `@earendil-works/pi-schema`
+  in tests, but not exercised through a live pi session's tool loop.

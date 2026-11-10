@@ -22,7 +22,8 @@ This package connects them. Kernel rules ride in data pi-goal already accepts â€
 |---|---|---|
 | pi | >= 1.5.0 (`resources_discover`, `agent_before_settle`) | everything |
 | `@ariesfish/pi-goal` | >= 0.5.3 | the loop, contract, gate |
-| python3 | >= 3.11 | ncu helpers and kernel-wiki queries (no PyYAML needed) |
+| Node.js | >= 22 | the extension and kernel-wiki queries |
+| python3 | >= 3.11 | ncu helpers only; kernel-wiki queries are Node.js |
 | CUDA toolkit + Nsight Compute | 13.2 + 2026.3.1 documented target | profiling |
 | NVIDIA GPU | sm_90 verified in v1 | measuring anything |
 
@@ -151,7 +152,7 @@ kernel_wiki_candidate({
   commands or files (a fenced code block is the allow-list) â€” because the corpus
   is shared and the next operator cannot resolve them.
 - It never writes the corpus. Publishing is a human step: `cp` the file into
-  `kernel-wiki/wiki/<type>/`, run `generate-indices.py`, commit, bump
+  `kernel-wiki/wiki/<type>/`, run `uv run scripts/generate-indices.py`, commit, bump
   `KERNEL_WIKI_PIN`.
 
 ## The skill
@@ -275,7 +276,7 @@ measured. `kernel_kb({ action: "lint" })` fails closed on a missing tree.
 pi-kernel-expert 0.4.0
   loop engine   pi-goal installed
   ncu skill     vendored @c7980a43cb88 at .../skills/ncu-report-skill
-  kernel-wiki   cached at ~/.pi/agent/kernel-expert/cache/kernel-wiki@377d4560840d
+  kernel-wiki   cached at ~/.pi/agent/kernel-expert/cache/kernel-wiki@70530df1cd089103e5bb8d688815bac9dceb8033
 ```
 
 The ncu skill is vendored and works offline. The kernel-wiki corpus is fetched

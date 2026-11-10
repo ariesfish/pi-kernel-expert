@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { bool, obj, opt, str, type Static } from "@earendil-works/pi-schema";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import { agentLayout } from "../support/paths.ts";
 import { type CorpusIndex, readCorpusIndex } from "../kernel/corpus-index.ts";
@@ -31,6 +31,29 @@ import {
 const MIN_UNLOCK_REASON = 16;
 
 type ToolResult = { content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> };
+
+const ParamsSchema = obj({
+  path: opt(str({ description: `Milestone file. Default: ${MILESTONE_RELATIVE_PATH} under the workspace.` })),
+  workspace: opt(str({ description: "Task workspace. Default: current directory." })),
+  lock: opt(
+    bool({
+      description:
+        "Freeze the ### M0 Contract block in .kernel/milestone.lock.json. Refused when the file has refusals, or when a lock exists and the block has changed.",
+    }),
+  ),
+  unlock: opt(
+    bool({
+      description:
+        "Thaw a frozen M0 block. Requires reason; the reason is appended to ## 4. Dead Ends and the lock is removed.",
+    }),
+  ),
+  reason: opt(
+    str({
+      description: `Why M0 may change, in one sentence. Required by unlock, at least ${MIN_UNLOCK_REASON} characters, recorded verbatim.`,
+    }),
+  ),
+});
+type Params = Static<typeof ParamsSchema>;
 
 function refusal(rule: string, text: string, details: Record<string, unknown> = {}): ToolResult {
   return {
@@ -153,36 +176,15 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
       "At a plateau, write a `### Diagnosis <id>` block instead of another candidate: four lines — `class` (missing-decision, wrong-decision, measurement-defect, environment), `decision` (the id to add or change), `measurement` (the cheapest test that tells the causes apart), `abandon` (what to stop doing), and `citations` (at least three `path:line` or `path#anchor` references the claims rest on — they are opened, and a file that is not there or a line past the end is refused). `measurement` must carry one command in backticks plus the outcomes it separates. Add `- self-diagnosis: <why>` when no reviewer was available. The block is validated by shape and never gates.",
       "Fix every refusal in one edit: the validator reports all of them at once, so re-running after each single fix spends the loop learning nothing.",
     ],
-    parameters: Type.Object({
-      path: Type.Optional(
-        Type.String({ description: `Milestone file. Default: ${MILESTONE_RELATIVE_PATH} under the workspace.` }),
-      ),
-      workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
-      lock: Type.Optional(
-        Type.Boolean({
-          description:
-            "Freeze the ### M0 Contract block in .kernel/milestone.lock.json. Refused when the file has refusals, or when a lock exists and the block has changed.",
-        }),
-      ),
-      unlock: Type.Optional(
-        Type.Boolean({
-          description:
-            "Thaw a frozen M0 block. Requires reason; the reason is appended to ## 4. Dead Ends and the lock is removed.",
-        }),
-      ),
-      reason: Type.Optional(
-        Type.String({
-          description: `Why M0 may change, in one sentence. Required by unlock, at least ${MIN_UNLOCK_REASON} characters, recorded verbatim.`,
-        }),
-      ),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       _signal,
       _onUpdate,
       ctx,
     ): Promise<ToolResult> {
+      const params = rawParams as Params;
       const workspace = params.workspace ? path.resolve(ctx.cwd, params.workspace) : ctx.cwd;
       const file = params.path ? path.resolve(workspace, params.path) : path.join(workspace, MILESTONE_RELATIVE_PATH);
       const label = path.relative(workspace, file) || file;

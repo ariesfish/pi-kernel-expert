@@ -5,7 +5,7 @@ import { buildWikiInvocation, formatWikiResult } from "../../extensions/pi-kerne
 
 test("query defaults to compact output", () => {
   const invocation = buildWikiInvocation({ query: "fuse gate-up dual GEMM on Blackwell" });
-  assert.equal(invocation.script, "query.py");
+  assert.equal(invocation.script, "query.mjs");
   assert.deepEqual(invocation.args, ["fuse gate-up dual GEMM on Blackwell", "--compact"]);
 });
 
@@ -17,7 +17,7 @@ test("query carries filters and an explicit limit", () => {
     limit: 10,
     compact: false,
   });
-  assert.equal(invocation.script, "query.py");
+  assert.equal(invocation.script, "query.mjs");
   assert.deepEqual(invocation.args, [
     "nvfp4",
     "--tag",
@@ -29,9 +29,9 @@ test("query carries filters and an explicit limit", () => {
   ]);
 });
 
-test("page fetch uses get_page.py and can follow sources", () => {
+test("page fetch uses get_page.mjs and can follow sources", () => {
   const invocation = buildWikiInvocation({ page: "kernel-flash-attention-4", follow_sources: true });
-  assert.equal(invocation.script, "get_page.py");
+  assert.equal(invocation.script, "get_page.mjs");
   assert.deepEqual(invocation.args, ["kernel-flash-attention-4", "--follow-sources"]);
 });
 
@@ -41,7 +41,7 @@ test("exactly one of query or page is required", () => {
   assert.match(buildWikiInvocation({ query: "   " }).error, /pass a query/);
 });
 
-test("limit outside 1..50 is rejected before running python", () => {
+test("limit outside 1..50 is rejected before running node", () => {
   assert.match(buildWikiInvocation({ query: "x", limit: 0 }).error, /1 and 50/);
   assert.match(buildWikiInvocation({ query: "x", limit: 51 }).error, /1 and 50/);
   assert.match(buildWikiInvocation({ query: "x", limit: 2.5 }).error, /1 and 50/);
@@ -49,16 +49,16 @@ test("limit outside 1..50 is rejected before running python", () => {
 
 test("a successful result keeps the command line and the body", () => {
   const text = formatWikiResult({
-    invocation: { script: "query.py", args: ["nvfp4", "--compact"] },
+    invocation: { script: "query.mjs", args: ["nvfp4", "--compact"] },
     result: { code: 0, stdout: "kernel-x  wiki/kernels/x.md\n", stderr: "", killed: false, truncated: false },
   });
-  assert.match(text, /^\$ python3 scripts\/query\.py nvfp4 --compact/);
+  assert.match(text, /^\$ node scripts\/query\.mjs nvfp4 --compact/);
   assert.match(text, /kernel-x/);
 });
 
 test("a failed result carries the error and no fabricated matches", () => {
   const text = formatWikiResult({
-    invocation: { script: "get_page.py", args: ["missing"] },
+    invocation: { script: "get_page.mjs", args: ["missing"] },
     result: { code: 1, stdout: "", stderr: "page not found", killed: false, truncated: false },
   });
   assert.match(text, /exit code 1/);

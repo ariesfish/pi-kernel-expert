@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { arr, bool, map, num, obj, oneOf, opt, str, type Static } from "@earendil-works/pi-schema";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import {
   normalizeContract,
@@ -19,34 +19,109 @@ import {
 const PACKAGE_ROOT = packageRootFrom(import.meta.url);
 const GENERATOR = `pi-kernel-expert ${readPackageVersion(PACKAGE_ROOT)}`;
 
-const GroupSchema = Type.Object({
-  name: Type.String({
+const GroupSchema = obj({
+  name: str({
     description: 'Data set name, exported as KERNEL_GROUP, e.g. typical, zero_block. [A-Za-z0-9][A-Za-z0-9_.-]*, unique in the cell.',
   }),
-  intent: Type.String({
+  intent: str({
     description: "What this data set must prove, in one sentence. Required: a group without an intent is refused.",
   }),
-  seed: Type.Optional(Type.Number({ description: "Integer seed the command may use to build the data. Exported as KERNEL_GROUP_SEED." })),
+  seed: opt(num({ description: "Integer seed the command may use to build the data. Exported as KERNEL_GROUP_SEED." })),
 });
 
-const CellSchema = Type.Object({
-  id: Type.String({ description: "Stable cell id, e.g. m1024_n4096_k4096" }),
-  dtype: Type.String({ description: "Exported as KERNEL_DTYPE, e.g. bf16, fp8_e4m3" }),
-  vars: Type.Optional(
-    Type.Record(Type.String(), Type.String(), {
+const CellSchema = obj({
+  id: str({ description: "Stable cell id, e.g. m1024_n4096_k4096" }),
+  dtype: str({ description: "Exported as KERNEL_DTYPE, e.g. bf16, fp8_e4m3" }),
+  vars: opt(
+    map(str(), {
       description: "Extra variables exported as KERNEL_<KEY>, e.g. { M: '1024', N: '4096' }",
     }),
   ),
-  boundary: Type.Optional(
-    Type.Boolean({ description: "Mark an edge-case cell so failures name it as a boundary; a boundary cell may carry 0 groups." }),
+  boundary: opt(
+    bool({ description: "Mark an edge-case cell so failures name it as a boundary; a boundary cell may carry 0 groups." }),
   ),
-  groups: Type.Optional(
-    Type.Array(GroupSchema, {
+  groups: opt(
+    arr(GroupSchema, {
       description:
         "The data sets this cell is judged on. Required (>= 3) unless boundary is true; each group runs the check and the benchmark and reports its own METRIC line.",
     }),
   ),
 });
+
+const ParamsSchema = obj({
+  objective: str({ description: "One sentence: what this task optimizes." }),
+  workspace: opt(str({ description: "Task workspace. Default: current directory." })),
+  check_command: str({
+    description:
+      "Per-cell, per-group correctness command; env carries KERNEL_CELL, KERNEL_GROUP, KERNEL_GROUP_INTENT, KERNEL_GROUP_SEED, KERNEL_DTYPE, KERNEL_RTOL, KERNEL_ATOL and the cell vars. Exit 0 = correct.",
+  }),
+  benchmark_command: str({
+    description: "Per-cell benchmark command; prints one number or a METRIC line. Same env as the check command.",
+  }),
+  cells: arr(CellSchema, { minItems: 1 }),
+  rtol: num({ description: "Relative tolerance recorded in the contract and exported as KERNEL_RTOL." }),
+  atol: num({ description: "Absolute tolerance, exported as KERNEL_ATOL." }),
+  metric_name: opt(str({ description: "Underlying metric name. Default: latency_us." })),
+  direction: opt(
+    oneOf(["lower", "higher"], {
+      description: "Is the underlying metric better lower or higher? Default: lower.",
+    }),
+  ),
+  repeats: opt(num({ description: "Measured repetitions per cell. Default: 5." })),
+  warmup: opt(num({ description: "Discarded warmup runs per cell. Default: 1." })),
+  guard_pct: opt(
+    num({ description: "Fail the benchmark when a cell regresses by more than this percent. Default: 5." }),
+  ),
+  noise_floor_pct: opt(
+    num({ description: "A keep below this geomean improvement is refused. Default: 2." }),
+  ),
+  checks_timeout_seconds: opt(num({ description: "Timeout for the check criterion. Default: 900." })),
+  scope_globs: opt(arr(str())),
+  test_globs: opt(arr(str())),
+  basis: opt(
+    oneOf(["device", "e2e"], {
+      description:
+        'What the benchmark times: "device" (kernel device time) or "e2e" (whole host call). Default: device.',
+    }),
+  ),
+  harness_globs: opt(
+    arr(str(), {
+      description:
+        'Paths a diff may not touch (the comparator, the bench harness). Default: ["goal.sh", "goal.checks.sh"] — add the comparator or it stays writable.',
+    }),
+  ),
+  reference_command: opt(
+    str({
+      description:
+        "Shell command for the same-job reference implementation, measured in the same run. Must differ from benchmark_command.",
+    }),
+  ),
+  calibrate_command: opt(
+    str({
+      description:
+        "Shell command that measures the REFERENCE against itself and prints max_diff=<number>; bash goal.checks.sh --calibrate runs it once per dtype into .kernel/calibration.json. Without it the precision gate has no ruler and stays unarmed.",
+    }),
+  ),
+  clock_lock_sm: opt(
+    num({
+      description:
+        "The SM clock you locked this card to, in MHz. Recorded with the loaded sample and checked against it: a lock that did not hold is reported, not assumed.",
+    }),
+  ),
+  clock_lock_mem: opt(
+    num({ description: "The memory clock you locked, in MHz. Recorded beside clock_lock_sm." }),
+  ),
+  burn_in_ms: opt(
+    num({
+      description:
+        "Wall-clock burn-in before the first measured window when pairing, in ms (0 disables it). Default: 4000. The first window of a job reads 3-5% fast, so a burn-in keeps that bias off one side.",
+    }),
+  ),
+  force: opt(
+    bool({ description: "Regenerate even when artifacts exist. Requires /goal allow-benchmark in sealed mode." }),
+  ),
+});
+type Params = Static<typeof ParamsSchema>;
 
 /**
  * The contract is the shape matrix; the milestone is the plan that says which
@@ -95,86 +170,15 @@ export function registerContractTool(pi: ExtensionAPI): void {
       "Have the check command print max_diff=<relative error> and pass calibrate_command (the reference measured against itself); then `bash goal.checks.sh --calibrate` records the ruler and kernel_candidate refuses a keep past 3x the reference's own error plus the dtype floor.",
       "Set basis to e2e only when the command times the whole host call; a device-basis number and an e2e-basis number are never comparable.",
     ],
-    parameters: Type.Object({
-      objective: Type.String({ description: "One sentence: what this task optimizes." }),
-      workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
-      check_command: Type.String({
-        description:
-          "Per-cell, per-group correctness command; env carries KERNEL_CELL, KERNEL_GROUP, KERNEL_GROUP_INTENT, KERNEL_GROUP_SEED, KERNEL_DTYPE, KERNEL_RTOL, KERNEL_ATOL and the cell vars. Exit 0 = correct.",
-      }),
-      benchmark_command: Type.String({
-        description: "Per-cell benchmark command; prints one number or a METRIC line. Same env as the check command.",
-      }),
-      cells: Type.Array(CellSchema, { minItems: 1 }),
-      rtol: Type.Number({ description: "Relative tolerance recorded in the contract and exported as KERNEL_RTOL." }),
-      atol: Type.Number({ description: "Absolute tolerance, exported as KERNEL_ATOL." }),
-      metric_name: Type.Optional(Type.String({ description: "Underlying metric name. Default: latency_us." })),
-      direction: Type.Optional(
-        Type.Union([Type.Literal("lower"), Type.Literal("higher")], {
-          description: "Is the underlying metric better lower or higher? Default: lower.",
-        }),
-      ),
-      repeats: Type.Optional(Type.Number({ description: "Measured repetitions per cell. Default: 5." })),
-      warmup: Type.Optional(Type.Number({ description: "Discarded warmup runs per cell. Default: 1." })),
-      guard_pct: Type.Optional(
-        Type.Number({ description: "Fail the benchmark when a cell regresses by more than this percent. Default: 5." }),
-      ),
-      noise_floor_pct: Type.Optional(
-        Type.Number({ description: "A keep below this geomean improvement is refused. Default: 2." }),
-      ),
-      checks_timeout_seconds: Type.Optional(Type.Number({ description: "Timeout for the check criterion. Default: 900." })),
-      scope_globs: Type.Optional(Type.Array(Type.String())),
-      test_globs: Type.Optional(Type.Array(Type.String())),
-      basis: Type.Optional(
-        Type.Union([Type.Literal("device"), Type.Literal("e2e")], {
-          description:
-            'What the benchmark times: "device" (kernel device time) or "e2e" (whole host call). Default: device.',
-        }),
-      ),
-      harness_globs: Type.Optional(
-        Type.Array(Type.String(), {
-          description:
-            'Paths a diff may not touch (the comparator, the bench harness). Default: ["goal.sh", "goal.checks.sh"] — add the comparator or it stays writable.',
-        }),
-      ),
-      reference_command: Type.Optional(
-        Type.String({
-          description:
-            "Shell command for the same-job reference implementation, measured in the same run. Must differ from benchmark_command.",
-        }),
-      ),
-      calibrate_command: Type.Optional(
-        Type.String({
-          description:
-            "Shell command that measures the REFERENCE against itself and prints max_diff=<number>; bash goal.checks.sh --calibrate runs it once per dtype into .kernel/calibration.json. Without it the precision gate has no ruler and stays unarmed.",
-        }),
-      ),
-      clock_lock_sm: Type.Optional(
-        Type.Number({
-          description:
-            "The SM clock you locked this card to, in MHz. Recorded with the loaded sample and checked against it: a lock that did not hold is reported, not assumed.",
-        }),
-      ),
-      clock_lock_mem: Type.Optional(
-        Type.Number({ description: "The memory clock you locked, in MHz. Recorded beside clock_lock_sm." }),
-      ),
-      burn_in_ms: Type.Optional(
-        Type.Number({
-          description:
-            "Wall-clock burn-in before the first measured window when pairing, in ms (0 disables it). Default: 4000. The first window of a job reads 3-5% fast, so a burn-in keeps that bias off one side.",
-        }),
-      ),
-      force: Type.Optional(
-        Type.Boolean({ description: "Regenerate even when artifacts exist. Requires /goal allow-benchmark in sealed mode." }),
-      ),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       _signal,
       _onUpdate,
       ctx,
     ): Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }> {
+      const params = rawParams as Params;
       const root = params.workspace ? path.resolve(ctx.cwd, params.workspace) : ctx.cwd;
       const validation = validateWorkspace(root);
       if (!validation.ok) {

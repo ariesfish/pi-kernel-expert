@@ -61,7 +61,7 @@ const CONTRACT = {
 };
 
 const CORPUS = {
-  pin: "3c41f99bde5d029690c15cc68cb47e56841b36ee",
+  pin: "70530df1cd089103e5bb8d688815bac9dceb8033",
   dir: "/tmp/kernel-wiki",
   pages: [
     { id: "migration-wgmma-to-tcgen05", confidence: "source-reported", path: "wiki/reference/migration-wgmma-to-tcgen05.md" },

@@ -1,9 +1,14 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { obj, opt, str, type Static } from "@earendil-works/pi-schema";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Type } from "typebox";
 
 import { formatWorkspaceIssues, initWorkspace, validateWorkspace, workspacePaths } from "../workspace/layout.ts";
+
+const ParamsSchema = obj({
+  workspace: opt(str({ description: "Task workspace. Default: current directory." })),
+});
+type Params = Static<typeof ParamsSchema>;
 
 function resolveWorkspace(cwd: string, workspace?: string): string {
   return workspace ? path.resolve(cwd, workspace) : cwd;
@@ -21,16 +26,15 @@ export function registerInitTool(pi: ExtensionAPI): void {
       "Fill docs/draft.md and docs/plan.md with real content; kernel_contract refuses placeholders and empty sections.",
       "Write the draft before proposing implementation. A task with no measured baseline gets no candidates.",
     ],
-    parameters: Type.Object({
-      workspace: Type.Optional(Type.String({ description: "Task workspace. Default: current directory." })),
-    }),
+    parameters: ParamsSchema,
     async execute(
       _toolCallId,
-      params,
+      rawParams,
       _signal,
       _onUpdate,
       ctx,
     ): Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }> {
+      const params = rawParams as Params;
       const root = resolveWorkspace(ctx.cwd, params.workspace);
       const result = initWorkspace(root);
       const validation = validateWorkspace(root);
