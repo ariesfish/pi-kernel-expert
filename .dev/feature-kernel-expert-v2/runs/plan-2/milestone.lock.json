@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "milestoneSha": "2715b2a54cd7967369b7d5eb1b9721bc37d4d0c230de489eb49c0383b4ce64bf",
+  "m0ContractSha": "e582a5a803577fb3eae52efd34f4935ef256ba0413654127e6f141d0dd90e689",
+  "lockedAt": "2026-11-10T03:39:35.649Z",
+  "m0Contract": "### M0 Contract\n- tile: 2048 elements per block, 256 threads, 8 per thread\n- vector width: 4 x fp32\n- smem: none, the mapping needs no staging\n- warp roles: none, every warp loads and stores the same way\n- register budget: 40 (room for a pair of in-flight loads)\n- issue order: index, load, fma, store\n- accumulator precision: fp32"
+}

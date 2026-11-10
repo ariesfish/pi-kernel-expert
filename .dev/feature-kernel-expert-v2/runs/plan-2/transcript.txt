@@ -1,0 +1,98 @@
+
+========================================================================
+1. validate the milestone as written
+========================================================================
+docs/milestone.md — clean.
+No M0 lock (.kernel/milestone.lock.json absent): the block may still change. Lock it with lock: true.
+6 section(s): 1. Problem and Target, 2. Contract, 3. DAG and Phase Order, 4. Dead Ends, 5. Global Gate, 6. Rules; 2 decision(s); 1 gate block(s)
+phases:
+  M0 Contract — 6 frozen item(s)
+  M0 Architecture — 2 decision(s)
+  M0 Gate — 4 gate line(s)
+decisions:
+  D0.1 Map consecutive threads to consecutive elements (M0) — depends on none
+  D0.2 Split the ring into cells by working set (M0) — depends on ⇐ D0.1
+gates:
+  M0 Gate:1 [VERIFY: ncu-direct] profile:run1 — device_ms on n128m/typical drops by at least 8x with goal.checks.sh green
+  M0 Gate:2 [VERIFY: correctness] — every cell and group still matches the reference within its dtype epsilon
+  M0 Gate:3 [VERIFY: ncu-derived] profile:run1 — one warp request reads four sectors, not 128
+  M0 Gate:4 [VERIFY: mechanism] — the request amplification is gone, which is why the number moved
+dead ends: 1 row(s)
+
+========================================================================
+2. lock: freeze the ### M0 Contract block
+========================================================================
+docs/milestone.md — locked: M0 Contract frozen at 1d6404233512 (6 items: tile, smem, warp roles, register budget, issue order, accumulator precision).
+File sha 97078ea2ce84, recorded in .kernel/milestone.lock.json. An edit inside the block is now refused as m0-thawed; changing M0 on purpose needs unlock: true with a reason, which lands in Dead Ends.
+
+========================================================================
+3. the lock file
+========================================================================
+{
+  "version": 1,
+  "milestoneSha": "97078ea2ce84b219006ce2f938c6d2a26ec96a8b19ff3e28af4cec429aee6e16",
+  "m0ContractSha": "1d6404233512dc0dd68996856fc8e71db408b2026d7053f81f98bde22e69ef25",
+  "lockedAt": "2026-11-10T03:39:35.647Z",
+  "m0Contract": "### M0 Contract\n- tile: 1024 elements per block, 256 threads, 4 per thread\n- smem: none, the mapping needs no staging\n- warp roles: none, every warp loads and stores the same way\n- register budget: 32 (the kernel is 11 instructions)\n- issue order: index, load, fma, store\n- accumulator precision: fp32" …
+
+========================================================================
+4. the same file, three M0 items changed, validated
+========================================================================
+docs/milestone.md — refused: 3 problem(s), each with the rule, the row, and the fix:
+1. m0-thawed M0 Contract: tile: the locked line `- tile: 1024 elements per block, 256 threads, 4 per thread` now reads `- tile: 2048 elements per block, 256 threads, 8 per thread`; M0 was frozen at 1d6404233512 on 2026-11-10T03:39:35.647Z Fix: Restore the block exactly as locked. To change M0 on purpose, run kernel_milestone with unlock: true and a reason: the reason is appended to ## 4. Dead Ends, which is what makes a thaw a recorded decision instead of a quiet edit.
+2. m0-thawed M0 Contract: register budget: the locked line `- register budget: 32 (the kernel is 11 instructions)` now reads `- register budget: 40 (room for a pair of in-flight loads)`; M0 was frozen at 1d6404233512 on 2026-11-10T03:39:35.647Z Fix: Restore the block exactly as locked. To change M0 on purpose, run kernel_milestone with unlock: true and a reason: the reason is appended to ## 4. Dead Ends, which is what makes a thaw a recorded decision instead of a quiet edit.
+3. m0-thawed M0 Contract: vector width: `- vector width: 4 x fp32` was added after the lock; an item added to M0 is a decision taken after the measurements it enables Fix: Restore the block exactly as locked. To change M0 on purpose, run kernel_milestone with unlock: true and a reason: the reason is appended to ## 4. Dead Ends, which is what makes a thaw a recorded decision instead of a quiet edit.
+
+========================================================================
+5. re-locking is not a way to absorb the edit
+========================================================================
+docs/milestone.md — refused: 3 problem(s), each with the rule, the row, and the fix:
+1. m0-thawed M0 Contract: tile: the locked line `- tile: 1024 elements per block, 256 threads, 4 per thread` now reads `- tile: 2048 elements per block, 256 threads, 8 per thread`; M0 was frozen at 1d6404233512 on 2026-11-10T03:39:35.647Z Fix: Restore the block exactly as locked. To change M0 on purpose, run kernel_milestone with unlock: true and a reason: the reason is appended to ## 4. Dead Ends, which is what makes a thaw a recorded decision instead of a quiet edit.
+2. m0-thawed M0 Contract: register budget: the locked line `- register budget: 32 (the kernel is 11 instructions)` now reads `- register budget: 40 (room for a pair of in-flight loads)`; M0 was frozen at 1d6404233512 on 2026-11-10T03:39:35.647Z Fix: Restore the block exactly as locked. To change M0 on purpose, run kernel_milestone with unlock: true and a reason: the reason is appended to ## 4. Dead Ends, which is what makes a thaw a recorded decision instead of a quiet edit.
+3. m0-thawed M0 Contract: vector width: `- vector width: 4 x fp32` was added after the lock; an item added to M0 is a decision taken after the measurements it enables Fix: Restore the block exactly as locked. To change M0 on purpose, run kernel_milestone with unlock: true and a reason: the reason is appended to ## 4. Dead Ends, which is what makes a thaw a recorded decision instead of a quiet edit.
+
+========================================================================
+6. unlock without a reason
+========================================================================
+unlock-reason: unlock needs a reason of at least 16 characters saying what changed and why M0 may move now. Got "". The reason is appended to ## 4. Dead Ends: a thaw nobody can read later is indistinguishable from an accident.
+
+========================================================================
+7. unlock with a reason
+========================================================================
+docs/milestone.md — unlocked. The M0 freeze at 1d6404233512 is gone and the block may change.
+Recorded in ## 4. Dead Ends: - M0 | the register budget was measured on an sm80 card at 256 threads; sm90 at 512 threads needs 40 | m0-contract@1d6404233512
+Re-lock with lock: true once the new block holds; until then every candidate's milestoneSha points at a plan with no freeze.
+
+========================================================================
+8. validated after the thaw
+========================================================================
+docs/milestone.md — clean.
+No M0 lock (.kernel/milestone.lock.json absent): the block may still change. Lock it with lock: true.
+6 section(s): 1. Problem and Target, 2. Contract, 3. DAG and Phase Order, 4. Dead Ends, 5. Global Gate, 6. Rules; 2 decision(s); 1 gate block(s)
+phases:
+  M0 Contract — 7 frozen item(s)
+  M0 Architecture — 2 decision(s)
+  M0 Gate — 4 gate line(s)
+decisions:
+  D0.1 Map consecutive threads to consecutive elements (M0) — depends on none
+  D0.2 Split the ring into cells by working set (M0) — depends on ⇐ D0.1
+gates:
+  M0 Gate:1 [VERIFY: ncu-direct] profile:run1 — device_ms on n128m/typical drops by at least 8x with goal.checks.sh green
+  M0 Gate:2 [VERIFY: correctness] — every cell and group still matches the reference within its dtype epsilon
+  M0 Gate:3 [VERIFY: ncu-derived] profile:run1 — one warp request reads four sectors, not 128
+  M0 Gate:4 [VERIFY: mechanism] — the request amplification is gone, which is why the number moved
+dead ends: 2 row(s)
+
+========================================================================
+9. what the unlock left in ## 4. Dead Ends
+========================================================================
+- D0.2 | a 128-bit vector load changed nothing, the cost was never instruction count | profile:run2
+- M0 | the register budget was measured on an sm80 card at 256 threads; sm90 at 512 threads needs 40 | m0-contract@1d6404233512
+
+========================================================================
+10. re-lock the block as it now stands
+========================================================================
+docs/milestone.md — locked: M0 Contract frozen at e582a5a80357 (7 items: tile, vector width, smem, warp roles, register budget, issue order, accumulator precision).
+File sha 2715b2a54cd7, recorded in .kernel/milestone.lock.json. An edit inside the block is now refused as m0-thawed; changing M0 on purpose needs unlock: true with a reason, which lands in Dead Ends.
+
+workspace: /Users/ariesfish/Projects/github/dev-skills/pi-kernel-expert/.dev/feature-kernel-expert-v2/runs/plan-2/.work

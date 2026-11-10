@@ -71,7 +71,18 @@
   the seven sections, phases `M0..Mk`, every decision's five-tuple (`Action`,
   `Purpose`, `Trigger`, `Cost`, `Depends on`) with its `⇐`/`⊗`/`⇒` edges, and
   the typed `[VERIFY: …]` gate lines. It reports every refusal in one pass with
-  the rule, the row, and the fix, and never writes the file.
+  the rule, the row, and the fix, and never writes the file except to record an
+  unlock.
+- **The M0 contract freezes by hash.** `kernel_milestone lock: true` writes
+  `.kernel/milestone.lock.json` — the milestone sha, the `### M0 Contract`
+  block's sha, the time, and the block's own text. After that the block is
+  byte-identical or the file is refused as `m0-thawed`, one refusal per changed
+  item, quoting the locked line beside the new one. Re-locking a thawed file
+  refuses with the same diff, so the lock cannot absorb an edit. `unlock: true`
+  needs a reason of at least 16 characters, appends it to `## 4. Dead Ends` as
+  `- M0 | <reason> | m0-contract@<sha>`, and removes the lock: changing M0 is
+  allowed, doing it quietly is not. A lock file that does not parse is refused
+  (`lock-unreadable`) rather than read as "no lock".
 - `scripts/job-env-check.sh`: proves nvcc, Nsight Compute and a CUDA-enabled
   torch are visible from a non-interactive shell on the GPU node, naming every
   missing item and exiting non-zero.

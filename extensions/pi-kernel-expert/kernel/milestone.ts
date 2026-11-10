@@ -26,6 +26,7 @@
  * the gate line, and the line is judged on its shape alone.
  */
 import type { KernelContract } from "./contract.ts";
+import { type MilestoneLock, diffM0Block, m0ContractBlock } from "./milestone-lock.ts";
 
 /** The plan file, per task workspace. */
 export const MILESTONE_RELATIVE_PATH = "docs/milestone.md";
@@ -96,6 +97,7 @@ export const MILESTONE_RULE_IDS = [
   "gate-no-mechanism-line",
   "trigger-is-category",
   "phase-order",
+  "m0-thawed",
 ] as const;
 
 export type MilestoneRuleId = (typeof MILESTONE_RULE_IDS)[number];
@@ -126,9 +128,14 @@ export interface Section {
   end: number;
 }
 
-export type PhaseKind = "gate" | "block";
+export type PhaseKind = "gate" | "block" | "contract";
 
-/** A `### M<k> …` block. `gate` blocks hold gate lines; every other block holds decisions. */
+/**
+ * A `### M<k> …` block. `gate` blocks hold gate lines, `contract` is the frozen
+ * M0 block, and every other block holds decisions — which is why `contract` is
+ * its own kind: it holds no decisions, so it cannot make a `D0.*` address
+ * ambiguous, and `### M0 Contract` must be able to sit next to `### M0 Architecture`.
+ */
 export interface Phase {
   id: string;
   /** `k` of `M<k>`, or -1 for a `### ` heading that carries no phase id. */
@@ -238,6 +245,8 @@ export interface MilestoneContext {
   contract?: KernelContract | null;
   /** The `profile/<run_id>` directories that exist. T-012 resolves `ncu-*` pointers here. */
   profileRunIds?: readonly string[];
+  /** `.kernel/milestone.lock.json`, already parsed. Absent means the milestone is unlocked. */
+  lock?: MilestoneLock | null;
 }
 
 export function renderMilestone(model: MilestoneModel): string {
@@ -294,7 +303,7 @@ export function parseMilestone(text: string): { model: MilestoneModel; problems:
         id: id ? id[1] : heading,
         index: id ? Number(id[1].slice(1)) : -1,
         name: id ? id[2].trim() : heading,
-        kind: id && /^gate$/i.test(id[2].trim()) ? "gate" : "block",
+        kind: id && /^gate$/i.test(id[2].trim()) ? "gate" : id && /^contract$/i.test(id[2].trim()) ? "contract" : "block",
         heading: line,
         start: index,
         end: lines.length,
@@ -443,7 +452,7 @@ function stripMarkers(text: string): string {
  * the contract and the profile runs that exist so a *pointer* can be resolved;
  * this module judges shape only and resolves nothing.
  */
-export function validateMilestone(model: MilestoneModel, _ctx: MilestoneContext = {}): Problem[] {
+export function validateMilestone(model: MilestoneModel, ctx: MilestoneContext = {}): Problem[] {
   return [
     ...model.problems,
     ...missingKeys(model),
@@ -455,7 +464,47 @@ export function validateMilestone(model: MilestoneModel, _ctx: MilestoneContext 
     ...noMechanismLine(model),
     ...categoryTriggers(model),
     ...phaseOrder(model),
+    ...m0Thawed(model, ctx.lock),
   ];
+}
+
+/**
+ * 10. The M0 contract is frozen by hash once locked. This is the one refusal
+ * nobody can argue with from inside the file: the block was agreed before there
+ * was a number, and a later edit changes what every measurement is measured
+ * against. The fix is an unlock with a reason, which becomes a diagnosis row.
+ */
+function m0Thawed(model: MilestoneModel, lock: MilestoneLock | null | undefined): Problem[] {
+  if (!lock) return [];
+  const block = m0ContractBlock(model);
+  const fix =
+    "Restore the block exactly as locked. To change M0 on purpose, run kernel_milestone with unlock: true and a reason: the reason is appended to ## 4. Dead Ends, which is what makes a thaw a recorded decision instead of a quiet edit.";
+  if (!block) {
+    return [
+      makeProblem(
+        "m0-thawed",
+        "M0 Contract",
+        "the frozen `### M0 Contract` block is no longer in the milestone, so the lock now guards nothing",
+        fix,
+      ),
+    ];
+  }
+  const changes = diffM0Block(lock.m0Contract.split("\n"), block.lines);
+  return changes.map((change) => {
+    const what = (() => {
+      switch (change.kind) {
+        case "changed":
+          return `the locked line \`${change.before}\` now reads \`${change.after}\`; M0 was frozen at ${lock.m0ContractSha.slice(0, 12)} on ${lock.lockedAt}`;
+        case "added":
+          return `\`${change.after}\` was added after the lock; an item added to M0 is a decision taken after the measurements it enables`;
+        case "removed":
+          return `\`${change.before}\` was removed after the lock`;
+        default:
+          return `the items were reordered after the lock: \`${change.before}\` now follows \`${change.after}\`, and M0's order is the issue order`;
+      }
+    })();
+    return makeProblem("m0-thawed", `M0 Contract: ${change.key}`, what, fix);
+  });
 }
 
 /** 1. The five-tuple is the decision. A key that is absent or empty is a decision nobody can act on. */
@@ -892,6 +941,11 @@ export function formatMilestoneSummary(model: MilestoneModel): string {
       if (phase.kind === "gate") {
         const block = model.gates.find((entry) => entry.phase === phase.id);
         lines.push(`  ${phase.id} ${phase.name} — ${block?.lines.length ?? 0} gate line(s)`);
+      } else if (phase.kind === "contract") {
+        // The frozen block holds items, not decisions; counting M0's decisions
+        // here would blame them on the block that holds no decisions at all.
+        const items = m0ContractBlock(model)?.items.length ?? 0;
+        lines.push(`  ${phase.id} ${phase.name} — ${items} frozen item(s)`);
       } else {
         lines.push(`  ${phase.id} ${phase.name} — ${owned.length} decision(s)`);
       }

@@ -170,6 +170,19 @@ dead-end rows. It reports every refusal in one pass — rule, row, and fix — a
 never writes the file. `kernel_init` does not create the milestone: you write
 it, this tool judges it.
 
+The plan's hard choices — tile, smem inventory, warp roles, register budget,
+issue order, accumulator precision — go in `### M0 Contract`, one
+`- <item>: <value>` line each. Lock them once they are right:
+
+```text
+kernel_milestone({ lock: true })
+```
+
+From then on the block is byte-identical or the file is refused as `m0-thawed`,
+naming the item that moved. To change M0 on purpose, `unlock: true` with a
+reason: it lands in `## 4. Dead Ends` as a diagnosis, so a thaw is a decision
+with a date instead of an edit nobody remembers making.
+
 ## Check what is wired
 
 ```text

@@ -188,7 +188,7 @@ T-015 workspace integration + kernel-flow skill  (after T-010)
 T-016 real-workspace evidence (plan-1, plan-2)   (after T-013, T-014)
 ```
 
-Frontier: **T-011**, **T-012**, **T-013** (T-010 closed 2026-11-10, `b7f9b19`; `corpus` module T-017/T-018 closed, T-019 evidenced).
+Frontier: **T-012**, **T-013** (T-010 closed 2026-11-10, `b7f9b19`; T-011 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced).
 
 Adjacent, done outside the ticket graph: the corpus moved to `ariesfish/kernel-wiki`
 (`1571a54`, ADR 0007) — skill name compliant, sanitised at source, page ids frozen. That is what
@@ -223,6 +223,10 @@ T-012's `wiki:` citations now resolve against.
   {milestoneSha, m0ContractSha, lockedAt}. After the lock the `### M0 Contract` block must be
   byte-identical; an edit is refused as `m0-thawed` naming the changed item. `unlock: true` is
   allowed only with a reason, which is appended to `## 4. Dead Ends` as a diagnosis row.
+- **Closed 2026-11-10**: `kernel/milestone-lock.ts` + `lock`/`unlock`/`reason` params; 11 new tests.
+  The lock stores the block's own text, not only its hash, so a thaw names the item; `### M0 Contract`
+  became its own `PhaseKind` because T-010's `phase-order` read it as a second `M0` decision block.
+  A lock file that does not parse is `lock-unreadable`, not "unlocked".
 - **Acceptance criteria**:
   - [check: `npm test`] — a locked milestone with an edited M0 item is refused as `m0-thawed` naming
     the item; an edit outside the M0 block is accepted and moves the milestone sha; unlock without a

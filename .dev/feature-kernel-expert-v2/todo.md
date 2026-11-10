@@ -63,13 +63,13 @@
 - [x] parse → render → parse byte-identical
 - [x] trigger phrase list fires; an observable trigger passes
 
-## T-011 (blocked: T-010) — M0 freezes by hash
-- [ ] lock writes `.kernel/milestone.lock.json`
-- [ ] `m0-thawed` names the changed item
-- [ ] unlock requires a reason, recorded as a diagnosis row
-- [ ] runs/plan-2 evidence
+## T-011 (closed 2026-11-10) — M0 freezes by hash
+- [x] lock writes `.kernel/milestone.lock.json` (block text included, so a thaw names the item)
+- [x] `m0-thawed` names the changed item; re-locking a thawed file refuses with the same diff
+- [x] unlock requires a reason (≥16 chars), recorded as a Dead Ends row
+- [x] runs/plan-2 evidence: lock, thaw.diff, three refusals, unlock, re-lock
 
-## T-012 (blocked: T-010) — citations: measurement vs knowledge
+## T-012 (ready-for-agent, blocked: T-010) — citations: measurement vs knowledge
 - [ ] measurement pointers (`profile:`, `cell-group:`) resolve; `gate-citation-unresolved` names pointer + path
 - [ ] `wiki:<id>#<confidence>` on rows only; `gate-cites-knowledge` on a gate line
 - [ ] corpus absent ⇒ row passes, report carries `knowledge-source-absent` naming kernel_bootstrap

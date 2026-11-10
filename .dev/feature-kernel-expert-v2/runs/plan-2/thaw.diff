@@ -1,0 +1,13 @@
+ M0 Contract, then M0 Architecture (the address mapping), then M1 Levers.
+ 
+ ### M0 Contract
+-- tile: 1024 elements per block, 256 threads, 4 per thread
++- tile: 2048 elements per block, 256 threads, 8 per thread
++- vector width: 4 x fp32
+ - smem: none, the mapping needs no staging
+ - warp roles: none, every warp loads and stores the same way
+-- register budget: 32 (the kernel is 11 instructions)
++- register budget: 40 (room for a pair of in-flight loads)
+ - issue order: index, load, fma, store
+ - accumulator precision: fp32
+ 
