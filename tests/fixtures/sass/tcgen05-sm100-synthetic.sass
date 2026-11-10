@@ -1,0 +1,20 @@
+	code for sm_100
+	.target	sm_100
+
+		Function : _Z19attention_tcgen05_v1PKfS0_Pfii
+.headerflags	@"EF_CUDA_SM100"
+
+        /*0000*/                   LDC R1, c[0x0][0x28] ;
+        /*0010*/                   S2R R0, SR_TID.X ;
+        /*0020*/                   S2UR UR4, SR_CTAID.X ;
+        /*0030*/                   SYNCS.ARRIVE.TRANS64.A1T0 RZ, [UR4], RZ ;
+        /*0040*/                   UTCMMA.16816.F32.E4M3.E4M3 R4, R8, R12, R4 ;
+        /*0050*/                   UTCMMA.16816.F32.E4M3.E4M3 R4, R8, R16, R4 ;
+        /*0060*/                   UTCMMA.COMMIT.2 RZ ;
+        /*0070*/                   SYNCS.PHASECHK.TRANS64.TRYWAIT RZ, [UR4], RZ ;
+        /*0080*/                   FFMA R20, R21, R22, R20 ;
+        /*0090*/                   UTCMMA.16816.F32.E4M3.E4M3 R4, R8, R20, R4 ;
+        /*00a0*/                   UTCMMA.COMMIT.2 RZ ;
+        /*00b0*/                   SYNCS.PHASECHK.TRANS64.TRYWAIT RZ, [UR4], RZ ;
+        /*00c0*/                   STG.E desc[UR4][R2.64], R4 ;
+        /*00d0*/                   EXIT ;

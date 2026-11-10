@@ -13,8 +13,10 @@ test("extension registers the command, the tools, and the discovery handler", ()
     "kernel_candidate",
     "kernel_contract",
     "kernel_init",
+    "kernel_kb",
     "kernel_milestone",
     "kernel_profile",
+    "kernel_sass",
     "kernel_wiki",
     "kernel_wiki_candidate",
   ]);

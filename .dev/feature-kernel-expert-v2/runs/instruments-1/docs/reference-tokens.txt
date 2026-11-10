@@ -1,0 +1,8 @@
+# Upstream symbols this workspace does not name in an entry.
+# One per line; `#` starts a comment.
+flash_attn_dsl
+flash_fwd_sm90
+mainloop_bwd_sm90
+intrawg_overlap
+RescaleOBeforeGemm
+deep_gemm

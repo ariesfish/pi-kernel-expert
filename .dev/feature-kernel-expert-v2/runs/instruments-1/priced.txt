@@ -1,0 +1,32 @@
+
+========================================================================
+1. the entry as measured: cite, then the gate line
+========================================================================
+KB:identical-census-different-addressing
+kb/sm90/identical-census-different-addressing.md — MEASURED NVIDIA H200 2026-11-09
+Cite it as `[PRICED: <delta>, KB:identical-census-different-addressing]` on a `[VERIFY: sass-derived]` gate line, where <delta> is the entry's own measured footprint, not the number you are hoping for.
+
+========================================================================
+   the milestone
+========================================================================
+docs/milestone.md — clean.
+No M0 lock (.kernel/milestone.lock.json absent): the block may still change. Lock it with lock: true.
+6 section(s): 1. Problem and Target, 2. Contract, 3. DAG and Phase Order, 4. Dead Ends, 5. Global Gate, 6. Rules; 1 decision(s); 1 gate block(s)
+  M0 Gate:3 [VERIFY: sass-derived] [PRICED: 11.39x on the mapping, KB:identical-census-different-addressing] — the two mappings carry the same loads, fma and store, and differ in the addressing `IMAD`: the census does not separate them and the time does
+
+========================================================================
+2. the same entry, downgraded to UNVERIFIED: cite
+========================================================================
+kb-entry-unverified: kb/sm90/identical-census-different-addressing.md is UNVERIFIED (one card, one kernel shape, no sm120 run) — nobody has measured it, so it cannot price a gate line. Cite a profile run instead, or measure it.
+Fix: run the probe, then set `MEASURED <gpu> <yyyy-mm-dd>` and name the command; until then this is a direction, not evidence
+
+========================================================================
+3. and the gate line that priced itself with it
+========================================================================
+docs/milestone.md — refused: 1 problem(s), each with the rule, the row, and the fix:
+1. gate-citation-unresolved M0 Gate:3: the [PRICED: …] price cites KB:identical-census-different-addressing, which cannot be cited: kb/sm90/identical-census-different-addressing.md is UNVERIFIED (one card, one kernel shape, no sm120 run) — nobody has measured it, so it cannot price a gate line. Cite a profile run instead, or measure it. Fix: measure the entry, or price the line with a profile run: a transcribed recipe is not a price.
+
+========================================================================
+4. restored, the milestone validates again
+========================================================================
+docs/milestone.md — clean.

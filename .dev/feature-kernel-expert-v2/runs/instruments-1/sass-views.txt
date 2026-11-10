@@ -1,0 +1,71 @@
+
+========================================================================
+census — bench.sass
+========================================================================
+SASS-OK kernel=_Z15saxpy_coalescedifPKfPf instructions=32 families=12 top=NOP:12 LDC:4 IMAD:3 ULDC:3 EXIT:2
+dump bench.sass sha256 63072e7e6a5989b0
+kernel _Z15saxpy_coalescedifPKfPf (named)
+census cannot tell which instruction is on the hot path: a large count is not a large cost.
+
+========================================================================
+operands — bench.sass
+========================================================================
+OPERANDS kernel=_Z15saxpy_coalescedifPKfPf mma_total=0 a_reg=0 a_desc=0 a_other=0
+dump bench.sass sha256 63072e7e6a5989b0
+kernel _Z15saxpy_coalescedifPKfPf (named)
+operands cannot tell whether the operand path is fast, only which one was built.
+
+========================================================================
+serial — bench.sass
+========================================================================
+WGMMA-SKIP kernel=_Z15saxpy_coalescedifPKfPf wgmma=0
+dump bench.sass sha256 63072e7e6a5989b0
+kernel _Z15saxpy_coalescedifPKfPf (named)
+serial reads the wait placement, not the reason: a wait can be the aliasing proof or a genuine dependency.
+
+========================================================================
+schedule — bench.sass
+========================================================================
+SCHED-SKIP kernel=_Z15saxpy_coalescedifPKfPf isa=none mma_runs=0 barriers=0 ldsm=0 ew_runs=1 depbar_before_each_ew=[0]
+dump bench.sass sha256 63072e7e6a5989b0
+kernel _Z15saxpy_coalescedifPKfPf (named)
+schedule cannot see memory-level parallelism: two schedules with the same waits can still differ by the cache.
+
+========================================================================
+live — bench.sass
+========================================================================
+LIVE-OK kernel=_Z15saxpy_coalescedifPKfPf peak=8 uniform=7 budget=unknown (no band applied)
+dump bench.sass sha256 63072e7e6a5989b0
+kernel _Z15saxpy_coalescedifPKfPf (named)
+live counts the registers the kernel names, not the ones ptxas allocated — a dump carries no allocation metadata. The ncu details page reports registers per thread; `launch` reads it.
+
+========================================================================
+struct — bench.sass
+========================================================================
+STRUCT-OK kernel=_Z15saxpy_coalescedifPKfPf regions=1 segments=1 precision=unknown granule=unknown warp_specialized=no
+dump bench.sass sha256 63072e7e6a5989b0
+kernel _Z15saxpy_coalescedifPKfPf (named)
+struct reads the opcodes, not the algorithm: the same tiles can implement a different kernel.
+
+========================================================================
+launch — bench.sass
+========================================================================
+LAUNCH-PARTIAL kernel=_Z15saxpy_coalescedifPKfPf grid=4096 block=256 ctas=? cluster=0 cluster_max_active=0 regs=16 smem_dyn=0 missing=ctas
+dump bench.sass sha256 63072e7e6a5989b0
+kernel _Z15saxpy_coalescedifPKfPf (named)
+launch reads the shape that ran, not the occupancy it achieved.
+  launch: ctas absent from the input. A shape read off the grid is the fallacy this view prevents — pass the details page or the launch__* metrics.
+
+========================================================================
+the same reading for the transposed kernel, for contrast
+========================================================================
+SASS-OK kernel=_Z13saxpy_stridedifPKfPf instructions=40 families=13 top=NOP:15 ULDC:5 IMAD:3 LDC:3 BRA:2
+dump bench.sass sha256 63072e7e6a5989b0
+kernel _Z13saxpy_stridedifPKfPf (named)
+census cannot tell which instruction is on the hot path: a large count is not a large cost.
+
+========================================================================
+lint, before the entry exists
+========================================================================
+lint clean.
+scanned 2 file(s): kb/sm90/index.md, kb/sm90/identical-census-different-addressing.md

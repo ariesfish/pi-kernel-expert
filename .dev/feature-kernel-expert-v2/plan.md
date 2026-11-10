@@ -434,6 +434,7 @@ the shape it needs.
   instructions when the count column exists; else refused as `sass-kernel-ambiguous` naming the
   candidates and their instruction counts. Output: `SASS-OK|SASS-FAIL kernel= instructions= opcodes=`
   plus the dump path and sha256.
+- **Closed 2026-11-10**: one parser, two formats (cuobjdump + ncu source page, plain and CSV), the same 32-instruction census from both on a real sm90 binary. Kernel resolution: named → substring (ambiguous names refused with the candidates) → most-executed (ties refused) → only-kernel → refusal naming counts. Real dump landed in `tests/fixtures/sass/`.
 - **Acceptance criteria**:
   - [check: `npm test`] — both formats from the same cubin produce the same census; no `--kernel` and
     no count column is refused by name; the first kernel in the file is never silently chosen.
@@ -447,6 +448,7 @@ the shape it needs.
 - **What to build**: `view: operands` (`mma_total= a_reg= a_desc= a_other=`) and `view: serial`
   (`wgmma= depbar0= tight= ratio=` with bands `SEVERE >= 0.9`, `ELEVATED >= 0.5`, reference 0.15 in
   one threshold table). Each prints the inference it forbids in one line.
+- **Closed 2026-11-10**: `a_reg`/`a_desc`/`a_other` over HMMA/WGMMA/UTCMMA; serial ratio = gaps-with-a-wait / gaps, bands in `SERIAL_BANDS`. Synthetic sm90/sm100 fixtures for the MMA paths, since the SAXPY kernel has no MMA.
 - **Acceptance criteria**:
   - [check: `npm test`] — a dump whose A operand comes through smem reports `a_reg=0` with a nonzero
     `a_desc`; a serialized pipeline lands in the severe band; a threshold table exists in one place.
@@ -461,6 +463,7 @@ the shape it needs.
   `mma_sync` / `tcgen05`) and `view: live` (peak registers, guessed fraction, compared against the
   contract's `M0` register budget when a contract exists; no contract means no band, never an invented
   one).
+- **Closed 2026-11-10**: MMA runs, barriers, LDSM, `depbar_before_each_ew`, the tcgen05 split (`utcmma`/`commits`/`mbar_waits`); `live` takes the M0 budget from the milestone and applies no band without one. A kernel with no MMA is `SCHED-SKIP`, not `SCHED-FAIL`.
 - **Acceptance criteria**:
   - [check: `npm test`] — `LE 1` and `LE 0` chains are distinguished; `live` without a contract
     reports the peak and says no band was applied; with one, the verdict names the budget it used.
@@ -475,6 +478,7 @@ the shape it needs.
   and `view: launch` (grid, block, CTAs, cluster, `cluster_max_active`, regs, dynamic smem) with
   `LAUNCH-PARTIAL` naming every field the dump does not carry — a cluster read off the grid shape is
   the fallacy this view exists to prevent.
+- **Closed 2026-11-10**: precision and tile from the opcodes (`16816`, `64x128x16`); `launch` reads `Metric Name`/`Metric Value` rows *and* detail-page columns, so a real export gives grid 4096 / block 256 / cluster 0 / regs 16 — and `LAUNCH-PARTIAL` names what the export lacks instead of inventing a 1.
 - **Acceptance criteria**:
   - [check: `npm test`] — precision comes from opcodes, not from source text; a dump with no
     `launch__*` metrics reports `LAUNCH-PARTIAL` and names the missing fields; a flat grid with
@@ -489,6 +493,7 @@ the shape it needs.
 - **What to build**: `kb/<arch>/<entry>.md` schema (five sections + certification header +
   `## Certification boundary`), three statuses with their invariants, and `kernel_kb cite <entry>`
   emitting `KB:<id>` only for a complete `MEASURED` entry; every refusal names what is missing.
+- **Closed 2026-11-10**: entry schema, three statuses with invariants, and `cite` refusing five ways (no mark, no status, no boundary, no command, not measured), each naming what is missing.
 - **Acceptance criteria**:
   - [check: `npm test`] — the four refusals (no mark, `UNVERIFIED`, no boundary, `MEASURED` without
     GPU or date) and the one acceptance.
@@ -503,6 +508,7 @@ the shape it needs.
 - **What to build**: `kernel_kb lint` with five rules (`kb-reference-token`, `kb-line-ref`,
   `kb-narrative`, `kb-missing-index`, `kb-uncertified-claim`), `README.md`/`TEMPLATE.md` exempt from
   the first three, and `kernel_kb index` validating (never generating) the symptom ledger.
+- **Closed 2026-11-10**: five lint rules with `README.md`/`TEMPLATE.md` exempt from the three content rules, a missing tree reported as "nothing was scanned", and `index` validating duplicates, dangling rows and status drift.
 - **Acceptance criteria**:
   - [check: `npm test`] — each rule fires on its fixture and stays quiet on a clean tree; a missing
     `index.md` reports that nothing was scanned; an entry with two index rows and a row with no entry
@@ -516,6 +522,7 @@ the shape it needs.
 - **Blocked by**: T-024, T-012
 - **What to build**: `plan`'s `[PRICED:]` source resolver gains the `KB:` namespace, resolved through
   the same predicate `kernel_kb cite` uses, with the same refusal reason quoted.
+- **Closed 2026-11-10**: `KB:<entry>` resolves in `[PRICED:]` through an injected resolver that is the *same* predicate `cite` uses; an `UNVERIFIED` entry refuses with the citation tool's reason quoted.
 - **Acceptance criteria**:
   - [check: `npm test`] — a certified entry resolves; an `UNVERIFIED` entry is refused as
     `gate-citation-unresolved` with the citation tool's reason; a `KB:` source that names no entry
@@ -530,6 +537,7 @@ the shape it needs.
 - **What to build**: on `h200-7`, dump SASS for the SAXPY fixture in both modes, run all six views on
   them, write one `kb/sm90/` entry from a real reading (certification header, boundary, status), and
   show a `[PRICED: …, KB:<entry>]` gate line resolving on a milestone.
+- **Closed 2026-11-10**: real dumps on `h200-7`, all seven views, one `kb/sm90/` entry with its index, and a milestone gate line whose price resolves. The reading corrected the milestone: the kernel does **one element per thread**, not four.
 - **Acceptance criteria**:
   - [evidence: `runs/instruments-1/` — the dumps, the six verdict lines, the entry, the M0-locked
     milestone with a resolving price]

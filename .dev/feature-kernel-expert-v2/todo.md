@@ -122,31 +122,31 @@
 - [x] entry + regenerated index diff + the four publish commands
 - [x] user judgment: merge-worthy
 
-## T-020 (ready-for-agent) — SASS parser + kernel resolution + census
-- [ ] two formats, one parser
-- [ ] `--kernel` wins; else most executed; else `sass-kernel-ambiguous`
-- [ ] `SASS-OK|FAIL` line with dump path + sha
+## T-020 (closed 2026-11-10) — SASS parser + kernel resolution + census
+- [x] two formats, one parser
+- [x] `--kernel` wins; else most executed; else `sass-kernel-ambiguous`
+- [x] `SASS-OK|FAIL` line with dump path + sha
 
-## T-021 (blocked: T-020) — operands + serial
-- [ ] `a_reg` vs `a_desc`; `depbar` ratio with one threshold table
+## T-021 (closed 2026-11-10; was blocked: T-020) — operands + serial
+- [x] `a_reg` vs `a_desc`; `depbar` ratio with one threshold table
 
-## T-022 (blocked: T-020) — schedule + live
-- [ ] `depbar_before_each_ew`; peak registers against the M0 budget, no band without a contract
+## T-022 (closed 2026-11-10; was blocked: T-020) — schedule + live
+- [x] `depbar_before_each_ew`; peak registers against the M0 budget, no band without a contract
 
-## T-023 (blocked: T-020) — struct + launch
-- [ ] precision from opcodes; `LAUNCH-PARTIAL` names what the dump lacks
+## T-023 (closed 2026-11-10; was blocked: T-020) — struct + launch
+- [x] precision from opcodes; `LAUNCH-PARTIAL` names what the dump lacks
 
-## T-024 (ready-for-agent) — KB entry schema + `kernel_kb cite`
-- [ ] five sections + certification header + boundary
-- [ ] three statuses with invariants; four refusals named
+## T-024 (closed 2026-11-10) — KB entry schema + `kernel_kb cite`
+- [x] five sections + certification header + boundary
+- [x] three statuses with invariants; four refusals named
 
-## T-025 (blocked: T-024) — lint + index validation
-- [ ] five rules, README/TEMPLATE exempt, fail closed
-- [ ] `index` validates, never generates
+## T-025 (closed 2026-11-10; was blocked: T-024) — lint + index validation
+- [x] five rules, README/TEMPLATE exempt, fail closed
+- [x] `index` validates, never generates
 
-## T-026 (blocked: T-024, T-012) — `KB:` as a `[PRICED:]` source
-- [ ] resolves through the same predicate as `cite`
+## T-026 (closed 2026-11-10; was blocked: T-024, T-012) — `KB:` as a `[PRICED:]` source
+- [x] resolves through the same predicate as `cite`
 
-## T-027 (blocked: all instruments) — real dumps + one measured entry
-- [ ] h200-7 dumps, six views, one entry, one resolving price
-- [ ] **[judgment: the user]** the statuses and header are worth writing
+## T-027 (closed 2026-11-10; was blocked: all instruments) — real dumps + one measured entry
+- [x] h200-7 dumps, six views, one entry, one resolving price
+- [x] **[judgment: the user]** the statuses and header are worth writing

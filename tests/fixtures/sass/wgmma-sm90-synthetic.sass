@@ -1,0 +1,25 @@
+	code for sm_90
+	.target	sm_90
+
+		Function : _Z16attention_wgmma_v1PKfS0_Pfii
+.headerflags	@"EF_CUDA_SM90"
+
+        /*0000*/                   LDC R1, c[0x0][0x28] ;
+        /*0010*/                   S2R R0, SR_CTAID.X ;
+        /*0020*/                   S2R R2, SR_TID.X ;
+        /*0030*/                   WARPSYNC 0xffffffff ;
+        /*0040*/                   BAR.SYNC 0x0 ;
+        /*0050*/                   LDSM.16.M88.4 R4, [R10] ;
+        /*0060*/                   LDSM.16.M88.4 R8, [R12] ;
+        /*0070*/                   WGMMA.64x128x16.F32.BF16 desc[UR4], R4, desc[UR8] ;
+        /*0080*/                   WGMMA.64x128x16.F32.BF16 desc[UR4], R8, desc[UR8] ;
+        /*0090*/                   WGMMA.64x128x16.F32.BF16 desc[UR4], R12, desc[UR8] ;
+        /*00a0*/                   DEPBAR.LE SB0, 0x0 ;
+        /*00b0*/                   FFMA R20, R21, R22, R20 ;
+        /*00c0*/                   FFMA R23, R24, R25, R23 ;
+        /*00d0*/                   HMMA.16816.F32.BF16 R4, R8, R12, R4 ;
+        /*00e0*/                   HMMA.16816.F32.BF16 R4, R8, R16, R4 ;
+        /*00f0*/                   DEPBAR.LE SB0, 0x0 ;
+        /*0100*/                   STG.E desc[UR4][R2.64], R4 ;
+        /*0110*/                   EXIT ;
+        /*0120*/                   BRA 0x120 ;

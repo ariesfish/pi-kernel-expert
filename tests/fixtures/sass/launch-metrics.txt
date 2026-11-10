@@ -1,0 +1,8 @@
+==PROF== Connected to process 3276835 (/root/pkex/fixtures/saxpy/bench)
+launch__grid_size = 128
+launch__block_size = 256
+launch__ctas_per_cga = 1
+launch__cluster_dim_x = 16
+launch__cluster_max_active_clusters = 8
+launch__registers_per_thread = 24
+launch__smem_dynamic_size = 0

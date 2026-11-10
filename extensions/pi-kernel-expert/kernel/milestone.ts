@@ -321,6 +321,13 @@ export interface MilestoneContext {
   /** Checks that a diagnosis citation opens; absent means shape-only. */
   citationResolver?: CitationResolver;
   /**
+   * Resolves a `KB:<entry>` price: `null` when the entry can be cited, or the
+   * reason it cannot. Injected for the same reason as `citationResolver` — the
+   * tree is the tool's business — and it is the *same* predicate `kernel_kb cite`
+   * uses, because two resolvers for one namespace drift.
+   */
+  kbResolver?: (id: string) => string | null;
+  /**
    * The cached corpus. `undefined` means the caller did not look; `null` means
    * it looked and found nothing, which is reported as `knowledge-source-absent`.
    * Not looking and finding nothing are different facts, and only one of them
@@ -1228,6 +1235,34 @@ function gateCitations(model: MilestoneModel, ctx: MilestoneContext): Problem[] 
       // A wiki citation in the pointer position is `gate-cites-knowledge`'s to
       // charge; two refusals for one defect is a reader puzzling over which to fix.
       if (/^wiki:/.test(token)) continue;
+      // A KB entry is a price, not a measurement: it resolves through the KB's own
+      // predicate (certification mark, MEASURED status, boundary, command).
+      if (/^KB:/i.test(token)) {
+        const id = token.slice(3).trim();
+        if (id === "") {
+          problems.push(
+            makeProblem(
+              "gate-citation-unresolved",
+              line.row,
+              `the ${where} source \`${token}\` names no entry. A KB price is \`KB:<entry-id>\`.`,
+              "name the entry the price came from, or cite a profile run instead.",
+            ),
+          );
+          continue;
+        }
+        const reason = ctx.kbResolver ? ctx.kbResolver(id) : null;
+        if (reason !== null) {
+          problems.push(
+            makeProblem(
+              "gate-citation-unresolved",
+              line.row,
+              `the ${where} price cites KB:${id}, which cannot be cited: ${reason}`,
+              "measure the entry, or price the line with a profile run: a transcribed recipe is not a price.",
+            ),
+          );
+        }
+        continue;
+      }
       const parsed = parseMeasurementPointer(token);
       if (!parsed) {
         // A prose price (`measured on the sm90 box`) is not a pointer and is not

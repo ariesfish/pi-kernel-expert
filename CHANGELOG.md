@@ -152,6 +152,31 @@
 - `kernel_contract` takes `scope_globs`; with the whole tree in scope, editing
   `docs/milestone.md` changes the candidate fingerprint and makes every profile
   taken before the edit stale. A kernel task scopes to `kernel/**`.
+### Added — `instruments`
+
+- **`kernel_sass`**: seven readings over a SASS dump, no GPU at analysis time. One
+  parser for `cuobjdump -sass` and the ncu source page (plain or CSV with
+  `Instructions Executed`). `census`, `operands` (`a_reg` vs `a_desc`), `serial`
+  (the wgmma wait ratio, with `SEVERE >= 0.9` / `ELEVATED >= 0.5` in one table),
+  `schedule` (MMA runs, barriers, LDSM, and whether a wait precedes each
+  elementwise run — the overlap fact), `live` (peak registers against the M0
+  budget), `struct` (blocks, barriers, precision and tile from the opcodes), and
+  `launch` (grid, block, cluster, registers per thread from the metrics, not from
+  the grid shape). The kernel is never guessed: named, or the most executed one, or
+  a refusal listing the candidates. Every view prints the dump's sha and the one
+  inference a reader is likely to over-make.
+- **`kernel_kb`**: the workspace's own knowledge base, `kb/<arch>/<entry>.md` with
+  five sections plus a certification header and a `## Certification boundary`, and
+  three statuses whose invariants are mechanical (`MEASURED <gpu> <yyyy-mm-dd>`,
+  `UNVERIFIED — <what is missing>`, `TODO`). `cite` emits `KB:<id>` only for a
+  measured entry and otherwise refuses, naming what is missing. `lint` runs five
+  rules — upstream reference tokens, line references nobody can open, session
+  narrative, a missing arch index, a claim that outruns its evidence — and fails
+  closed when there is no `kb/` tree. `index` validates the symptom ledger and
+  never generates it.
+- The plan's `[PRICED: …]` resolver now accepts `KB:<entry>`, resolved through the
+  same predicate `kernel_kb cite` uses, so a price and its citation cannot disagree.
+
 ## [0.4.0] - 2026-11-07
 
 ### Added

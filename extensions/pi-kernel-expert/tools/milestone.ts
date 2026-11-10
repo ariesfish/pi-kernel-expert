@@ -6,6 +6,7 @@ import { Type } from "typebox";
 import { agentLayout } from "../support/paths.ts";
 import { type CorpusIndex, readCorpusIndex } from "../kernel/corpus-index.ts";
 import type { KernelContract } from "../kernel/contract.ts";
+import { kbCitationCheck } from "./kb.ts";
 import {
   MILESTONE_LOCK_RELATIVE_PATH,
   type MilestoneLock,
@@ -267,6 +268,7 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
         profileRunIds: readProfileRunIds(workspace),
         corpus,
         citationResolver: citationResolver(workspace),
+        kbResolver: (id) => kbCitationCheck(workspace, id),
       });
       const refusals = problems.filter((problem) => problem.severity === "refusal");
       const warnings = problems.filter((problem) => problem.severity === "warning");

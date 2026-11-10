@@ -231,6 +231,40 @@ classes, exactly one decision id, a backticked command, three citations it
 actually **opens** — and the block never gates: a diagnosis is what the plan
 learned, not a way to pass a milestone by explaining it.
 
+## Read what the compiler emitted
+
+Six structural questions, from a dump you already have — no GPU at analysis time:
+
+```text
+kernel_sass({ view: "census",  dump: "sass.txt", kernel: "attn_fwd" })
+kernel_sass({ view: "operands", dump: "sass.txt" })     # a_reg vs a_desc
+kernel_sass({ view: "serial",  dump: "sass.txt" })      # did ptxas serialize the wgmma?
+kernel_sass({ view: "schedule", dump: "sass.txt" })     # the wait before each elementwise run
+kernel_sass({ view: "live",    dump: "sass.txt" })      # peak registers vs the M0 budget
+kernel_sass({ view: "struct",  dump: "sass.txt" })      # blocks, barriers, precision, tile
+kernel_sass({ view: "launch",  dump: "sass.txt", metrics: "details.csv" })
+```
+
+Each reading prints one line, the dump's sha256, and the inference it cannot support:
+`census` does not know which instruction is on the hot path, `live` counts the
+registers the kernel names rather than the ones ptxas allocated, `launch` reads the
+shape that ran rather than the occupancy it achieved.
+
+## Write down what you learned
+
+`kb/<arch>/<entry>.md` is the workspace's own knowledge base — a second tier the
+corpus cannot be. A wiki page supports a direction; an entry carries its own
+measured footprint, its own boundary, and a citation that can be refused:
+
+```text
+kernel_kb({ action: "cite", entry: "identical-census-different-addressing" })
+→ KB:identical-census-different-addressing
+```
+
+Only a `MEASURED <gpu> <yyyy-mm-dd>` entry cites; `UNVERIFIED` and `TODO` do not, and
+a `[PRICED: 11.39x, KB:<id>]` gate line is refused when the entry behind it is not
+measured. `kernel_kb({ action: "lint" })` fails closed on a missing tree.
+
 ## Check what is wired
 
 ```text

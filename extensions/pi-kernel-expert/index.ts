@@ -16,6 +16,8 @@ import { registerCandidateTool } from "./tools/candidate.ts";
 import { registerContractTool } from "./tools/contract.ts";
 import { registerInitTool } from "./tools/init.ts";
 import { registerMilestoneTool } from "./tools/milestone.ts";
+import { registerKbTool } from "./tools/kb.ts";
+import { registerSassTool } from "./tools/sass.ts";
 import { registerProfileTool } from "./tools/profile.ts";
 import { registerStatusCommand } from "./tools/status.ts";
 import { registerWikiCandidateTool } from "./tools/wiki-candidate.ts";
@@ -31,6 +33,8 @@ export default function kernelExpertExtension(pi: ExtensionAPI): void {
   registerProfileTool(pi);
   registerCandidateTool(pi);
   registerMilestoneTool(pi);
+  registerSassTool(pi);
+  registerKbTool(pi);
 
   pi.on("resources_discover", async (event, ctx) => {
     const plan = planKernelWikiRegistration({ cwd: event.cwd, layout: agentLayout() });
