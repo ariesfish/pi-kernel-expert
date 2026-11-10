@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { CONFIDENCE_LABELS, readCorpusIndex } from "../../extensions/pi-kernel-expert/kernel/corpus-index.ts";
+import { KERNEL_WIKI_PIN } from "../../extensions/pi-kernel-expert/support/paths.ts";
 import { parseMilestone, validateMilestone } from "../../extensions/pi-kernel-expert/kernel/milestone.ts";
 
 const MILESTONE = `# Milestone: fused attention
@@ -61,7 +62,7 @@ const CONTRACT = {
 };
 
 const CORPUS = {
-  pin: "70530df1cd089103e5bb8d688815bac9dceb8033",
+  pin: KERNEL_WIKI_PIN,
   dir: "/tmp/kernel-wiki",
   pages: [
     { id: "migration-wgmma-to-tcgen05", confidence: "source-reported", path: "wiki/reference/migration-wgmma-to-tcgen05.md" },

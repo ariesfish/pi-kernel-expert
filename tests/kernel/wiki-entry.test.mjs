@@ -421,6 +421,8 @@ test("the tool writes a validated candidate and pre-fills from the workspace", (
   assert.match(text, /architectures sm90 from profile\/run1 \(gpu "NVIDIA H200"\)/);
   assert.match(text, /confidence source-reported/);
   assert.match(text, /corpus-absent/);
+  assert.match(text, /run node scripts\/generate-indices\.mjs, commit, bump KERNEL_WIKI_PIN/);
+  assert.doesNotMatch(text, /uv run|generate-indices\.py/);
 });
 
 test("a corpus that already has the id is refused and nothing is written", () => {

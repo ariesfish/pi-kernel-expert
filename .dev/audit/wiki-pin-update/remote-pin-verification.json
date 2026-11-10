@@ -1,0 +1,12 @@
+{
+  "node": "v24.21.0",
+  "remote": "git@github.com:ariesfish/kernel-wiki.git",
+  "pin": "486ea701bbd1c88cb9bb3369ecdb7af50c91fc16",
+  "fetchState": "installed",
+  "fetchRevision": "486ea701bbd1c88cb9bb3369ecdb7af50c91fc16",
+  "warnings": [],
+  "queryExit": 0,
+  "pageExit": 0,
+  "cachedState": "already",
+  "installedPackagesInCorpus": false
+}

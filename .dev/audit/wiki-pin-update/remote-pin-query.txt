@@ -1,0 +1,8 @@
+$ node scripts/query.mjs nvfp4 --type kernel --compact
+# 5 result(s)
+
+  [wiki-kernel] kernel-nvfp4-gemm: NVFP4 GEMM  (wiki/kernels/nvfp4-gemm.md)
+  [wiki-kernel] kernel-nvfp4-gemv: NVFP4 batched GEMV  (wiki/kernels/nvfp4-gemv.md)
+  [wiki-kernel] kernel-gated-dual-gemm: Gated Dual GEMM (Gate-Up + Activation)  (wiki/kernels/gated-dual-gemm.md)
+  [wiki-kernel] kernel-grouped-gemm: Grouped GEMM for MoE  (wiki/kernels/grouped-gemm.md)
+  [wiki-kernel] kernel-fused-moe: Fused MoE — Expert GEMM and Adjacent Operations  (wiki/kernels/fused-moe.md)

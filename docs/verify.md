@@ -193,3 +193,34 @@ Host: same dev box, Node 24.21.0; no GPU, no ncu, no pi-goal install.
   repository is pushed.
 - Tool arguments were compiled and validated with `@earendil-works/pi-schema`
   in tests, but not exercised through a live pi session's tool loop.
+
+## 2026-11-10 — Published JavaScript corpus pin
+
+Host: Node 24.21.0 on the dev box. Corpus revision:
+`486ea701bbd1c88cb9bb3369ecdb7af50c91fc16`, published to kernel-wiki's
+`origin/master` before this pin update.
+
+| Check | Method | Result |
+|---|---|---|
+| Consumer regression suite | `npm test` | 347 passed, zero failures or skips |
+| TypeScript diagnostics | IDE diagnostics for the workspace and edited extension modules | no diagnostics |
+| Remote visibility | `git ls-remote` over HTTPS and SSH | both return the exact pinned revision |
+| Remote fetch | `fetchPinnedCorpus` using GitHub SSH and a temporary agent cache | installed the exact pin, zero warnings |
+| Registered query tool | `kernel_wiki` with `query: nvfp4`, `type: kernel`, `compact: true` | five results including `kernel-nvfp4-gemm`, exit 0 |
+| Registered page tool | `kernel_wiki` with `page: kernel-flash-attention-4` | requested page returned, exit 0 |
+| Cache reuse | repeat `fetchPinnedCorpus` at the same target | `already`; revision still matches |
+| Runtime installation | inspect the fetched corpus | no `node_modules` installation |
+
+The new corpus uses JSON machine data and Node.js maintenance commands.
+Candidate publication guidance uses `node scripts/generate-indices.mjs`.
+Replay evidence is under `.dev/audit/wiki-pin-update/`.
+
+### Limits
+
+- The default HTTPS remote was visible, but full clones timed out at 45 and
+  90 seconds on this host. The successful full fetch used
+  `git@github.com:ariesfish/kernel-wiki.git`; this run does not certify the
+  default HTTPS clone path.
+- Registered tools ran through the test host backed by real child processes,
+  not an interactive pi session. No GPU, compiler, ncu, or upstream evidence
+  recapture is claimed by this pin verification.

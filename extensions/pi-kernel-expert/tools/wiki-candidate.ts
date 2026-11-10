@@ -170,7 +170,7 @@ export function formatWikiCandidateOutcome(outcome: WikiCandidateOutcome): strin
   }
   lines.push(`corpus: ${outcome.notes.corpus}`);
   lines.push(
-    `publish (human step, never this tool): cp ${path.join(wikiCandidatesDir("."), `${entry.id}.md`)} into kernel-wiki/wiki/<type>/, run uv run scripts/generate-indices.py, commit, bump KERNEL_WIKI_PIN`,
+    `publish (human step, never this tool): cp ${path.join(wikiCandidatesDir("."), `${entry.id}.md`)} into kernel-wiki/wiki/<type>/, run node scripts/generate-indices.mjs, commit, bump KERNEL_WIKI_PIN`,
   );
   return lines.join("\n");
 }
@@ -302,7 +302,7 @@ export function registerWikiCandidateTool(pi: ExtensionAPI): void {
       "Negative readings is where a hypothesis a measurement killed goes, with the numbers that killed it; it may be empty, and a reviewer will ask why.",
       "CHECK EVERY NUMBER against the commands you actually ran, before writing the page. The validator cannot tell a measured number from a plausible one: a plausible sentence in Measured footprint or Negative readings is the one defect this tool cannot catch, and it is the one this corpus exists to prevent. Re-read both sections against the session's command history.",
       "Pass reproduce: the exact build and run commands plus their raw output (a number on a line the command did not produce). A verified entry is refused without it, because a source token that resolves only inside your workspace is a claim about evidence, not evidence.",
-      "Publishing is manual by design: cp into kernel-wiki/wiki/<type>/, run `uv run scripts/generate-indices.py`, commit, bump KERNEL_WIKI_PIN.",
+      "Publishing is manual by design: cp into kernel-wiki/wiki/<type>/, run `node scripts/generate-indices.mjs`, commit, bump KERNEL_WIKI_PIN.",
     ],
     parameters: ParamsSchema,
     async execute(

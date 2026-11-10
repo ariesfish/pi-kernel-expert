@@ -16,9 +16,11 @@ export const NCU_SKILL = "ncu-report-skill";
  * The fetch still scans for the restricted marker — an absence it did not
  * verify is an absence it cannot claim.
  *
+ * All corpus query and maintenance commands use Node.js; first-party machine
+ * metadata uses JSON. Upstream asset formats and source attribution are retained.
  * Updating this pin means updating THIRD_PARTY_NOTICES.md and the changelog.
  */
-export const KERNEL_WIKI_PIN = "70530df1cd089103e5bb8d688815bac9dceb8033";
+export const KERNEL_WIKI_PIN = "486ea701bbd1c88cb9bb3369ecdb7af50c91fc16";
 
 export interface AgentLayout {
   /** Pi's agent directory; `PI_CODING_AGENT_DIR` overrides the default. */

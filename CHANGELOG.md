@@ -4,10 +4,10 @@
 
 ### Changed
 
-- The pinned `kernel-wiki` revision is now `70530df1cd08`. Its query tools are
-  Node.js (`scripts/query.mjs`, `scripts/get_page.mjs`): `kernel_wiki` invokes
-  `node` instead of `python3`, and no Python interpreter is needed on the query
-  path. Python remains the corpus maintenance toolchain there, managed by uv.
+- Updated the `kernel-wiki` pin to the fully Node.js corpus. Queries and corpus
+  maintenance need no Python or uv; first-party metadata now uses JSON. The
+  query entry points and page IDs remain stable. Candidate publication guidance
+  now invokes `node scripts/generate-indices.mjs`.
 - Tool parameter schemas now use `@earendil-works/pi-schema` instead of
   TypeBox. The `typebox` dependency is removed. Object schemas are closed by
   default, so an argument with an undeclared field is rejected rather than

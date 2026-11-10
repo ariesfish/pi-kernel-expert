@@ -152,7 +152,7 @@ kernel_wiki_candidate({
   commands or files (a fenced code block is the allow-list) — because the corpus
   is shared and the next operator cannot resolve them.
 - It never writes the corpus. Publishing is a human step: `cp` the file into
-  `kernel-wiki/wiki/<type>/`, run `uv run scripts/generate-indices.py`, commit, bump
+  `kernel-wiki/wiki/<type>/`, run `node scripts/generate-indices.mjs`, commit, bump
   `KERNEL_WIKI_PIN`.
 
 ## The skill
@@ -276,7 +276,7 @@ measured. `kernel_kb({ action: "lint" })` fails closed on a missing tree.
 pi-kernel-expert 0.4.0
   loop engine   pi-goal installed
   ncu skill     vendored @c7980a43cb88 at .../skills/ncu-report-skill
-  kernel-wiki   cached at ~/.pi/agent/kernel-expert/cache/kernel-wiki@70530df1cd089103e5bb8d688815bac9dceb8033
+  kernel-wiki   cached at ~/.pi/agent/kernel-expert/cache/kernel-wiki@486ea701bbd1c88cb9bb3369ecdb7af50c91fc16
 ```
 
 The ncu skill is vendored and works offline. The kernel-wiki corpus is fetched

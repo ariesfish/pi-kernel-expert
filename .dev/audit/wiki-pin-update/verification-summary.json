@@ -1,0 +1,20 @@
+{
+  "pin": "486ea701bbd1c88cb9bb3369ecdb7af50c91fc16",
+  "consumerTests": {
+    "passed": 347,
+    "failed": 0,
+    "skipped": 0
+  },
+  "ideDiagnostics": [],
+  "remoteVisibility": [
+    "https",
+    "ssh"
+  ],
+  "fullFetchTransport": "ssh",
+  "httpsCloneTimeoutSeconds": [
+    45,
+    90
+  ],
+  "interactivePiSession": false,
+  "gpuRun": false
+}

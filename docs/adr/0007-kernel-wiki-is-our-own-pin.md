@@ -50,7 +50,7 @@ Maintain the corpus as its own repository, `ariesfish/kernel-wiki`, and keep fet
 - Every existing installation's `KernelWiki@b6b4301…` cache is orphaned. It costs 37 MB and one
   `kernel_bootstrap`; nothing references it after the rename.
 - The pin now points at our own commit, so "upstream changed" is no longer a reason to move it.
-  Moving it means: add pages, run `scripts/generate-indices.py` plus the two checks in `scripts/`,
+  Moving it means: add pages, run `node scripts/generate-indices.mjs` and the corpus quality checks,
   commit, bump `KERNEL_WIKI_PIN`, and update the changelog and `THIRD_PARTY_NOTICES.md` together.
 - Corpus updates are decoupled from package releases, which is the property ADR 0002 wanted and a
   bundled copy would have lost.
