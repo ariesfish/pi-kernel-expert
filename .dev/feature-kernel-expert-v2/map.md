@@ -12,7 +12,7 @@ Source: `.dev/forgekernel-gap/research.md` (the gap analysis this map builds fro
 
 Spec files: `evidence` → `spec.md` (shipped, 9 tickets, 2026-11-10); `plan` → `spec-plan.md`
 (approved, T-010 shipped, T-011..T-016 open); `corpus` → `spec-corpus.md` (approved 2026-11-10);
-`instruments` → not yet specced.
+`instruments` → `spec-instruments.md` (approved 2026-11-10, T-020..T-027 open).
 
 Build order: `evidence` → `plan`; `instruments` may start any time after `evidence` lands its
 runner, and its KB certification half waits for `evidence`.

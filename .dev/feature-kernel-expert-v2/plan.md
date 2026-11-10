@@ -312,7 +312,9 @@ T-012's `wiki:` citations now resolve against.
   - [check: `npm test`] — a Diagnosis block missing a field is refused by name; a `class` outside the
     four is refused; a diagnosis with no decision id is refused.
   - [evidence: `runs/plan-1/diagnosis/` — one real diagnosis block produced at a plateau]
-  - [judgment: the user] — that the reviewer brief asks a question worth answering.
+  - [judgment: the user, 2026-11-10] — **accepted: v2 is the shape.** The first brief took prose and
+  could only be judged on taste; the strengthened one is checkable, and the check is what caught the
+  `missing-decision` contradiction. A brief whose answer can be opened is worth asking.
 
 ## [T-015] Workspace integration and the skill
 
@@ -402,3 +404,135 @@ T-017 entry schema + kernel_wiki_candidate ──┬─ T-018 kernel_candidate r
 - **Acceptance criteria**:
   - [evidence: `runs/corpus-1/` — the entry, the regenerated index diff, and the four commands]
   - [judgment: the user] — that the entry is merge-worthy as written.
+
+
+---
+
+# Module `instruments` (spec-instruments.md)
+
+```
+T-020 parser + kernel resolution + census ──┬─ T-021 operands + serial
+                                            ├─ T-022 schedule + live
+                                            └─ T-023 struct + launch
+T-024 KB entry schema + kernel_kb cite
+T-025 KB lint (5 rules, fail-closed) + index validation
+T-026 KB:<entry> resolves as a [PRICED:] source   (after T-024, and plan's T-012)
+T-027 real dumps + one measured entry + a resolving price   (after T-020..T-026)
+```
+
+Frontier: **T-020** and **T-024** (they share nothing but the workspace; T-020 is a parser, T-024 is a
+schema). T-026 is the only cross-module ticket, and it is small because `plan`'s resolver already has
+the shape it needs.
+
+## [T-020] Read a SASS dump without guessing which kernel it is
+
+- **Type**: AFK
+- **Blocked by**: none
+- **What to build**: `kernel/sass.ts` + `kernel_sass` with `view: census`. One parser for two formats
+  (`cuobjdump -sass` with `/*0028*/` comments, NCU source page with a `0x0000` column, optionally CSV
+  with `Instructions Executed`). Kernel resolution: `--kernel` wins; else the most executed
+  instructions when the count column exists; else refused as `sass-kernel-ambiguous` naming the
+  candidates and their instruction counts. Output: `SASS-OK|SASS-FAIL kernel= instructions= opcodes=`
+  plus the dump path and sha256.
+- **Acceptance criteria**:
+  - [check: `npm test`] — both formats from the same cubin produce the same census; no `--kernel` and
+    no count column is refused by name; the first kernel in the file is never silently chosen.
+  - [evidence: `runs/instruments-1/census.txt` on a real h200-7 dump]
+  - [judgment: — none]
+
+## [T-021] Operands and serialization: the two inferences the budget hides
+
+- **Type**: AFK
+- **Blocked by**: T-020
+- **What to build**: `view: operands` (`mma_total= a_reg= a_desc= a_other=`) and `view: serial`
+  (`wgmma= depbar0= tight= ratio=` with bands `SEVERE >= 0.9`, `ELEVATED >= 0.5`, reference 0.15 in
+  one threshold table). Each prints the inference it forbids in one line.
+- **Acceptance criteria**:
+  - [check: `npm test`] — a dump whose A operand comes through smem reports `a_reg=0` with a nonzero
+    `a_desc`; a serialized pipeline lands in the severe band; a threshold table exists in one place.
+  - [evidence: `runs/instruments-1/operands.txt`, `serial.txt`]
+  - [judgment: — none]
+
+## [T-022] Schedule and liveness: the overlap fact and its register price
+
+- **Type**: AFK
+- **Blocked by**: T-020
+- **What to build**: `view: schedule` (runs, depbars, `depbar_before_each_ew`, the ISA split
+  `mma_sync` / `tcgen05`) and `view: live` (peak registers, guessed fraction, compared against the
+  contract's `M0` register budget when a contract exists; no contract means no band, never an invented
+  one).
+- **Acceptance criteria**:
+  - [check: `npm test`] — `LE 1` and `LE 0` chains are distinguished; `live` without a contract
+    reports the peak and says no band was applied; with one, the verdict names the budget it used.
+  - [evidence: `runs/instruments-1/schedule.txt`, `live.txt`]
+  - [judgment: — none]
+
+## [T-023] Structure and launch: how the phase is built, and what shape it was given
+
+- **Type**: AFK
+- **Blocked by**: T-020
+- **What to build**: `view: struct` (regions, segments, warps, precision from the MMA opcodes, granule)
+  and `view: launch` (grid, block, CTAs, cluster, `cluster_max_active`, regs, dynamic smem) with
+  `LAUNCH-PARTIAL` naming every field the dump does not carry — a cluster read off the grid shape is
+  the fallacy this view exists to prevent.
+- **Acceptance criteria**:
+  - [check: `npm test`] — precision comes from opcodes, not from source text; a dump with no
+    `launch__*` metrics reports `LAUNCH-PARTIAL` and names the missing fields; a flat grid with
+    `cluster_dim_x` set is reported as clustered.
+  - [evidence: `runs/instruments-1/struct.txt`, `launch.txt`]
+  - [judgment: — none]
+
+## [T-024] The KB entry, and a citation that can be refused
+
+- **Type**: AFK
+- **Blocked by**: none
+- **What to build**: `kb/<arch>/<entry>.md` schema (five sections + certification header +
+  `## Certification boundary`), three statuses with their invariants, and `kernel_kb cite <entry>`
+  emitting `KB:<id>` only for a complete `MEASURED` entry; every refusal names what is missing.
+- **Acceptance criteria**:
+  - [check: `npm test`] — the four refusals (no mark, `UNVERIFIED`, no boundary, `MEASURED` without
+    GPU or date) and the one acceptance.
+  - [evidence: `runs/instruments-1/kb/sm90/` with one real entry, and the refusal on a copy with the
+    certification line removed]
+  - [judgment: — none]
+
+## [T-025] Lint the KB, and fail closed
+
+- **Type**: AFK
+- **Blocked by**: T-024
+- **What to build**: `kernel_kb lint` with five rules (`kb-reference-token`, `kb-line-ref`,
+  `kb-narrative`, `kb-missing-index`, `kb-uncertified-claim`), `README.md`/`TEMPLATE.md` exempt from
+  the first three, and `kernel_kb index` validating (never generating) the symptom ledger.
+- **Acceptance criteria**:
+  - [check: `npm test`] — each rule fires on its fixture and stays quiet on a clean tree; a missing
+    `index.md` reports that nothing was scanned; an entry with two index rows and a row with no entry
+    are both reported.
+  - [evidence: `runs/instruments-1/lint.txt` — one finding per rule on one deliberately dirty copy]
+  - [judgment: — none]
+
+## [T-026] `KB:<entry>` is a price a gate line can cite
+
+- **Type**: AFK
+- **Blocked by**: T-024, T-012
+- **What to build**: `plan`'s `[PRICED:]` source resolver gains the `KB:` namespace, resolved through
+  the same predicate `kernel_kb cite` uses, with the same refusal reason quoted.
+- **Acceptance criteria**:
+  - [check: `npm test`] — a certified entry resolves; an `UNVERIFIED` entry is refused as
+    `gate-citation-unresolved` with the citation tool's reason; a `KB:` source that names no entry
+    names the lookup path.
+  - [evidence: `runs/instruments-1/priced.txt` — the accepted line and the refused one]
+  - [judgment: — none]
+
+## [T-027] Real dumps, one measured entry, one resolving price
+
+- **Type**: AFK, human-judged at the end
+- **Blocked by**: T-020..T-026
+- **What to build**: on `h200-7`, dump SASS for the SAXPY fixture in both modes, run all six views on
+  them, write one `kb/sm90/` entry from a real reading (certification header, boundary, status), and
+  show a `[PRICED: …, KB:<entry>]` gate line resolving on a milestone.
+- **Acceptance criteria**:
+  - [evidence: `runs/instruments-1/` — the dumps, the six verdict lines, the entry, the M0-locked
+    milestone with a resolving price]
+  - [check: `npm test` and `npm run typecheck` green]
+  - [judgment: the user] — that the three statuses and the certification header are something they
+    will keep writing, not a form to get past a lint.

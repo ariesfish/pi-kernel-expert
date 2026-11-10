@@ -87,8 +87,9 @@
 - [x] `self-diagnosis` when no `agent` tool
 - [x] strengthened on the user's call: `measurement` must be a runnable command, `citations` (≥3,
       opened) — see runs/plan-1/diagnosis/transcript-v2.txt
-- [ ] **[judgment: the user]** that the brief asks a question worth answering — now against
-      runs/plan-1/diagnosis/reviewer.v2.md (the written block validates clean)
+- [x] **[judgment: the user, 2026-11-10]** the v2 brief is the shape: a runnable command plus the
+      outcomes it separates, and three citations that are opened. The judgment was made *because*
+      the strengthened version can be checked — see runs/plan-1/diagnosis/transcript-v2.txt
 
 ## T-015 (closed 2026-11-10) — workspace + skill
 - [x] `kernel_init` writes the milestone template (17 placeholders, all named on refusal)
@@ -120,3 +121,32 @@
 ## T-019 (blocked: T-017, T-018) — one real promotion → one entry
 - [x] entry + regenerated index diff + the four publish commands
 - [x] user judgment: merge-worthy
+
+## T-020 (ready-for-agent) — SASS parser + kernel resolution + census
+- [ ] two formats, one parser
+- [ ] `--kernel` wins; else most executed; else `sass-kernel-ambiguous`
+- [ ] `SASS-OK|FAIL` line with dump path + sha
+
+## T-021 (blocked: T-020) — operands + serial
+- [ ] `a_reg` vs `a_desc`; `depbar` ratio with one threshold table
+
+## T-022 (blocked: T-020) — schedule + live
+- [ ] `depbar_before_each_ew`; peak registers against the M0 budget, no band without a contract
+
+## T-023 (blocked: T-020) — struct + launch
+- [ ] precision from opcodes; `LAUNCH-PARTIAL` names what the dump lacks
+
+## T-024 (ready-for-agent) — KB entry schema + `kernel_kb cite`
+- [ ] five sections + certification header + boundary
+- [ ] three statuses with invariants; four refusals named
+
+## T-025 (blocked: T-024) — lint + index validation
+- [ ] five rules, README/TEMPLATE exempt, fail closed
+- [ ] `index` validates, never generates
+
+## T-026 (blocked: T-024, T-012) — `KB:` as a `[PRICED:]` source
+- [ ] resolves through the same predicate as `cite`
+
+## T-027 (blocked: all instruments) — real dumps + one measured entry
+- [ ] h200-7 dumps, six views, one entry, one resolving price
+- [ ] **[judgment: the user]** the statuses and header are worth writing
