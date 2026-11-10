@@ -202,6 +202,26 @@ naming the item that moved. To change M0 on purpose, `unlock: true` with a
 reason: it lands in `## 4. Dead Ends` as a diagnosis, so a thaw is a decision
 with a date instead of an edit nobody remembers making.
 
+## Diagnose a plateau
+
+Three consecutive rejects, or a gate line that will not move, is a plateau: the
+plan's current reading is wrong somewhere. `kernel-diagnose` dispatches a
+readonly reviewer on a different model with the artifacts and not the reasoning,
+and the answer becomes a record:
+
+```text
+### Diagnosis plateau-1
+- class: measurement-defect
+- decision: D0.1
+- measurement: run ncu with source counters on the frozen baseline and attribute
+  the 31.7% short scoreboard per SASS instruction
+- abandon: the SASS-asserted gate verdicts; three rejects are not three measurements
+```
+
+`kernel_milestone` validates the block by shape, and the block never gates: a
+diagnosis is what the plan learned, not a way to pass a milestone by explaining
+it.
+
 ## Check what is wired
 
 ```text

@@ -81,12 +81,13 @@
 - [x] `precondition` accepted and recorded
 - [x] benchmark.csv gains `milestone_decision`
 
-## T-014 (blocked: T-010) — diagnosis record
-- [ ] `kernel-diagnose` skill + brief
-- [ ] `### Diagnosis` shape validation, never gates
-- [ ] `self-diagnosis` when no `agent` tool
+## T-014 (code closed 2026-11-10, judgment open) — diagnosis record
+- [x] `kernel-diagnose` skill + brief
+- [x] `### Diagnosis` shape validation, never gates
+- [x] `self-diagnosis` when no `agent` tool
+- [ ] **[judgment: the user]** that the brief asks a question worth answering — see runs/plan-1/diagnosis/reviewer.md
 
-## T-015 (blocked: T-010) — workspace + skill
+## T-015 (ready-for-agent, blocked: T-010) — workspace + skill
 - [ ] `kernel_init` writes the milestone template
 - [ ] `kernel_contract` warns when missing/empty
 - [ ] kernel-flow skill: step, refusal rows, plateau move

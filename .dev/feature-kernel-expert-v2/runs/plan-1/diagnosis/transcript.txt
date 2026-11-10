@@ -1,0 +1,53 @@
+=== T-014 diagnosis evidence ====================================================
+
+Dispatched 2026-11-10 with the `agent` tool: readonly: true, model opus
+(the loop runs on deepseek-v4-1-flash), payload = milestone.md + candidates.jsonl
++ profile/run1,run4/summary.json + loop-log.txt. No reasoning from the
+implementing agent was given, which is the point of the tool's `readonly` and
+the brief's "artifacts and not the reasoning".
+
+The brief asked four questions in a fixed shape. The reviewer's answer:
+
+------------------------------------------------------------------------------
+class: measurement-defect
+decision: D0.1
+measurement: run ncu with source counters on the frozen baseline (a1b2c3d,
+  diffHash 0000) for a/typical and attribute run1's 31.7% short_scoreboard per
+  SASS instruction: if the epilogue's sts/lds block holds its claimed 20% the
+  class is missing-decision, if ldmatrix dominates it is wrong-decision, and
+  either outcome falsifies this one
+abandon: the C3-style host-bound screen and SASS-asserted gate verdicts as
+  rejection grounds; deviceMs 0.19, the 20% epilogue premise and the
+  190-register spill appear in no recorded counter, and three rejects are not
+  three measurements
+------------------------------------------------------------------------------
+
+Full answer with its five citations: reviewer.md.
+
+What it did that the brief asked for and the loop had not: it read the artifacts
+it was given against each other and found that Gate:1's number (epilogue share)
+appears in no profile summary, that C3's kill rode a device time ten times below
+the loop's own baseline, and that the dead-end row cites a register-spill
+counter that run2 never recorded. None of that is a code suggestion — it is the
+measurement question the loop stopped asking.
+
+The block below was written into milestone.md and validated by kernel_milestone:
+
+### Diagnosis plateau-1
+- class: measurement-defect
+- decision: D0.1
+- measurement: run ncu with source counters ... (verbatim, see milestone.md)
+- abandon: the C3-style host-bound screen and SASS-asserted gate verdicts ...
+
+Validation output (kernel/milestone.ts, same code the tool runs):
+
+  roundtrip: true
+  diagnoses: [{"id":"plateau-1","rows":["class","decision","measurement","abandon"]}]
+  problems: []
+  Diagnosis plateau-1 — measurement-defect, D0.1
+
+Construction note, stated so the evidence is not mistaken for a real plateau:
+this workspace is a *constructed* plateau — a plausible milestone, four ledger
+rows and four profile summaries — because no real workspace has yet run the loop
+to a plateau. What is real here is the reviewer, the brief, the tool call and the
+validation. T-016 is where a real workspace takes this path.

@@ -62,6 +62,13 @@ export const VERIFY_NONE = "none";
  * A trigger is an observable, never a category. These phrases are what an agent
  * writes when it has not decided what the decision is for.
  */
+/** What a plateau can be. Four causes, because the fifth is "keep measuring". */
+export const DIAGNOSIS_CLASSES = ["missing-decision", "wrong-decision", "measurement-defect", "environment"] as const;
+export type DiagnosisClass = (typeof DIAGNOSIS_CLASSES)[number];
+
+/** The four rows a `### Diagnosis <id>` block must carry, plus the optional self-review note. */
+export const DIAGNOSIS_FIELDS = ["class", "decision", "measurement", "abandon"] as const;
+
 export const TRIGGER_CATEGORIES = [
   "when needed",
   "as needed",
@@ -106,6 +113,9 @@ export const MILESTONE_RULE_IDS = [
   "wiki-citation-misplaced",
   "wiki-citation-unlabelled",
   "knowledge-source-absent",
+  "diagnosis-missing-field",
+  "diagnosis-class",
+  "diagnosis-decision",
 ] as const;
 
 export type MilestoneRuleId = (typeof MILESTONE_RULE_IDS)[number];
@@ -145,7 +155,7 @@ export interface Section {
   end: number;
 }
 
-export type PhaseKind = "gate" | "block" | "contract";
+export type PhaseKind = "gate" | "block" | "contract" | "diagnosis";
 
 /**
  * A `### M<k> …` block. `gate` blocks hold gate lines, `contract` is the frozen
@@ -229,6 +239,29 @@ export interface GateLine {
   pricedRaw: string | null;
 }
 
+/** One `- Key: value` line of a diagnosis block. */
+export interface DiagnosisRow {
+  key: string;
+  value: string;
+  line: number;
+  raw: string;
+}
+
+/**
+ * `### Diagnosis <id>`: what a plateau produces instead of another candidate.
+ * Shape only — never a gate, never a decision. A diagnosis records what the plan
+ * got wrong and what the next measurement should discriminate; the agent that
+ * owns the milestone is still the one that edits it.
+ */
+export interface Diagnosis {
+  /** The heading's own suffix: `### Diagnosis plateau-1` → `plateau-1`. */
+  id: string;
+  heading: string;
+  start: number;
+  end: number;
+  rows: DiagnosisRow[];
+}
+
 export interface GateBlock {
   heading: string;
   phase: string;
@@ -248,6 +281,7 @@ export interface MilestoneModel {
   phases: Phase[];
   decisions: Decision[];
   gates: GateBlock[];
+  diagnoses: Diagnosis[];
   /** `## 4. Dead Ends` rows, `- ` stripped: `<D ids> | <reason> | <evidence>`. */
   deadEnds: string[];
   /** What the parser could not structure. Empty for a file the parser could read whole. */
@@ -283,14 +317,20 @@ export function parseMilestone(text: string): { model: MilestoneModel; problems:
   const phases: Phase[] = [];
   const decisions: Decision[] = [];
   const gates: GateBlock[] = [];
+  const diagnoses: Diagnosis[] = [];
   const deadEnds: string[] = [];
 
   let section: Section | null = null;
   let phase: Phase | null = null;
   let gate: GateBlock | null = null;
   let decision: Decision | null = null;
+  let diagnosis: Diagnosis | null = null;
 
   const closeInside = (end: number): void => {
+    if (diagnosis) {
+      diagnosis.end = end;
+      diagnosis = null;
+    }
     if (decision) {
       decision.end = end;
       decision = null;
@@ -323,11 +363,18 @@ export function parseMilestone(text: string): { model: MilestoneModel; problems:
       closeInside(index);
       const heading = h3[1].trim();
       const id = /^(M\d+)\b\s*(.*)$/.exec(heading);
+      const diagnosisId = id ? null : /^diagnosis\b\s*(.*)$/i.exec(heading);
       phase = {
         id: id ? id[1] : heading,
         index: id ? Number(id[1].slice(1)) : -1,
         name: id ? id[2].trim() : heading,
-        kind: id && /^gate$/i.test(id[2].trim()) ? "gate" : id && /^contract$/i.test(id[2].trim()) ? "contract" : "block",
+        kind: id && /^gate$/i.test(id[2].trim())
+          ? "gate"
+          : id && /^contract$/i.test(id[2].trim())
+            ? "contract"
+            : diagnosisId
+              ? "diagnosis"
+              : "block",
         heading: line,
         start: index,
         end: lines.length,
@@ -336,6 +383,17 @@ export function parseMilestone(text: string): { model: MilestoneModel; problems:
       if (phase.kind === "gate") {
         gate = { heading: line, phase: phase.id, start: index, end: lines.length, lines: [] };
         gates.push(gate);
+      }
+      if (phase.kind === "diagnosis") {
+        const suffix = /^diagnosis\b\s*(.*)$/i.exec(heading)?.[1].trim() ?? "";
+        diagnosis = {
+          id: suffix === "" ? phase.id : suffix,
+          heading: line,
+          start: index,
+          end: lines.length,
+          rows: [],
+        };
+        diagnoses.push(diagnosis);
       }
       continue;
     }
@@ -365,6 +423,12 @@ export function parseMilestone(text: string): { model: MilestoneModel; problems:
 
   for (const entry of decisions) readDecisionRows(entry, lines);
   for (const block of gates) readGateLines(block, lines);
+  for (const entry of diagnoses) {
+    for (let index = entry.start + 1; index < entry.end; index += 1) {
+      const row = /^-\s*([A-Za-z][A-Za-z -]*):\s*(.*)$/.exec(lines[index].trim());
+      if (row) entry.rows.push({ key: row[1].trim(), value: row[2].trim(), line: index, raw: lines[index] });
+    }
+  }
 
   const deadEndSection = sections.find((entry) => /dead\s*end/i.test(entry.title));
   if (deadEndSection) {
@@ -375,7 +439,7 @@ export function parseMilestone(text: string): { model: MilestoneModel; problems:
     }
   }
 
-  const model: MilestoneModel = { lines, sections, phases, decisions, gates, deadEnds, problems: [] };
+  const model: MilestoneModel = { lines, sections, phases, decisions, gates, diagnoses, deadEnds, problems: [] };
   return { model, problems: model.problems };
 }
 
@@ -491,6 +555,7 @@ export function validateMilestone(model: MilestoneModel, ctx: MilestoneContext =
     ...m0Thawed(model, ctx.lock),
     ...gateCitations(model, ctx),
     ...wikiCitations(model, ctx),
+    ...diagnoses(model),
   ];
 }
 
@@ -887,6 +952,109 @@ function phaseOrder(model: MilestoneModel): Problem[] {
 }
 
 /**
+ * 13. A diagnosis block is a record of what the plan got wrong, so it has four
+ * fields and no prose: the class (which of the four causes), the decision to add
+ * or change, the cheapest discriminating measurement, and what to abandon.
+ *
+ * It never gates. A diagnosis that could satisfy a gate line would be a way to
+ * pass a milestone by diagnosing it, which is the opposite of the point.
+ */
+function diagnoses(model: MilestoneModel): Problem[] {
+  const problems: Problem[] = [];
+  const known = model.decisions.map((decision) => decision.id);
+  for (const entry of model.diagnoses) {
+    const row = `Diagnosis ${entry.id}`;
+    const seen = new Map(entry.rows.map((item) => [item.key.toLowerCase(), item]));
+    for (const field of DIAGNOSIS_FIELDS) {
+      const item = seen.get(field);
+      if (!item) {
+        problems.push(
+          makeProblem(
+            "diagnosis-missing-field",
+            row,
+            `the block has no \`- ${field}:\` line. ${DIAGNOSIS_HINT[field]}`,
+            `add \`- ${field}: <value>\` to ${entry.heading.trim()}; a diagnosis missing one of the four is a hunch with an id.`,
+          ),
+        );
+        continue;
+      }
+      if (item.value === "" || isPlaceholder(item.value)) {
+        problems.push(
+          makeProblem(
+            "diagnosis-missing-field",
+            row,
+            `the \`${field}\` line is empty. ${DIAGNOSIS_HINT[field]}`,
+            `fill in what the diagnosis established: ${DIAGNOSIS_HINT[field]}`,
+          ),
+        );
+      }
+    }
+
+    const klass = seen.get("class")?.value.toLowerCase();
+    if (klass && klass !== "" && !(DIAGNOSIS_CLASSES as readonly string[]).includes(klass)) {
+      problems.push(
+        makeProblem(
+          "diagnosis-class",
+          row,
+          `${JSON.stringify(klass)} is not a diagnosis class: the four are ${DIAGNOSIS_CLASSES.join(", ")}. The class decides what changes — a decision, the plan's reading of the measurement, or the machine.`,
+          `name one of ${DIAGNOSIS_CLASSES.join(", ")}; if none fits, the plateau is not diagnosed yet.`,
+        ),
+      );
+    }
+
+    const target = seen.get("decision")?.value ?? "";
+    const ids = target.match(/D\d+\.\d+/g) ?? [];
+    if (target !== "" && ids.length === 0) {
+      problems.push(
+        makeProblem(
+          "diagnosis-decision",
+          row,
+          `\`decision: ${target}\` names no decision id. A diagnosis says which decision to add or change, so it points where the plan can be edited${known.length === 0 ? "; this milestone has no decisions yet" : `: ${known.join(", ")}`}.`,
+          `name the decision (${known.length === 0 ? "D0.1 is the first" : `one of ${known.join(", ")}`}), or add it to the milestone first.`,
+        ),
+      );
+    } else if (ids.length > 0) {
+      const unknown = ids.filter((id) => !known.includes(id));
+      if (unknown.length > 0) {
+        problems.push(
+          makeProblem(
+            "diagnosis-decision",
+            row,
+            `${unknown.join(", ")} ${unknown.length === 1 ? "is" : "are"} not in this milestone (${known.length === 0 ? "it has no decisions" : `it has ${known.join(", ")}`}). A diagnosis points at a decision the plan can act on.`,
+            "add the decision first, or point the diagnosis at the decision the plateau is really about.",
+          ),
+        );
+      }
+    }
+
+    for (const item of entry.rows) {
+      const key = item.key.toLowerCase();
+      if (!(DIAGNOSIS_FIELDS as readonly string[]).includes(key) && key !== "self-diagnosis") {
+        continue;
+      }
+      if (key === "self-diagnosis" && item.value === "") {
+        problems.push(
+          makeProblem(
+            "diagnosis-missing-field",
+            row,
+            "the `self-diagnosis` line is empty: a self-review is allowed, but it has to say why the reviewer was not asked, or a reader cannot tell an honest self-review from a skipped one.",
+            "say why (no agent tool in this session, no different model available), or drop the line and run the reviewer.",
+          ),
+        );
+      }
+    }
+  }
+  return problems;
+}
+
+const DIAGNOSIS_HINT: Record<(typeof DIAGNOSIS_FIELDS)[number], string> = {
+  class: "which of the four causes this plateau is.",
+  decision: "the decision to add or change, by id.",
+  measurement: "the cheapest measurement that tells the causes apart.",
+  abandon: "what to stop doing; a diagnosis that abandons nothing has not decided anything.",
+};
+
+/**
  * 11. A gate line cites a measurement, and a measurement has an address: a run
  * under `profile/`, or a cell and group in the contract. A pointer that names
  * nothing is worse than no pointer, because it reads like evidence.
@@ -1213,6 +1381,11 @@ export function formatMilestoneSummary(model: MilestoneModel): string {
       if (phase.kind === "gate") {
         const block = model.gates.find((entry) => entry.phase === phase.id);
         lines.push(`  ${phase.id} ${phase.name} — ${block?.lines.length ?? 0} gate line(s)`);
+      } else if (phase.kind === "diagnosis") {
+        const entry = model.diagnoses.find((item) => item.heading === phase.heading);
+        const klass = entry?.rows.find((item) => item.key.toLowerCase() === "class")?.value ?? "no class";
+        const decision = entry?.rows.find((item) => item.key.toLowerCase() === "decision")?.value ?? "no decision";
+        lines.push(`  Diagnosis ${entry?.id ?? phase.name} — ${klass}, ${decision}`);
       } else if (phase.kind === "contract") {
         // The frozen block holds items, not decisions; counting M0's decisions
         // here would blame them on the block that holds no decisions at all.

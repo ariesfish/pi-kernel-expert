@@ -1,0 +1,1 @@
+{"runId":"run2","tag":"full","contractSha":"f8e23a3d24b6","diffHash":"1111","gitHead":"a1b2c3d","gpu":{"name":"NVIDIA H200","clockSm":"1980","clockMem":"3201"},"ncuVersion":"2025.3.1","metrics":{"smsp__warp_issue_stalled_short_scoreboard_per_warp_active.pct":30.9,"l1tex__throughput.avg.pct_of_peak_sustained_elapsed":8.6,"launch__waves_per_multiprocessor":1.11}}

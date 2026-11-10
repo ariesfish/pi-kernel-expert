@@ -188,7 +188,7 @@ T-015 workspace integration + kernel-flow skill  (after T-010)
 T-016 real-workspace evidence (plan-1, plan-2)   (after T-013, T-014)
 ```
 
-Frontier: **T-014** (T-010..T-013 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced). T-015 is unblocked and independent of T-014.
+Frontier: **T-015** (T-010..T-014 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced). T-016 needs a real workspace and comes after T-015.
 
 Adjacent, done outside the ticket graph: the corpus moved to `ariesfish/kernel-wiki`
 (`1571a54`, ADR 0007) — skill name compliant, sanitised at source, page ids frozen. That is what
@@ -296,6 +296,11 @@ T-012's `wiki:` citations now resolve against.
   `### Diagnosis <id>` block is validated by shape (`class`, `decision`, `measurement`, `abandon`),
   never gates, and is what a plateau produces instead of another candidate. Where the `agent` tool is
   absent the record is marked `self-diagnosis`.
+- **Closed 2026-11-10**: `### Diagnosis <id>` is its own `PhaseKind`, three rules
+  (`diagnosis-missing-field`, `diagnosis-class`, `diagnosis-decision`), 8 tests; the
+  `kernel-diagnose` skill carries the brief. Evidence: a real readonly reviewer on a different model
+  (`opus` against the loop's `deepseek-v4-1-flash`) answered the four questions, and its block
+  validates clean. **Judgment seat still open**: whether the brief asks a question worth answering.
 - **Acceptance criteria**:
   - [check: `npm test`] — a Diagnosis block missing a field is refused by name; a `class` outside the
     four is refused; a diagnosis with no decision id is refused.

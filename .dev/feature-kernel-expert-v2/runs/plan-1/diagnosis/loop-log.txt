@@ -1,0 +1,15 @@
+2026-11-09T21:10Z C1 keep D0.1  recorded. geomean_speedup 1.0 (baseline)
+2026-11-09T22:40Z C2 reject D0.1 widen the epilogue store to 128-bit vectors
+   geomean_speedup 1.001 < noise floor 1.02
+   ncu run2: short_scoreboard 30.9% (baseline 31.7%), l1tex throughput 8.6% (baseline 8.4%)
+2026-11-10T01:05Z C3 reject D0.1 hoist the epilogue into a second kernel
+   host_bound: hostEnqueueMs 0.42 vs deviceMs 0.19 on a/typical
+2026-11-10T02:20Z C4 reject D0.1 raise the register budget to 210
+   refused: m0-thawed (register budget is frozen at 168)
+   unlocked and re-run anyway: waves/SM 0.75 (baseline 1.12), geomean 0.94
+2026-11-10T02:55Z loop stopped: 3 consecutive rejects, all citing D0.1.
+   M0 Gate:1 (epilogue time below 5%) still fails. M0 Gate:3 (accumulator never leaves the
+   register file) was never measured directly; it is asserted from the SASS.
+
+Open observation from the operator, not evidence: every attempt moved the epilogue's
+*instructions* and none moved the *occupancy* the spilling accumulator costs.
