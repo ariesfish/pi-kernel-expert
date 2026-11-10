@@ -188,7 +188,7 @@ T-015 workspace integration + kernel-flow skill  (after T-010)
 T-016 real-workspace evidence (plan-1, plan-2)   (after T-013, T-014)
 ```
 
-Frontier: **T-016** (T-010..T-015 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced). T-016 is the real-workspace evidence pass.
+Frontier: **none in `plan`** — T-010..T-016 closed 2026-11-10 (`corpus` module T-017/T-018 closed, T-019 evidenced). Next module: `instruments`, not yet specced.
 
 Adjacent, done outside the ticket graph: the corpus moved to `ariesfish/kernel-wiki`
 (`1571a54`, ADR 0007) — skill name compliant, sanitised at source, page ids frozen. That is what
@@ -340,6 +340,12 @@ T-012's `wiki:` citations now resolve against.
 - **Blocked by**: T-013, T-014
 - **What to build**: one workspace, three archived runs: a keep refused for an unknown decision then
   accepted after the row lands; an M0 thaw refusal; a plateau that produces a validated diagnosis.
+- **Closed 2026-11-10**: one workspace (`runs/plan-4/.work`) walks the whole module through the real
+  tools: template warn → plan validated against an existing profile → M0 lock → `decision-unknown` →
+  row lands → keep recorded → `m0-thawed` → unlock with reason → re-lock → three rejects → reviewer →
+  diagnosis validated with every citation opened. Two defects the run found: profiles taken before the
+  change (all three carried one `diffHash` that was no candidate's — `profile-stale` working on the
+  script), and diagnosis rows counted as dead ends.
 - **Acceptance criteria**:
   - [evidence: `runs/plan-1/` and `runs/plan-2/` with the commands, the outputs, and a README stating
     what each proves]

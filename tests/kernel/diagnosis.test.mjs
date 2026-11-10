@@ -233,3 +233,12 @@ test("through the tool: a citation that names a line past the end is refused, an
   const anchor = await run(BASE.replace("candidates.jsonl#C3", "candidates.jsonl#C9"));
   assert.match(anchor.content[0].text, /contains no "C9"/);
 });
+
+test("a diagnosis block is not a dead end: its rows ban no combination", () => {
+  const parsed = model();
+  assert.deepEqual(
+    parsed.deadEnds.map((row) => row.split("|")[0].trim()),
+    ["D0.1"],
+    "the diagnosis under Dead Ends does not count as a banned bundle",
+  );
+});

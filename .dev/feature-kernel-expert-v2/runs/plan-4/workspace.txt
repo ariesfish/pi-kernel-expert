@@ -1,0 +1,127 @@
+
+========================================================================
+1. kernel_init
+========================================================================
+Kernel task workspace: /Users/ariesfish/Projects/github/dev-skills/pi-kernel-expert/.dev/feature-kernel-expert-v2/runs/plan-4/.work
+created: docs/draft.md, docs/plan.md, docs/milestone.md, candidates.jsonl
+kept existing: none
+contract will live at /Users/ariesfish/Projects/github/dev-skills/pi-kernel-expert/.dev/feature-kernel-expert-v2/runs/plan-4/.work/kernel.contract.json
+
+Draft/plan sections still need real content before a contract can be frozen:
+- docs/draft.md › Baseline and validation: section still holds the generated placeholder
+- docs/draft.md › Risks and unknowns: section still holds the generated placeholder
+- docs/draft.md › Candidate directions: section still holds the generated placeholder
+- docs/draft.md › First steps: section still holds the generated placeholder
+- docs/draft.md › Validation and evaluation commands: section still holds the generated placeholder
+- docs/draft.md › Evidence required: section still holds the generated placeholder
+- docs/plan.md › Steps: section still holds the generated placeholder
+- docs/plan.md › Evidence per step: section still holds the generated placeholder
+- docs/plan.md › Stop conditions: section still holds the generated placeholder
+
+========================================================================
+2. kernel_contract, milestone still the template
+========================================================================
+Contract frozen for 2 cell(s), 6 input group(s).
+kernel.contract.json sha256 de8c7226570782ac33efc08b80a0b933d76d0763709a2354bf04a5d73909b10b
+groups a=typical,zero_block,tail  b=typical,zero_block,tail
+basis device  harness goal.sh, goal.checks.sh, .kernel/calibration.json, .kernel/precision.tsv, .kernel/baseline.tsv
+reference none (a cross-run baseline stays legal, labelled `pairing: absent`)
+calibration none (the check's max_diff has no ruler, so the precision gate stays unarmed)
+
+written:
+- kernel.contract.json
+- goal.sh
+- goal.checks.sh
+- kernel-freeze.json
+
+warnings:
+- docs/milestone.md is still kernel_init's template (1 placeholder decision(s) named D0.1): fill it before a keep is recorded, or the keep will name no decision.
+
+Next:
+1. Pass kernel-freeze.json to freeze_criteria (one human confirmation).
+2. Use metric_name geomean_speedup with direction higher for init_goal/experiments.
+3. Run goal.sh once to record the baseline; it reports geomean_speedup=1 and writes .kernel/baseline.tsv.
+4. Later runs compare per cell, refuse a regression beyond the guard, and emit the geomean.
+
+========================================================================
+3. the plan, validated against the profile that exists
+========================================================================
+docs/milestone.md — clean.
+No M0 lock (.kernel/milestone.lock.json absent): the block may still change. Lock it with lock: true.
+6 section(s): 1. Problem and Target, 2. Contract, 3. DAG and Phase Order, 4. Dead Ends, 5. Global Gate, 6. Rules; 2 decision(s); 1 gate block(s)
+phases:
+  M0 Contract — 6 frozen item(s)
+  M0 Architecture — 2 decision(s)
+  M0 Gate — 4 gate line(s)
+decisions:
+  D0.1 Fuse the epilogue into registers (M0) — depends on none
+  D0.2 Stage two tiles through cp.async (M0) — depends on ⇐ D0.1
+gates:
+  M0 Gate:1 [VERIFY: ncu-direct] profile:run1 — epilogue share drops below 5% on a/typical
+  M0 Gate:2 [VERIFY: correctness] cell-group: a/typical — every cell and group still matches the reference within its epsilon
+  M0 Gate:3 [VERIFY: ncu-derived] profile:run1 — one warp request reads four sectors, not 128
+  M0 Gate:4 [VERIFY: mechanism] — the epilogue is gone, which is why device_ms moved
+dead ends: 1 row(s)
+
+========================================================================
+4. kernel_milestone lock: M0 freezes
+========================================================================
+docs/milestone.md — locked: M0 Contract frozen at e65a5f291af5 (6 items: tile, smem, warp roles, register budget, issue order, accumulator precision).
+File sha 963a5f88587d, recorded in .kernel/milestone.lock.json. An edit inside the block is now refused as m0-thawed; changing M0 on purpose needs unlock: true with a reason, which lands in Dead Ends.
+
+========================================================================
+5. a keep naming a decision the plan does not have
+========================================================================
+Candidate not recorded — 1 refusal(s), all printed:
+- decision-unknown (charged to the candidate): D3.7 is not in docs/milestone.md (it has D0.1, D0.2); nothing in D3.7 is in the milestone. A decision id the plan does not have is a name for nothing. Fix: add the decision to the milestone first (kernel_milestone to validate it), or name the decision this change actually implements.
+
+========================================================================
+6. the decision row lands, and the milestone still validates
+========================================================================
+docs/milestone.md — clean.
+M0 Contract frozen at e65a5f291af5 since 2026-11-10T04:38:07.570Z; unchanged.
+
+========================================================================
+7. the same keep, naming D0.3
+========================================================================
+recorded C1 (keep) milestone=D0.3 sha=bc8fb5c94146 profile=run1 geomean=1.12
+
+========================================================================
+8. an M0 edit after the lock
+========================================================================
+docs/milestone.md — refused: 1 problem(s), each with the rule, the row, and the fix:
+1. m0-thawed M0 Contract: warp roles: the locked line `- warp roles: 4 mma, 4 copy` now reads `- warp roles: 8 mma, 4 copy`; M0 was frozen at e65a5f291af5 on 2026-11-10T04:38:07.570Z Fix: Restore the block exactly as locked. To change M0 on purpose, run kernel_milestone with unlock: true and a reason: the reason is appended to ## 4. Dead Ends, which is what makes a thaw a recorded decision instead of a quiet edit.
+
+========================================================================
+9. unlock with the reason that lets it move
+========================================================================
+docs/milestone.md — unlocked. The M0 freeze at e65a5f291af5 is gone and the block may change.
+Recorded in ## 4. Dead Ends: - M0 | D0.3 splits the writeback across eight mma warps, so the warp split in M0 is no longer the layout the plan measured; 168 registers still holds | m0-contract@e65a5f291af5
+Re-lock with lock: true once the new block holds; until then every candidate's milestoneSha points at a plan with no freeze.
+
+========================================================================
+10. re-locked on the new M0
+========================================================================
+docs/milestone.md — locked: M0 Contract frozen at 976d17b9d863 (6 items: tile, smem, warp roles, register budget, issue order, accumulator precision).
+- D0.1+D0.2 | the pair spills 190 registers at 128x128 | profile:run2
+- M0 | D0.3 splits the writeback across eight mma warps, so the warp split in M0 is no longer the layout the plan measured; 168 registers still holds | m0-contract@e65a5f291af5
+
+========================================================================
+11. the ledger the reviewer will see
+========================================================================
+C1 keep D0.3 profile=run1 keep the accumulator in registers through the epilogue
+C2 reject D0.3 profile=run2 widen the epilogue store to 128-bit vectors
+C3 reject D0.3 profile=run3 hoist the epilogue into a second kernel
+C4 reject D0.3 profile=run4 raise the register budget to 210
+
+========================================================================
+12. benchmark.csv
+========================================================================
+candidate,parent,at,decision,milestone_decision,description,geomean_speedup,latency_us_a,latency_us_b,profile_run,bottleneck_metric,reason,forced,pairing,verdict,forced_rules,wiki
+C1,baseline,2026-11-10T04:38:07.644Z,keep,D0.3,keep the accumulator in registers through the epilogue,1.12,9.1,11.4,run1,smsp__warp_issue_stalled_short_scoreboard_per_warp_active.pct,,,absent,measured,,none
+C2,C1,2026-11-10T04:38:07.729Z,reject,D0.3,widen the epilogue store to 128-bit vectors,,,,run2,,geomean 1.001 is below the 2% noise floor; short scoreboard unchanged at 30.9%,,absent,unmeasured,,
+C3,C2,2026-11-10T04:38:07.812Z,reject,D0.3,hoist the epilogue into a second kernel,,,,run3,,host-bound: hostEnqueueMs 0.42 against deviceMs 0.19 on a/typical,,absent,unmeasured,,
+C4,C3,2026-11-10T04:38:07.894Z,reject,D0.3,raise the register budget to 210,,,,run4,,waves/SM 0.75 from 1.12 and geomean 0.94: the extra registers cost occupancy,,absent,unmeasured,,
+
+READY FOR REVIEWER: one keep on D0.3, then three rejects on D0.3, each with its own profile.
+

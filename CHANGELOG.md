@@ -146,6 +146,12 @@
   torch are visible from a non-interactive shell on the GPU node, naming every
   missing item and exiting non-zero.
 
+- A `### Diagnosis <id>` block under `## 4. Dead Ends` no longer counts as a
+  dead end: its rows are a diagnosis, not a banned combination, and counting
+  them let a diagnosis foreclose a decision bundle through `dead-end-bundle`.
+- `kernel_contract` takes `scope_globs`; with the whole tree in scope, editing
+  `docs/milestone.md` changes the candidate fingerprint and makes every profile
+  taken before the edit stale. A kernel task scopes to `kernel/**`.
 ## [0.4.0] - 2026-11-07
 
 ### Added

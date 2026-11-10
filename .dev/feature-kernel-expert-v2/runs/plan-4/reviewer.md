@@ -1,0 +1,6 @@
+### Diagnosis plateau-1
+- class: measurement-defect
+- decision: D0.3 — the writeback split every candidate is logged under, whose trigger (local ld/st sectors at 168 registers) and whose gate metric (epilogue share) appear in no run ever collected; the loop steered by aggregate short scoreboard instead
+- measurement: `ncu -c 1 --set full -lineinfo -k regex:fmha_fwd -o profile/run5 bash bench.sh && ncu --import profile/run5.ncu-rep --csv --page source` => short-scoreboard stalls attribute to K-loop ldmatrix lines with epilogue smem under 5% means measurement-defect (the counter steering rejections like C2's "unchanged at 30.9%" belongs to the K loop and never measured the epilogue); stalls still concentrated on the epilogue's sts/lds lines means wrong-decision (C1's keep never fused the epilogue, so D0.3/D0.2 chased non-binding limiters)
+- abandon: verdicts on numbers no run contains — the aggregate short-scoreboard rejections (C2's class) and the "D0.1+D0.2 spills 190 registers | profile:run2" dead end that forecloses D0.2 on a register count absent from run2 (run2 is C2's store-widening diff, metrics hold only short scoreboard and waves)
+- citations: docs/milestone.md:49, docs/milestone.md:55, profile/run1/summary.json:31, profile/run2/summary.json:18, candidates.jsonl#C2, candidates.jsonl#C3

@@ -454,9 +454,15 @@ export function parseMilestone(text: string): { model: MilestoneModel; problems:
 
   const deadEndSection = sections.find((entry) => /dead\s*end/i.test(entry.title));
   if (deadEndSection) {
+    const inDiagnosis = (index: number): boolean =>
+      diagnoses.some((entry) => index > entry.start && index < entry.end);
     for (let index = deadEndSection.start + 1; index < deadEndSection.end; index += 1) {
       const row = lines[index].trim();
       if (row === "" || /^#{1,6}\s/.test(row)) continue;
+      // A diagnosis block sits under Dead Ends because that is where a plateau's
+      // record belongs, but its rows are a diagnosis, not a banned combination:
+      // counting them as dead ends would let a diagnosis ban a decision bundle.
+      if (inDiagnosis(index)) continue;
       deadEnds.push(row.replace(/^-\s*/, ""));
     }
   }

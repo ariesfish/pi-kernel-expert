@@ -1,0 +1,27 @@
+
+========================================================================
+12. the reviewer's block, validated by kernel_milestone
+========================================================================
+docs/milestone.md — clean.
+M0 Contract frozen at 976d17b9d863 since 2026-11-10T04:38:07.647Z; unchanged.
+6 section(s): 1. Problem and Target, 2. Contract, 3. DAG and Phase Order, 4. Dead Ends, 5. Global Gate, 6. Rules; 3 decision(s); 1 gate block(s)
+phases:
+  M0 Contract — 6 frozen item(s)
+  M0 Architecture — 3 decision(s)
+  M0 Gate — 4 gate line(s)
+  Diagnosis plateau-1 — measurement-defect, D0.3 — the writeback split every candidate is logged under, whose trigger (local ld/st sectors at 168 registers) and whose gate metric (epilogue share) appear in no run ever collected; the loop steered by aggregate short scoreboard instead
+decisions:
+  D0.1 Fuse the epilogue into registers (M0) — depends on none
+  D0.2 Stage two tiles through cp.async (M0) — depends on ⇐ D0.1
+  D0.3 Split the output writeback across the 8 warps (M0) — depends on ⇐ D0.1
+gates:
+  M0 Gate:1 [VERIFY: ncu-direct] profile:run1 — epilogue share drops below 5% on a/typical
+  M0 Gate:2 [VERIFY: correctness] cell-group: a/typical — every cell and group still matches the reference within its epsilon
+  M0 Gate:3 [VERIFY: ncu-derived] profile:run1 — one warp request reads four sectors, not 128
+  M0 Gate:4 [VERIFY: mechanism] — the epilogue is gone, which is why device_ms moved
+dead ends: 2 row(s)
+
+========================================================================
+13. the diagnosis as the summary reports it
+========================================================================
+  Diagnosis plateau-1 — measurement-defect, D0.3 — the writeback split every candidate is logged under, whose trigger (local ld/st sectors at 168 registers) and whose gate metric (epilogue share) appear in no run ever collected; the loop steered by aggregate short scoreboard instead

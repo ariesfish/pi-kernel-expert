@@ -95,10 +95,11 @@
 - [x] `kernel_contract` warns when missing/empty/still-template, freezes anyway
 - [x] kernel-flow skill: step 3b, three hard rules, nine failure rows
 
-## T-016 (ready-for-agent, blocked: T-013, T-014, T-015) — real evidence
-- [ ] runs/plan-1 refused→accepted + diagnosis
-- [ ] runs/plan-2 M0 thaw
-- [ ] tests + typecheck green
+## T-016 (closed 2026-11-10) — real evidence
+- [x] runs/plan-1 refused→accepted + diagnosis
+- [x] runs/plan-2 M0 thaw
+- [x] runs/plan-4 one workspace, whole module end to end
+- [x] 324 tests + typecheck green
 
 
 ---
