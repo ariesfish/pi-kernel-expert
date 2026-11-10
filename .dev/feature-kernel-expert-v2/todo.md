@@ -85,7 +85,10 @@
 - [x] `kernel-diagnose` skill + brief
 - [x] `### Diagnosis` shape validation, never gates
 - [x] `self-diagnosis` when no `agent` tool
-- [ ] **[judgment: the user]** that the brief asks a question worth answering — see runs/plan-1/diagnosis/reviewer.md
+- [x] strengthened on the user's call: `measurement` must be a runnable command, `citations` (≥3,
+      opened) — see runs/plan-1/diagnosis/transcript-v2.txt
+- [ ] **[judgment: the user]** that the brief asks a question worth answering — now against
+      runs/plan-1/diagnosis/reviewer.v2.md (the written block validates clean)
 
 ## T-015 (ready-for-agent, blocked: T-010) — workspace + skill
 - [ ] `kernel_init` writes the milestone template

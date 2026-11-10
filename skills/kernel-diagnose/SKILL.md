@@ -46,7 +46,7 @@ Read these, in this order, and nothing else:
   3. profile/<run>/summary.json — the counters the last attempt rested on
   4. the last diff: <diff command or path>
 
-Answer exactly four questions. No preamble, no summary of what you read.
+Answer exactly five questions. No preamble, no summary of what you read.
   class: one of missing-decision | wrong-decision | measurement-defect | environment
       missing-decision: the plan has no decision that would move this. You must name it.
       wrong-decision:   a decision is aimed at the wrong limiter, or was never
@@ -58,15 +58,22 @@ Answer exactly four questions. No preamble, no summary of what you read.
       decision this diagnosis is about. Never a list: a plateau diagnosed as three
       things is a plateau not diagnosed.
   measurement: the cheapest measurement that tells your class apart from the
-      alternatives. It must be runnable as one command on the frozen contract, and
-      it must be able to come out falsifying you.
+      alternatives, written as ONE command in backticks, then the two outcomes it
+      separates and which class each one implies. It has to be runnable as written
+      against the frozen contract, and it has to be able to come out falsifying you.
+      A measurement with no command is a hypothesis wearing a measurement's clothes.
   abandon: what to stop doing. Name the candidate class or decision to drop. A
       diagnosis that abandons nothing has not decided anything.
+  citations: at least three references, each `path:line` (a workspace-relative file
+      and the line that says it) or `path#anchor` (a JSONL row id, a section). They
+      are checked: a file that is not there, a line past the end, or an anchor that
+      does not appear is a refused block, not a citation.
 
 Rules:
-  - Cite the artifact and line for every claim about what happened. "Feels
-    latency-bound" is not a finding; "M1 Gate:3 fails while cells stay within
-    3% of each other, candidates.jsonl rows 4-6" is.
+  - Cite the artifact and line for every claim about what happened, in the
+    `citations` line. "Feels latency-bound" is not a finding;
+    "M1 Gate:3 fails while cells stay within 3% of each other,
+    candidates.jsonl#C4" is. Every citation must be one a reader can open.
   - If the artifacts cannot support a class, say `measurement-defect` and name the
     measurement that is missing. That answer is a real answer.
   - Do not propose code. Do not propose a candidate. The output is a diagnosis.
@@ -80,14 +87,21 @@ One block, appended under `## 4. Dead Ends` in `docs/milestone.md`:
 ### Diagnosis plateau-1
 - class: wrong-decision
 - decision: D1.2
-- measurement: profile a 4-warp variant at m1024/typical and compare sectors per request
+- measurement: `ncu --set full -k attention -c 1 ./goal.sh a typical` => the epilogue holds its claimed share means missing-decision, ldmatrix dominates means wrong-decision
 - abandon: the 128x128 tile; it spills before the mapping matters
+- citations: candidates.jsonl#C3, profile/run1/summary.json:1, loop-log.txt:12
 ```
 
-Then `kernel_milestone` validates it. The block is checked by shape — the four
-fields, one of the four classes, a decision id the milestone has — and **never
-gates**: it cannot make a gate line pass, and a milestone whose only evidence is
-a diagnosis is refused for having no gate line.
+Then `kernel_milestone` validates it. The block is checked by shape — the five
+lines, one of the four classes, a decision id the milestone has, a backticked
+command in `measurement`, and citations that resolve to a real file and line —
+and **never gates**: it cannot make a gate line pass, and a milestone whose only
+evidence is a diagnosis is refused for having no gate line.
+
+The citations are the part that makes the rest checkable. A reviewer that reports
+`measurement-defect` because "the number is not measuring the change" has to show
+which file and which line says so; a line that is not there is refused, not
+discounted.
 
 ## Two failure modes to name out loud
 
@@ -99,6 +113,10 @@ a diagnosis is refused for having no gate line.
   reachable, the executor may diagnose itself, and the block must carry
   `- self-diagnosis: <why>`. The line is required precisely because a
   self-review smells the same as a review in the file.
+- **A reviewer that cites nothing.** Three citations is the floor, and each is a
+  file and a line. If the reviewer cannot find three, it has not read the
+  artifacts; re-dispatch rather than record a diagnosis that rests on its own
+  confidence.
 
 ## After the diagnosis
 

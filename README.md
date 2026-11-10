@@ -215,12 +215,17 @@ and the answer becomes a record:
 - decision: D0.1
 - measurement: run ncu with source counters on the frozen baseline and attribute
   the 31.7% short scoreboard per SASS instruction
-- abandon: the SASS-asserted gate verdicts; three rejects are not three measurements
+- measurement: `ncu --metrics launch__registers_per_thread,l1tex__t_sectors_pipe_lsu_mem_local_op_ld.sum ./goal.sh a typical`
+  => local sectors above 0 at 168 registers means the accumulator spills (missing-decision),
+  local sectors 0 while the stall survives means D0.1 was never binding (wrong-decision)
+- abandon: the C4 register-budget thaw; it is measured dead at waves/SM 0.75
+- citations: milestone.md:59, candidates.jsonl#C4, loop-log.txt:10
 ```
 
-`kernel_milestone` validates the block by shape, and the block never gates: a
-diagnosis is what the plan learned, not a way to pass a milestone by explaining
-it.
+`kernel_milestone` validates the block by shape — the five lines, one of four
+classes, exactly one decision id, a backticked command, three citations it
+actually **opens** — and the block never gates: a diagnosis is what the plan
+learned, not a way to pass a milestone by explaining it.
 
 ## Check what is wired
 

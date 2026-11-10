@@ -82,6 +82,17 @@
   It never gates: a milestone whose only evidence is a diagnosis is refused for
   having no gate line. A self-review is allowed with `- self-diagnosis: <why>`,
   because a self-review reads the same as a review in the file.
+- A diagnosis' `measurement` must carry **one command in backticks** plus the
+  outcomes it separates (`diagnosis-measurement`): a measurement a reader cannot
+  run is a hypothesis wearing a measurement's clothes. Its `citations` line must
+  carry at least three `path:line` / `path#anchor` references
+  (`diagnosis-citation`), and `kernel_milestone` **opens each one** — a missing
+  file, a line past the end, a blank line, or an anchor that does not appear is
+  a refusal. A claim that rests on a line nobody can find is worse than no claim.
+- `missing-decision` names a decision the milestone does **not** have yet; the
+  other three classes name one it has, and naming an existing id for
+  `missing-decision` is refused as a contradiction (the class that fits is
+  `wrong-decision`). A diagnosis names exactly one id.
 - **`kernel-diagnose`** skill: a fixed reviewer brief for a readonly subagent on
   a different model, given the artifacts and not the reasoning, returning that
   block. It fires on a plateau (three consecutive rejects, a gate line that will

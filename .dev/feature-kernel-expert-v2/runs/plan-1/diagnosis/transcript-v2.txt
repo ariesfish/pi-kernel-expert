@@ -1,0 +1,72 @@
+=== T-014, strengthened brief: what the four new rules actually caught ==========
+
+2026-11-10. Same plateau, same reviewer model (opus against the loop's
+deepseek-v4-1-flash), readonly, artifacts only. The brief gained two
+requirements and the validator gained two rules:
+
+  measurement  must carry ONE command in backticks plus the outcomes it separates
+  citations    must be at least three `path:line` / `path#anchor` refs, and the
+               tool OPENS each one: no file, a line past the end, a blank line,
+               or an anchor that does not appear is a refusal
+
+Run 1 of the strengthened brief (reviewer.v1.md)
+------------------------------------------------
+It answered in prose-with-backticks and gave six citations, but wrote them
+repo-root-relative (`pi-kernel-expert/.dev/.../milestone.md:21`) although the
+brief says workspace-relative. All six failed to open. That is the resolver
+doing its job: a citation whose path only makes sense to the person who typed it
+is not a citation. The dispatch was at fault — the payload handed over absolute
+paths — so the third run names the workspace and says every citation must be
+relative to it.
+
+Run 2 (reviewer.v2.md) — and the rule it broke
+----------------------------------------------
+class: missing-decision
+decision: D1.2 split the output writeback across all 8 warps ...
+
+`D1.2` does not exist in the milestone, which is what `missing-decision` means —
+and my first version of `diagnosis-decision` refused exactly that: "an id the
+milestone does not have". The rule was wrong, not the reviewer: a
+missing-decision class can only ever name an id that is not there. A
+classification whose only correct answer is refused is a broken gate.
+
+Fixed before anything was recorded:
+  - `missing-decision` → the id must be NEW (and naming an existing id is now the
+    contradiction, with `wrong-decision` suggested as the class that fits)
+  - the other three classes → the id must exist, as before
+  - a diagnosis may name exactly one id; two or more is refused by name
+  - the refusal suggests the next free id (D1.2 here), which is what the
+    reviewer then picked
+
+Validated through the real tool, with the real resolver, against this workspace:
+
+  milestone.md — clean.
+  No M0 lock ...
+  6 section(s) ...; 3 decision(s); 2 gate block(s)
+  ok: true | refusals: [] | warnings: []
+  diagnoses: [{"id":"plateau-1","class":"missing-decision","decision":"D1.2 split the
+  output writeback across all 8 warps ..."}]
+
+The block as recorded:
+
+### Diagnosis plateau-1
+- class: missing-decision
+- decision: D1.2 split the output writeback across all 8 warps so each warp holds half the accumulator and the fused epilogue fits the frozen 168-register budget without spilling
+- measurement: `ncu --metrics launch__registers_per_thread,l1tex__t_sectors_pipe_lsu_mem_local_op_ld.sum,l1tex__t_sectors_pipe_lsu_mem_local_op_st.sum ./goal.sh a typical` => registers_per_thread 168 with local ld/st sectors > 0 means missing-decision, local sectors = 0 at <=168 registers while short-scoreboard stays ~31-34% and geomean stays flat means wrong-decision
+- abandon: epilogue-instruction edits under D0.1 (C2 store widening, C3 kernel hoist) and the D0.1 register-budget-thaw route (C4); none changes the 190-register footprint at 128x128, and the thaw half already regressed (waves/SM 1.12 to 0.75, geomean 0.94)
+- citations: milestone.md:59, milestone.md:21, candidates.jsonl#C4, loop-log.txt:10, loop-log.txt:11, profile/run1/summary.json:1
+
+What each citation actually says, checked by hand after the resolver passed:
+  milestone.md:59        "D0.1+D0.2 | the pair spills 190 registers at 128x128"
+  milestone.md:21        "- register budget: 168"
+  candidates.jsonl#C4    the register-budget thaw that regressed to geomean 0.94
+  loop-log.txt:10        "loop stopped: 3 consecutive rejects, all citing D0.1"
+  loop-log.txt:11        "M0 Gate:1 (epilogue time below 5%) still fails"
+  profile/run1/summary.json:1  the counters the attempts rested on
+
+The difference the strengthening made, in one sentence: v1 answered
+"measurement-defect" with a plausible paragraph; v2 had to produce a command
+that can come out against itself, and had to point at six lines a reader can
+open — which is what turned "the numbers feel unmeasured" into "168 registers
+spills 190, the fusion cannot be funded by the current DAG, and the decision the
+plan is missing is the one that splits the accumulator."

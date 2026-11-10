@@ -296,6 +296,13 @@ T-012's `wiki:` citations now resolve against.
   `### Diagnosis <id>` block is validated by shape (`class`, `decision`, `measurement`, `abandon`),
   never gates, and is what a plateau produces instead of another candidate. Where the `agent` tool is
   absent the record is marked `self-diagnosis`.
+- **Strengthened 2026-11-10 (user's call, option B)**: `measurement` must carry one command in
+  backticks plus the outcomes it separates (`diagnosis-measurement`); `citations` must carry three
+  `path:line` / `path#anchor` refs that `kernel_milestone` **opens** through an injected resolver
+  (`diagnosis-citation`); a diagnosis names exactly one id. Two defects the strengthening caught
+  before anything was recorded: `missing-decision` could never pass (it names an id that by
+  definition does not exist), and the reviewer wrote repo-root-relative citations until the dispatch
+  named the workspace.
 - **Closed 2026-11-10**: `### Diagnosis <id>` is its own `PhaseKind`, three rules
   (`diagnosis-missing-field`, `diagnosis-class`, `diagnosis-decision`), 8 tests; the
   `kernel-diagnose` skill carries the brief. Evidence: a real readonly reviewer on a different model

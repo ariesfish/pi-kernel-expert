@@ -22,7 +22,7 @@ abandon: the C3-style host-bound screen and SASS-asserted gate verdicts as
   three measurements
 ------------------------------------------------------------------------------
 
-Full answer with its five citations: reviewer.md.
+Full answer with its five citations: reviewer.v1.md.
 
 What it did that the brief asked for and the loop had not: it read the artifacts
 it was given against each other and found that Gate:1's number (epilogue share)

@@ -73,6 +73,44 @@ function readCorpus(): CorpusIndex | null {
   }
 }
 
+/**
+ * Open a diagnosis citation against the workspace. This is where the rule stops
+ * being shape and starts being checkable: a file that is not there, a line past
+ * the end, an anchor that does not appear. A citation nobody can follow is worse
+ * than none, because it reads like evidence.
+ */
+function citationResolver(workspace: string) {
+  return (ref: { raw: string; path: string; line: number | null; anchor: string | null }): string | null => {
+    const target = path.resolve(workspace, ref.path);
+    const relative = path.relative(workspace, target);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      return `${ref.path} is outside the workspace`;
+    }
+    let text: string;
+    try {
+      text = fs.readFileSync(target, "utf8");
+    } catch {
+      return `there is no ${ref.path} in this workspace`;
+    }
+    if (ref.line !== null) {
+      const lines = text.split("\n");
+      // A trailing newline makes split() one longer than the last addressable line.
+      const count = lines.length > 1 && lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
+      if (ref.line < 1 || ref.line > count) {
+        return `${ref.path} has ${count} line(s); line ${ref.line} is past the end`;
+      }
+      if (lines[ref.line - 1].trim() === "") {
+        return `${ref.path}:${ref.line} is blank`;
+      }
+      return null;
+    }
+    if (!text.includes(ref.anchor ?? "")) {
+      return `${ref.path} contains no ${JSON.stringify(ref.anchor)}`;
+    }
+    return null;
+  };
+}
+
 /** A lock file that exists but does not parse is a bypass, not an unlocked milestone. */
 function readLock(file: string): { lock: MilestoneLock | null; broken: boolean } {
   let text: string;
@@ -103,7 +141,7 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
     name: "kernel_milestone",
     label: "Validate Kernel Milestone",
     description:
-      "Read docs/milestone.md and validate it as an addressable plan: the seven sections, the phases M0..Mk and their order, every decision's five-tuple (Action, Purpose, Trigger, Cost, Depends on) with its ⇐/⊗/⇒ edges, the typed gate lines under each ### M<k> Gate, and the dead-end rows. Reports every refusal in one pass, each starting with the rule id and the row it is charged to (route-missing-key, route-dangling-dep, route-id-is-gate, route-placeholder, gate-verify-none, gate-sass-unpriced, gate-no-mechanism-line, trigger-is-category, phase-order, m0-thawed, diagnosis-missing-field, diagnosis-class, diagnosis-decision), with the fix. With lock: true it freezes the ### M0 Contract block in .kernel/milestone.lock.json; with unlock: true and a reason it thaws the block and appends that reason to ## 4. Dead Ends. Never writes the milestone except to record an unlock.",
+      "Read docs/milestone.md and validate it as an addressable plan: the seven sections, the phases M0..Mk and their order, every decision's five-tuple (Action, Purpose, Trigger, Cost, Depends on) with its ⇐/⊗/⇒ edges, the typed gate lines under each ### M<k> Gate, and the dead-end rows. Reports every refusal in one pass, each starting with the rule id and the row it is charged to (route-missing-key, route-dangling-dep, route-id-is-gate, route-placeholder, gate-verify-none, gate-sass-unpriced, gate-no-mechanism-line, trigger-is-category, phase-order, m0-thawed, diagnosis-missing-field, diagnosis-class, diagnosis-decision, diagnosis-measurement, diagnosis-citation), with the fix. With lock: true it freezes the ### M0 Contract block in .kernel/milestone.lock.json; with unlock: true and a reason it thaws the block and appends that reason to ## 4. Dead Ends. Never writes the milestone except to record an unlock.",
     promptSnippet: "Validate docs/milestone.md, freeze its M0 contract, or record an unlock",
     promptGuidelines: [
       "Write the milestone yourself; this tool validates it and freezes it. It never repairs or generates the plan.",
@@ -111,7 +149,7 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
       "A trigger is an observable, never a category: `waves/SM < 1 on the reference` passes, `optimize` and `when needed` are refused.",
       "Every gate line under `### M<k> Gate` carries one [VERIFY: ncu-direct | ncu-derived | sass-derived | correctness | mechanism] plus its pointer; `[VERIFY: none]` is refused, and `sass-derived` needs `[PRICED: <delta>, <source>]` on the same line.",
       "`### M0 Contract` holds one `- <item>: <value>` line per frozen choice (tile, smem, warp roles, register budget, issue order, accumulator precision). Lock it once the block is right: `lock: true`. After that the block is byte-identical or the file is refused as m0-thawed, and the ways out are restoring the block or `unlock: true` with a reason, which lands in Dead Ends as a diagnosis.",
-      "At a plateau, write a `### Diagnosis <id>` block instead of another candidate: four lines — `class` (missing-decision, wrong-decision, measurement-defect, environment), `decision` (the id to add or change), `measurement` (the cheapest test that tells the causes apart), `abandon` (what to stop doing). Add `- self-diagnosis: <why>` when no reviewer was available. The block is validated by shape and never gates.",
+      "At a plateau, write a `### Diagnosis <id>` block instead of another candidate: four lines — `class` (missing-decision, wrong-decision, measurement-defect, environment), `decision` (the id to add or change), `measurement` (the cheapest test that tells the causes apart), `abandon` (what to stop doing), and `citations` (at least three `path:line` or `path#anchor` references the claims rest on — they are opened, and a file that is not there or a line past the end is refused). `measurement` must carry one command in backticks plus the outcomes it separates. Add `- self-diagnosis: <why>` when no reviewer was available. The block is validated by shape and never gates.",
       "Fix every refusal in one edit: the validator reports all of them at once, so re-running after each single fix spends the loop learning nothing.",
     ],
     parameters: Type.Object({
@@ -228,6 +266,7 @@ export function registerMilestoneTool(pi: ExtensionAPI): void {
         contract: readWorkspaceContract(workspace) ?? null,
         profileRunIds: readProfileRunIds(workspace),
         corpus,
+        citationResolver: citationResolver(workspace),
       });
       const refusals = problems.filter((problem) => problem.severity === "refusal");
       const warnings = problems.filter((problem) => problem.severity === "warning");

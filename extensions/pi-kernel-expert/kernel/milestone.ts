@@ -66,8 +66,26 @@ export const VERIFY_NONE = "none";
 export const DIAGNOSIS_CLASSES = ["missing-decision", "wrong-decision", "measurement-defect", "environment"] as const;
 export type DiagnosisClass = (typeof DIAGNOSIS_CLASSES)[number];
 
-/** The four rows a `### Diagnosis <id>` block must carry, plus the optional self-review note. */
-export const DIAGNOSIS_FIELDS = ["class", "decision", "measurement", "abandon"] as const;
+/** The five rows a `### Diagnosis <id>` block must carry, plus the optional self-review note. */
+export const DIAGNOSIS_FIELDS = ["class", "decision", "measurement", "abandon", "citations"] as const;
+
+/** A citation a reader can open: `path:line` or `path#anchor`. */
+export interface CitationRef {
+  raw: string;
+  path: string;
+  /** 1-based line number, when the ref names one. */
+  line: number | null;
+  /** The anchor a `#` ref names. */
+  anchor: string | null;
+}
+
+/**
+ * Resolve one citation; `null` when it opens, or the reason it does not. Injected
+ * because the milestone model is a view over text — the workspace is the tool's
+ * business, and a kernel module that reached for `node:fs` to check a citation
+ * could not be unit-tested without one.
+ */
+export type CitationResolver = (ref: CitationRef) => string | null;
 
 export const TRIGGER_CATEGORIES = [
   "when needed",
@@ -116,6 +134,8 @@ export const MILESTONE_RULE_IDS = [
   "diagnosis-missing-field",
   "diagnosis-class",
   "diagnosis-decision",
+  "diagnosis-measurement",
+  "diagnosis-citation",
 ] as const;
 
 export type MilestoneRuleId = (typeof MILESTONE_RULE_IDS)[number];
@@ -298,6 +318,8 @@ export interface MilestoneContext {
   profileRunIds?: readonly string[];
   /** `.kernel/milestone.lock.json`, already parsed. Absent means the milestone is unlocked. */
   lock?: MilestoneLock | null;
+  /** Checks that a diagnosis citation opens; absent means shape-only. */
+  citationResolver?: CitationResolver;
   /**
    * The cached corpus. `undefined` means the caller did not look; `null` means
    * it looked and found nothing, which is reported as `knowledge-source-absent`.
@@ -555,7 +577,7 @@ export function validateMilestone(model: MilestoneModel, ctx: MilestoneContext =
     ...m0Thawed(model, ctx.lock),
     ...gateCitations(model, ctx),
     ...wikiCitations(model, ctx),
-    ...diagnoses(model),
+    ...diagnoses(model, ctx),
   ];
 }
 
@@ -959,7 +981,7 @@ function phaseOrder(model: MilestoneModel): Problem[] {
  * It never gates. A diagnosis that could satisfy a gate line would be a way to
  * pass a milestone by diagnosing it, which is the opposite of the point.
  */
-function diagnoses(model: MilestoneModel): Problem[] {
+function diagnoses(model: MilestoneModel, ctx: MilestoneContext): Problem[] {
   const problems: Problem[] = [];
   const known = model.decisions.map((decision) => decision.id);
   for (const entry of model.diagnoses) {
@@ -1003,8 +1025,17 @@ function diagnoses(model: MilestoneModel): Problem[] {
     }
 
     const target = seen.get("decision")?.value ?? "";
-    const ids = target.match(/D\d+\.\d+/g) ?? [];
-    if (target !== "" && ids.length === 0) {
+    const ids = [...new Set(target.match(/D\d+\.\d+/g) ?? [])];
+    if (ids.length > 1) {
+      problems.push(
+        makeProblem(
+          "diagnosis-decision",
+          row,
+          `the \`decision\` line names ${ids.length} decisions (${ids.join(", ")}). A plateau diagnosed as several things is a plateau not diagnosed: the next loop needs one decision to add or change.`,
+          "pick the one decision the evidence points at; the others can be a later diagnosis.",
+        ),
+      );
+    } else if (target !== "" && ids.length === 0) {
       problems.push(
         makeProblem(
           "diagnosis-decision",
@@ -1013,17 +1044,97 @@ function diagnoses(model: MilestoneModel): Problem[] {
           `name the decision (${known.length === 0 ? "D0.1 is the first" : `one of ${known.join(", ")}`}), or add it to the milestone first.`,
         ),
       );
-    } else if (ids.length > 0) {
-      const unknown = ids.filter((id) => !known.includes(id));
-      if (unknown.length > 0) {
+    } else if (ids.length === 1) {
+      const [id] = ids;
+      const exists = known.includes(id);
+      // `missing-decision` means the plan has no decision that would move this, so
+      // the id it names is by definition new. The other three classes name a
+      // decision the plan already has, which is what makes them actionable.
+      if (klass === "missing-decision" && exists) {
         problems.push(
           makeProblem(
             "diagnosis-decision",
             row,
-            `${unknown.join(", ")} ${unknown.length === 1 ? "is" : "are"} not in this milestone (${known.length === 0 ? "it has no decisions" : `it has ${known.join(", ")}`}). A diagnosis points at a decision the plan can act on.`,
-            "add the decision first, or point the diagnosis at the decision the plateau is really about.",
+            `${id} already exists in this milestone, so the class cannot be \`missing-decision\`: if the decision is there and the loop is stuck, the class is \`wrong-decision\` (it is aimed badly) or the decision was never measured.`,
+            `name the decision that is actually absent (the next free id is D${nextDecisionId(model)}), or change the class to wrong-decision.`,
           ),
         );
+      } else if (klass !== "missing-decision" && !exists) {
+        problems.push(
+          makeProblem(
+            "diagnosis-decision",
+            row,
+            `${id} is not in this milestone (${known.length === 0 ? "it has no decisions" : `it has ${known.join(", ")}`}). A diagnosis points at a decision the plan can act on; an id that exists nowhere is a plan nobody agreed to.`,
+            "point the diagnosis at the decision the plateau is really about, or use class `missing-decision` if the decision genuinely does not exist yet.",
+          ),
+        );
+      }
+    }
+
+    const measurement = seen.get("measurement")?.value ?? "";
+    if (measurement !== "") {
+      const command = /`([^`]+)`/.exec(measurement);
+      if (!command) {
+        problems.push(
+          makeProblem(
+            "diagnosis-measurement",
+            row,
+            "the `measurement` line carries no command: a measurement a reader cannot run is a hypothesis wearing a measurement's clothes. Write it as one command in backticks, then the outcomes it separates.",
+            "put the command between backticks, e.g. `ncu --set full -k attn -c 1 ./goal.sh a typical`, and follow it with what each outcome would mean.",
+          ),
+        );
+      } else if (!/=>|means|would mean|falsif|otherwise|separates/i.test(measurement)) {
+        problems.push(
+          makeProblem(
+            "diagnosis-measurement",
+            row,
+            "the `measurement` line names a command but not what its outcomes would separate: a measurement that cannot come out against the diagnosis is not discriminating. Say `=> <outcome A> means <class A>, <outcome B> means <class B>`.",
+            "add the two outcomes and the class each implies, so the next loop knows what it is about to learn.",
+          ),
+        );
+      }
+    }
+
+    const citationText = seen.get("citations")?.value ?? "";
+    if (citationText !== "") {
+      const refs = parseCitations(citationText);
+      const malformed = refs.filter((ref) => ref.path === "" || (ref.line === null && ref.anchor === null));
+      if (malformed.length > 0) {
+        problems.push(
+          makeProblem(
+            "diagnosis-citation",
+            row,
+            `${malformed.map((ref) => JSON.stringify(ref.raw)).join(", ")} ${malformed.length === 1 ? "is" : "are"} not a reference: each citation is \`path:line\` or \`path#anchor\`, workspace-relative.`,
+            "write each citation as the file that says it and the line or anchor within it, comma separated.",
+          ),
+        );
+      }
+      if (refs.length < 3) {
+        problems.push(
+          makeProblem(
+            "diagnosis-citation",
+            row,
+            `the block carries ${refs.length} citation(s) and three are the floor. A diagnosis that rests on one line it happened to read is a guess with a reference.`,
+            "cite at least three: the ledger row, the profile summary, and the line of the loop log that shows what happened.",
+          ),
+        );
+      }
+      const resolver = ctx.citationResolver;
+      if (resolver) {
+        for (const ref of refs) {
+          if (ref.path === "" || (ref.line === null && ref.anchor === null)) continue;
+          const reason = resolver(ref);
+          if (reason !== null) {
+            problems.push(
+              makeProblem(
+                "diagnosis-citation",
+                row,
+                `\`${ref.raw}\` does not open: ${reason}. A citation a reader cannot follow is the same as no citation, and worse to trust.`,
+                "fix the path or the line, or drop the claim that rested on it.",
+              ),
+            );
+          }
+        }
       }
     }
 
@@ -1047,11 +1158,46 @@ function diagnoses(model: MilestoneModel): Problem[] {
   return problems;
 }
 
+/**
+ * `path:line`, `path#anchor`, and the trailing punctuation a sentence leaves.
+ * A bare path is deliberately *not* a citation: "the loop log" is a gesture, and
+ * the reason this rule exists is that a gesture is unfalsifiable.
+ */
+export function parseCitations(text: string): CitationRef[] {
+  return text
+    .split(",")
+    .map((token) => token.trim())
+    .filter((token) => token !== "")
+    .map((raw) => {
+      const cleaned = raw.replace(/[.;]+$/, "").replace(/^`|`$/g, "");
+      const hash = /^([^#]+)#(.+)$/.exec(cleaned);
+      if (hash) return { raw, path: hash[1].trim(), line: null, anchor: hash[2].trim() };
+      const line = /^(.+?):(\d+)$/.exec(cleaned);
+      if (line) return { raw, path: line[1].trim(), line: Number(line[2]), anchor: null };
+      // A path with no line and no anchor: keep the path so the message can quote
+      // it, but it is not a reference and the rule refuses it.
+      return { raw, path: cleaned.includes(" ") ? "" : cleaned, line: null, anchor: null };
+    });
+}
+
+/** The next free decision id, so a `missing-decision` refusal can suggest one. */
+function nextDecisionId(model: MilestoneModel): string {
+  let highest = 0;
+  for (const decision of model.decisions) {
+    const match = /^D(\d+)\.(\d+)$/.exec(decision.id);
+    if (match) highest = Math.max(highest, Number(match[1]) * 100 + Number(match[2]));
+  }
+  const phase = Math.floor(highest / 100);
+  const index = highest % 100;
+  return `${phase}.${index + 1}`;
+}
+
 const DIAGNOSIS_HINT: Record<(typeof DIAGNOSIS_FIELDS)[number], string> = {
   class: "which of the four causes this plateau is.",
   decision: "the decision to add or change, by id.",
   measurement: "the cheapest measurement that tells the causes apart.",
   abandon: "what to stop doing; a diagnosis that abandons nothing has not decided anything.",
+  citations: "at least three `path:line` references the block's claims rest on.",
 };
 
 /**

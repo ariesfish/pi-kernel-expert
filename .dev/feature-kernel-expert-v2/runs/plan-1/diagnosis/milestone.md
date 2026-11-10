@@ -60,10 +60,11 @@ M0 Contract, then M0 Architecture, then M1 Levers. M1 is blocked on M0's gate.
 - D1.1 | two-warp reduction loses 8% at m1024 because the combine pass costs a barrier | profile:run5
 
 ### Diagnosis plateau-1
-- class: measurement-defect
-- decision: D0.1
-- measurement: run ncu with source counters on the frozen baseline (a1b2c3d, diffHash 0000) for a/typical and attribute run1's 31.7% short_scoreboard per SASS instruction: if the epilogue's sts/lds block holds its claimed 20% the class is missing-decision, if ldmatrix dominates it is wrong-decision, and either outcome falsifies this one
-- abandon: the C3-style host-bound screen and SASS-asserted gate verdicts as rejection grounds; deviceMs 0.19, the 20% epilogue premise and the 190-register spill appear in no recorded counter, and three rejects are not three measurements
+- class: missing-decision
+- decision: D1.2 split the output writeback across all 8 warps so each warp holds half the accumulator and the fused epilogue fits the frozen 168-register budget without spilling
+- measurement: `ncu --metrics launch__registers_per_thread,l1tex__t_sectors_pipe_lsu_mem_local_op_ld.sum,l1tex__t_sectors_pipe_lsu_mem_local_op_st.sum ./goal.sh a typical` => registers_per_thread 168 with local ld/st sectors > 0 means missing-decision, local sectors = 0 at <=168 registers while short-scoreboard stays ~31-34% and geomean stays flat means wrong-decision
+- abandon: epilogue-instruction edits under D0.1 (C2 store widening, C3 kernel hoist) and the D0.1 register-budget-thaw route (C4); none changes the 190-register footprint at 128x128, and the thaw half already regressed (waves/SM 1.12 to 0.75, geomean 0.94)
+- citations: milestone.md:59, milestone.md:21, candidates.jsonl#C4, loop-log.txt:10, loop-log.txt:11, profile/run1/summary.json:1
 
 ## 5. Global Gate
 Both phase gates hold on every cell and group, and goal.checks.sh is green.
