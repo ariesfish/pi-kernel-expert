@@ -75,11 +75,11 @@
 - [x] corpus absent ⇒ row passes, report carries `knowledge-source-absent` naming kernel_bootstrap
 - [x] one real page id resolved from the fetched corpus (migration-wgmma-to-tcgen05, source-reported)
 
-## T-013 (ready-for-agent, blocked: T-010) — candidate names its decision
-- [ ] `decision` + `milestoneSha` on the record
-- [ ] `decision-unknown`, `milestone-stale`, `dead-end-bundle` (not forceable)
-- [ ] `precondition` accepted and recorded
-- [ ] benchmark.csv gains `decision`
+## T-013 (closed 2026-11-10) — candidate names its decision
+- [x] `milestoneDecision` + `milestoneSha` on the record (the field `decision` was taken by keep/reject)
+- [x] `decision-unknown`, `milestone-stale`, `dead-end-bundle`, `decision-missing` (not forceable)
+- [x] `precondition` accepted and recorded
+- [x] benchmark.csv gains `milestone_decision`
 
 ## T-014 (blocked: T-010) — diagnosis record
 - [ ] `kernel-diagnose` skill + brief

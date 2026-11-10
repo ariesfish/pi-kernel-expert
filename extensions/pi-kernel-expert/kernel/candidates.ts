@@ -11,6 +11,7 @@ import {
   type KernelContract,
 } from "./contract.ts";
 import { diffFingerprint, sha256File, type DiffFingerprint } from "./diff.ts";
+import { checkMilestoneBinding, readMilestoneSnapshot } from "./milestone-binding.ts";
 import {
   CALIBRATION_JSON_PATH,
   PRECISION_TSV_PATH,
@@ -99,6 +100,12 @@ export interface CandidateRecord {
    * on a keep that has profile evidence, never a refusal.
    */
   wiki: WikiRecord | null;
+  /** The plan decision this candidate implements: `D0.1`, or a `+` joined bundle. */
+  milestoneDecision: string | null;
+  /** The `docs/milestone.md` sha the decision was read from; null without a milestone. */
+  milestoneSha: string | null;
+  /** What is different about a combination the plan already recorded as a dead end. */
+  precondition: string | null;
 }
 
 export type WikiRecord = { state: "produced"; id: string } | { state: "none" } | { state: "declined"; reason: string };
@@ -119,6 +126,12 @@ export interface CandidateInput {
   reading?: string;
   /** `{ id }`, `"none"`, or `{ declined: "reason" }`. */
   wiki?: { id?: string; declined?: string; none?: boolean };
+  /** The decision this candidate implements: `D2.3`, or `D2.1+D2.2`. Required on a keep when a milestone exists. */
+  milestoneDecision?: string;
+  /** The milestone sha the caller read, checked against the file; mismatch is `milestone-stale`. */
+  milestoneSha?: string;
+  /** What changed about a dead-ended combination. */
+  precondition?: string;
   forceWithReason?: string;
   exec: HostExec;
   signal?: AbortSignal;
@@ -201,6 +214,7 @@ export function renderBenchmarkCsv(records: CandidateRecord[]): string {
     "parent",
     "at",
     "decision",
+    "milestone_decision",
     "description",
     ...metricNames,
     "profile_run",
@@ -224,6 +238,7 @@ export function renderBenchmarkCsv(records: CandidateRecord[]): string {
         record.parent,
         record.at,
         record.decision,
+        record.milestoneDecision ?? "",
         record.description,
         ...metricNames.map((name) => record.metrics[name] ?? ""),
         record.profile?.runId ?? "",
@@ -472,6 +487,19 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     errors.push("a rejected candidate needs a reason; that reason is the evidence a later reader gets");
   }
 
+  // The plan binding is a keep's business: a rejection says why the attempt
+  // stopped, and needs no attribution to a decision it did not land.
+  const binding =
+    input.decision === "keep"
+      ? checkMilestoneBinding({
+          snapshot: readMilestoneSnapshot(input.workspace),
+          requested: input.milestoneDecision ?? null,
+          declaredSha: input.milestoneSha ?? null,
+          precondition: input.precondition ?? null,
+        })
+      : { record: { milestoneDecision: input.milestoneDecision?.trim() || null, milestoneSha: null, precondition: input.precondition?.trim() || null }, refusals: [], note: null };
+  refusals = [...refusals, ...binding.refusals];
+
   if (refusals.length > 0 || errors.length > 0) {
     // Every refusal is printed in one block: a keep with three problems says three.
     return { ok: false, errors: [...refusals.map(formatRefusal), ...errors], refusals };
@@ -506,6 +534,9 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     forcedReason: input.forceWithReason?.trim() || null,
     forcedRules,
     wiki: wikiInput.record,
+    milestoneDecision: binding.record.milestoneDecision,
+    milestoneSha: binding.record.milestoneSha,
+    precondition: binding.record.precondition,
   };
 
   fs.appendFileSync(paths.candidates, `${JSON.stringify(record)}\n`);
@@ -517,7 +548,7 @@ export async function recordCandidate(input: CandidateInput): Promise<CandidateO
     ledger: paths.candidates,
     benchmarkCsv: csv.ok ? { path: csv.path, rows: csv.rows } : null,
     precision,
-    warnings: keepWarnings(record),
+    warnings: [...(binding.note === null ? [] : [binding.note]), ...keepWarnings(record)],
   };
 }
 

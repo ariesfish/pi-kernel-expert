@@ -9,7 +9,7 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
     name: "kernel_candidate",
     label: "Record Kernel Candidate",
     description:
-      "Append a candidate to candidates.jsonl with its parent, diff hash, contract hash, per-cell metrics, the reading block it rests on, profile pointer, bottleneck claim, decision, and reason. Refuses a keep by naming every rule it breaks — the reading has no basis, the reading is host-bound or unmeasured, the diff edits a harnessGlobs path, a cell x group or a cell aggregate has no reading, the claimed cell value is not the reading's own, the candidate's max_diff is past 3x the reference's own error plus the dtype floor (.kernel/precision.tsv vs .kernel/calibration.json), a profile is stale — and prints all of them in one block, each with the side it is charged to and the fix.",
+      "Append a candidate to candidates.jsonl with its parent, diff hash, contract hash, per-cell metrics, the reading block it rests on, profile pointer, bottleneck claim, decision, and reason. Refuses a keep by naming every rule it breaks — the reading has no basis, the reading is host-bound or unmeasured, the diff edits a harnessGlobs path, a cell x group or a cell aggregate has no reading, the claimed cell value is not the reading's own, the candidate's max_diff is past 3x the reference's own error plus the dtype floor (.kernel/precision.tsv vs .kernel/calibration.json), a profile is stale — and prints all of them in one block, each with the side it is charged to and the fix. It also refuses a keep whose decision the plan does not have (decision-missing, decision-unknown), one whose milestone sha moved (milestone-stale), and one that retries a recorded dead-end bundle without a precondition.",
     promptSnippet: "Record a candidate decision with its evidence",
     promptGuidelines: [
       "Record every attempted candidate, kept or rejected. A rejection without a reason is not recorded.",
@@ -18,6 +18,8 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
       "Profile after the change and record the candidate before log_goal commits it; the diff hash binds the evidence.",
       "A bottleneck claim must name a metric that exists in the profile summary; absence is reported, never inferred.",
       "force_with_reason only accepts a run-level defect (missing basis, host-bound or unmeasured reading, an unmeasured cell/group, an uncalibrated reference). It never accepts an edited harness, a stale profile, or a measured precision regression.",
+      "Name the decision a keep implements: milestone_decision takes an id from docs/milestone.md (`D0.3`, or `D0.1+D0.2`). A keep that names no decision is refused once the plan exists, and an id the plan does not have is refused always — force_with_reason cannot buy attribution.",
+      "A combination the plan recorded as a dead end is refused unless precondition says what changed. A different precondition is the reason a killed idea becomes worth retrying; a smaller bundle is not.",
       "pi-goal's log_goal is still the thing that commits a keep; this ledger is the lineage on top of it.",
     ],
     parameters: Type.Object({
@@ -35,6 +37,24 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
         Type.String({ description: "A metric name present in the profile summary that supports the claim." }),
       ),
       reason: Type.Optional(Type.String({ description: "Required for reject." })),
+      milestone_decision: Type.Optional(
+        Type.String({
+          description:
+            "The docs/milestone.md decision this change implements: `D0.3`, or a `+` joined bundle. Required on a keep when a milestone exists; a bundle the plan recorded as a dead end needs precondition.",
+        }),
+      ),
+      milestone_sha: Type.Optional(
+        Type.String({
+          description:
+            "The milestone sha you read, as a guard: if docs/milestone.md has moved since, the keep is refused as milestone-stale.",
+        }),
+      ),
+      precondition: Type.Optional(
+        Type.String({
+          description:
+            "What is different about a combination the plan already killed. Recorded with the candidate; without it a dead-ended bundle is refused.",
+        }),
+      ),
       reading: Type.Optional(
         Type.String({
           description:
@@ -81,6 +101,9 @@ export function registerCandidateTool(pi: ExtensionAPI): void {
         commit: params.commit,
         reading: params.reading,
         wiki: params.wiki,
+        milestoneDecision: params.milestone_decision,
+        milestoneSha: params.milestone_sha,
+        precondition: params.precondition,
         forceWithReason: params.force_with_reason,
         exec: pi,
         signal,

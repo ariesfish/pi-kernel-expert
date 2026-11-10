@@ -37,7 +37,17 @@ export const RULE_IDS = [
   "profile-stale",
 ] as const;
 
-export type RuleId = (typeof RULE_IDS)[number];
+/**
+ * The plan-binding rules. They are a second family because they cannot fire from
+ * a reading alone: `collectRefusals` never sees the milestone, and a rule that
+ * needs a file the context does not carry belongs with the code that carries it.
+ * None is forceable — an unattributable keep is not a weaker keep.
+ */
+export const BINDING_RULE_IDS = ["decision-missing", "decision-unknown", "milestone-stale", "dead-end-bundle"] as const;
+
+export type BindingRuleId = (typeof BINDING_RULE_IDS)[number];
+
+export type RuleId = (typeof RULE_IDS)[number] | BindingRuleId;
 
 /** Who owns the defect: the run that produced the reading, or the candidate's change. */
 export type ChargedTo = "run" | "candidate";
@@ -119,6 +129,10 @@ export interface RefusalContext {
   /** The precision gate's verdict over `.kernel/precision.tsv` and `calibration.json`. */
   precision?: PrecisionComparison | null;
   profile?: ProfileStaleness | null;
+}
+
+export function bindingRefusal(rule: BindingRuleId, body: string, fix: string): Refusal {
+  return refusal(rule, "candidate", body, fix, false);
 }
 
 function refusal(rule: RuleId, charged: ChargedTo, body: string, fix: string, forceable?: boolean): Refusal {

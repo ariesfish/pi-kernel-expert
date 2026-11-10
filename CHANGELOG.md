@@ -73,6 +73,18 @@
   the typed `[VERIFY: …]` gate lines. It reports every refusal in one pass with
   the rule, the row, and the fix, and never writes the file except to record an
   unlock.
+- **A candidate names its decision.** `kernel_candidate` gains
+  `milestone_decision` (an id or a `+` joined bundle), `milestone_sha` and
+  `precondition`; the record gains `milestoneDecision`, `milestoneSha` and
+  `precondition`, and `benchmark.csv` gains the `milestone_decision` column.
+  Three refusals, none forceable: `decision-unknown` (the id is not in
+  `docs/milestone.md`, naming the ids it does have), `milestone-stale` (the sha
+  the caller read is not the file's), and `dead-end-bundle` (the bundle matches
+  a `## 4. Dead Ends` row and no precondition says what changed — a dead end
+  bans the pair, not its members). A fourth, `decision-missing`, covers the
+  absence the other three cannot: a keep with no decision while the plan
+  exists. A workspace without a milestone still records, with a warning that
+  the candidate names no decision.
 - **Citations resolve, or the line is refused.** Two namespaces, kept apart:
   measurement (`profile:<run>`, `cell-group:<cell>/<group>`, also accepted as
   `cell/group:`) may appear on a gate line and must resolve against `profile/`

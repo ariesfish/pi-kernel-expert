@@ -178,6 +178,18 @@ issue order, accumulator precision — go in `### M0 Contract`, one
 kernel_milestone({ lock: true })
 ```
 
+A keep names the decision it implements:
+
+```text
+kernel_candidate({ decision: "keep", milestone_decision: "D0.1", ... })
+```
+
+An id the plan does not have is refused (`decision-unknown`), a sha that moved
+since you read the plan is refused (`milestone-stale`), and a bundle the plan
+recorded as a dead end is refused until `precondition` says what is different
+(`dead-end-bundle`). None of the three can be forced: an unattributable keep is
+not a weaker keep, it is not a record.
+
 Gate lines cite measurements (`profile:<run>`, `cell-group:<cell>/<group>`) and
 those pointers are resolved against `profile/` and the contract: a line that
 cites a run nobody profiled is refused, with the path that was looked in.

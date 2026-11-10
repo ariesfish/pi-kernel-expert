@@ -15,6 +15,7 @@ import {
 import { normalizeContract, writeContractFiles } from "../../extensions/pi-kernel-expert/kernel/contract.ts";
 import { diffFingerprint } from "../../extensions/pi-kernel-expert/kernel/diff.ts";
 import { buildProfileSummary } from "../../extensions/pi-kernel-expert/kernel/profile.ts";
+import { milestoneSha } from "../../extensions/pi-kernel-expert/kernel/milestone-lock.ts";
 import { READING_END_MARKER, READING_START_MARKER } from "../../extensions/pi-kernel-expert/kernel/reading.ts";
 import {
   DRAFT_HEADINGS,
@@ -408,7 +409,7 @@ test("benchmark.csv is derived from the ledger and quotes free text", async () =
   const lines = fs.readFileSync(file, "utf8").trim().split("\n");
   assert.match(
     lines[0],
-    /^candidate,parent,at,decision,description,geomean_speedup,latency_us_a,latency_us_b,profile_run,bottleneck_metric,reason,forced,pairing,verdict,forced_rules,wiki$/,
+    /^candidate,parent,at,decision,milestone_decision,description,geomean_speedup,latency_us_a,latency_us_b,profile_run,bottleneck_metric,reason,forced,pairing,verdict,forced_rules,wiki$/,
   );
   assert.match(lines[1], /^C1,baseline,/);
   assert.match(lines[1], /1\.12,9\.1,9\.1/);
@@ -629,8 +630,11 @@ test("a keep with profile evidence and no wiki field warns instead of refusing",
     }),
   );
   assert.equal(outcome.ok, true, outcome.ok ? "" : outcome.errors.join("\n"));
-  assert.equal(outcome.warnings.length, 1);
-  assert.match(outcome.warnings[0], /has profile evidence \(run1\) and a bottleneck claim but no wiki entry/);
+  // Two warnings: the missing page, and the missing plan (no docs/milestone.md in
+  // this fixture, so the keep names no decision — a degradation, not a refusal).
+  assert.equal(outcome.warnings.length, 2);
+  assert.match(outcome.warnings.join("\n"), /has profile evidence \(run1\) and a bottleneck claim but no wiki entry/);
+  assert.match(outcome.warnings.join("\n"), /no docs\/milestone\.md in this workspace/);
   assert.match(formatCandidateOutcome(outcome), /warning\(s\):/);
 
   const answered = await recordCandidate(
@@ -641,9 +645,154 @@ test("a keep with profile evidence and no wiki field warns instead of refusing",
     }),
   );
   assert.equal(answered.ok, true);
-  assert.deepEqual(answered.warnings, [], "answering the question silences the warning");
+  assert.deepEqual(
+    answered.warnings.filter((warning) => /wiki entry/.test(warning)),
+    [],
+    "answering the question silences the wiki warning",
+  );
 
   const bare = await recordCandidate(keepInput(ctx, { description: "no profile, no claim" }));
   assert.equal(bare.ok, true);
-  assert.deepEqual(bare.warnings, [], "a keep with nothing to say is not nagged");
+  // The wiki question stays quiet (there is no mechanism to record), but the
+  // missing plan is still named: the two warnings answer different questions.
+  assert.deepEqual(bare.warnings.filter((warning) => /wiki entry/.test(warning)), [], "a keep with nothing to say is not nagged about a page");
+  assert.equal(bare.warnings.filter((warning) => /milestone/.test(warning)).length, 1);
+});
+
+// --- T-013: a candidate names its decision --------------------------------
+
+const MILESTONE_DOC = `# Milestone: probe
+
+## 1. Problem and Target
+Cut latency on the fused attention kernel.
+
+## 2. Contract
+- basis: device
+
+## 3. DAG and Phase Order
+M0, then M1.
+
+### M0 Contract
+- tile: 128x128
+- smem: 64 KiB
+- warp roles: 4 mma, 4 copy
+- register budget: 168
+- issue order: cp.async, ldmatrix, mma
+- accumulator precision: fp32
+
+### M0 Architecture
+#### D0.1 Fuse the epilogue
+- Action: keep the accumulator in registers through the epilogue
+- Purpose: remove the smem round trip
+- Trigger: ncu reports 30% of time in the epilogue
+- Cost: half a day
+- Depends on: none
+
+#### D0.2 Stage the tile through cp.async
+- Action: prefetch two tiles
+- Purpose: overlap the load with the mma
+- Trigger: long scoreboard above 40%
+- Cost: one day
+- Depends on: ⇐ D0.1
+
+### M0 Gate
+- device_ms drops on a/typical [VERIFY: mechanism]
+- every group still matches the reference [VERIFY: correctness]
+
+## 4. Dead Ends
+- D0.1+D0.2 | the pair spills 190 registers | profile:run2
+
+## 5. Global Gate
+The gate holds on every group.
+
+## 6. Rules
+One rule.
+`;
+
+function withMilestone(ctx, text = MILESTONE_DOC) {
+  fs.mkdirSync(path.join(ctx.root, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(ctx.root, "docs", "milestone.md"), text);
+  return text;
+}
+
+test("a keep that names no decision is refused while the plan exists", async () => {
+  const ctx = await setup();
+  withMilestone(ctx);
+  const outcome = await recordCandidate(keepInput(ctx));
+  assert.equal(outcome.ok, false);
+  assert.deepEqual(outcome.refusals.map((refusal) => refusal.rule), ["decision-missing"]);
+  assert.match(outcome.errors[0], /D0\.1, D0\.2/);
+  assert.equal(readCandidates(ctx.root).length, 0, "a refused keep is not recorded");
+});
+
+test("a decision the milestone does not have is refused, forceable by nothing", async () => {
+  const ctx = await setup();
+  withMilestone(ctx);
+  const outcome = await recordCandidate(
+    keepInput(ctx, { milestoneDecision: "D3.7", forceWithReason: "the number is good enough" }),
+  );
+  assert.equal(outcome.ok, false);
+  assert.deepEqual(outcome.refusals.map((refusal) => refusal.rule), ["decision-unknown"]);
+  assert.match(outcome.errors[0], /D3\.7/);
+  assert.equal(outcome.refusals[0].forceable, false, "a force reason never buys attribution");
+  assert.equal(readCandidates(ctx.root).length, 0);
+});
+
+test("a stale milestone sha is refused: the decision may have moved under it", async () => {
+  const ctx = await setup();
+  withMilestone(ctx);
+  const outcome = await recordCandidate(keepInput(ctx, { milestoneDecision: "D0.1", milestoneSha: "f".repeat(64) }));
+  assert.equal(outcome.ok, false);
+  assert.deepEqual(outcome.refusals.map((refusal) => refusal.rule), ["milestone-stale"]);
+  assert.match(outcome.errors[0], /ffffffffffff/);
+});
+
+test("a dead-ended bundle is refused, and a precondition is what re-opens it", async () => {
+  const ctx = await setup();
+  withMilestone(ctx);
+  const refused = await recordCandidate(keepInput(ctx, { milestoneDecision: "D0.2+D0.1" }));
+  assert.equal(refused.ok, false);
+  assert.deepEqual(refused.refusals.map((refusal) => refusal.rule), ["dead-end-bundle"]);
+  assert.match(refused.errors[0], /spills 190 registers/);
+
+  const accepted = await recordCandidate(
+    keepInput(ctx, {
+      milestoneDecision: "D0.1+D0.2",
+      precondition: "the spill was the 128x128 tile; this candidate keeps 64x128",
+    }),
+  );
+  assert.equal(accepted.ok, true, accepted.ok ? "" : accepted.errors.join("\n"));
+  const [record] = readCandidates(ctx.root);
+  assert.equal(record.milestoneDecision, "D0.1+D0.2");
+  assert.equal(record.precondition, "the spill was the 128x128 tile; this candidate keeps 64x128");
+  assert.match(record.milestoneSha, /^[0-9a-f]{64}$/);
+});
+
+test("a keep with a valid decision records the id and the sha it checked", async () => {
+  const ctx = await setup();
+  const text = withMilestone(ctx);
+  const outcome = await recordCandidate(keepInput(ctx, { milestoneDecision: "D0.1" }));
+  assert.equal(outcome.ok, true, outcome.ok ? "" : outcome.errors.join("\n"));
+  const record = readCandidates(ctx.root)[0];
+  assert.equal(record.milestoneDecision, "D0.1");
+  assert.equal(record.milestoneSha, milestoneSha(text));
+  assert.equal(record.precondition, null);
+  const csv = fs.readFileSync(path.join(ctx.root, "benchmark.csv"), "utf8").split("\n")[1];
+  assert.match(csv, /keep,D0\.1,fuse the epilogue/, "the ledger's own decision id reaches the CSV");
+});
+
+test("a rejection still needs only a reason, and records no decision", async () => {
+  const ctx = await setup();
+  withMilestone(ctx);
+  const outcome = await recordCandidate({
+    workspace: ctx.root,
+    decision: "reject",
+    description: "tried a bigger tile",
+    reason: "spilled 210 registers",
+    exec: ctx.exec,
+  });
+  assert.equal(outcome.ok, true, outcome.ok ? "" : outcome.errors.join("\n"));
+  const record = readCandidates(ctx.root)[0];
+  assert.equal(record.milestoneDecision, null);
+  assert.equal(record.milestoneSha, null);
 });

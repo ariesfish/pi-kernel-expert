@@ -1,0 +1,70 @@
+
+========================================================================
+1. no plan yet: the keep is recorded, and the record says it names no decision
+========================================================================
+recorded C1 (keep) — parent baseline
+  diff 5aeed1bf594c  contract f8e23a3d24b6
+  geomean_speedup 1.12
+  reading: basis device, hostBoundRatio 0.0198, verdict measured, pairing absent
+ledger: candidates.jsonl
+benchmark.csv refreshed (1 row(s), derived — never edit it)
+Next: pi-goal's log_goal decides the keep; this record is the lineage and evidence.
+
+warning(s):
+- no docs/milestone.md in this workspace, so this candidate names no decision: the plan is the attribution, and a workspace without one records lineage only.
+
+========================================================================
+2. the plan written
+========================================================================
+#### D0.1 Fuse the epilogue into registers
+#### D0.2 Stage two tiles through cp.async
+- D0.1+D0.2 | the pair spills 190 registers at 128x128 | profile:run2
+
+========================================================================
+3. a keep naming a decision the plan does not have
+========================================================================
+Candidate not recorded — 1 refusal(s), all printed:
+- decision-unknown (charged to the candidate): D3.7 is not in docs/milestone.md (it has D0.1, D0.2); nothing in D3.7 is in the milestone. A decision id the plan does not have is a name for nothing. Fix: add the decision to the milestone first (kernel_milestone to validate it), or name the decision this change actually implements.
+
+========================================================================
+4. the same keep, naming D0.1
+========================================================================
+recorded C2 (keep) — parent C1
+  diff 5aeed1bf594c  contract f8e23a3d24b6
+  geomean_speedup 1.12
+  reading: basis device, hostBoundRatio 0.0198, verdict measured, pairing absent
+ledger: candidates.jsonl
+benchmark.csv refreshed (2 row(s), derived — never edit it)
+Next: pi-goal's log_goal decides the keep; this record is the lineage and evidence.
+
+========================================================================
+5. the dead-ended pair, no precondition
+========================================================================
+Candidate not recorded — 1 refusal(s), all printed:
+- dead-end-bundle (charged to the candidate): D0.1+D0.2 is recorded as a dead end — the pair spills 190 registers at 128x128 — and this candidate retries the combination with no precondition. A dead end bans the pair, not its members: one of them alone is a different candidate. Fix: pass precondition naming what is different this time (a new precondition, not a smaller bundle), or implement one decision instead of the pair.
+
+========================================================================
+6. the same pair with a precondition
+========================================================================
+recorded C3 (keep) — parent C2
+  diff 5aeed1bf594c  contract f8e23a3d24b6
+  geomean_speedup 1.12
+  reading: basis device, hostBoundRatio 0.0198, verdict measured, pairing absent
+ledger: candidates.jsonl
+benchmark.csv refreshed (3 row(s), derived — never edit it)
+Next: pi-goal's log_goal decides the keep; this record is the lineage and evidence.
+
+========================================================================
+7. candidates.jsonl, the three fields
+========================================================================
+C1 keep milestoneDecision=null milestoneSha=null precondition=null
+C2 keep milestoneDecision=D0.1 milestoneSha=2b57f5376257 precondition=null
+C3 keep milestoneDecision=D0.1+D0.2 milestoneSha=2b57f5376257 precondition=recorded
+
+========================================================================
+8. benchmark.csv
+========================================================================
+candidate,parent,at,decision,milestone_decision,description,geomean_speedup,latency_us_a,profile_run,bottleneck_metric,reason,forced,pairing,verdict,forced_rules,wiki
+C1,baseline,2026-11-10T03:50:10.967Z,keep,,keep the accumulator in registers through the epilogue,1.12,9.1,,,,,absent,measured,,
+C2,C1,2026-11-10T03:50:11.049Z,keep,D0.1,keep the accumulator in registers through the epilogue,1.12,9.1,,,,,absent,measured,,
+C3,C2,2026-11-10T03:50:11.127Z,keep,D0.1+D0.2,keep the accumulator in registers through the epilogue,1.12,9.1,,,,,absent,measured,,

@@ -188,7 +188,7 @@ T-015 workspace integration + kernel-flow skill  (after T-010)
 T-016 real-workspace evidence (plan-1, plan-2)   (after T-013, T-014)
 ```
 
-Frontier: **T-013** (T-010 closed 2026-11-10, `b7f9b19`; T-011 and T-012 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced).
+Frontier: **T-014** (T-010..T-013 closed 2026-11-10; `corpus` module T-017/T-018 closed, T-019 evidenced). T-015 is unblocked and independent of T-014.
 
 Adjacent, done outside the ticket graph: the corpus moved to `ariesfish/kernel-wiki`
 (`1571a54`, ADR 0007) — skill name compliant, sanitised at source, page ids frozen. That is what
@@ -271,6 +271,16 @@ T-012's `wiki:` citations now resolve against.
   `decision-unknown` (id absent from the milestone), `milestone-stale` (sha differs from the current
   file), `dead-end-bundle` (the bundle matches a recorded dead end and no `precondition` was given).
   None are forceable. `benchmark.csv` gains the `decision` column.
+- **Closed 2026-11-10**: `kernel/milestone-binding.ts` (snapshot + binding), a second rule family
+  `BINDING_RULE_IDS` in `refusals.ts` (the reading rules' all-rules test would otherwise have to
+  produce rules that need a file it never sees). 14 tests, 8 evidence steps.
+  - **Deviation from this ticket**: a fourth rule, `decision-missing`, because three refusals cannot
+    express the absence — "a keep names no decision" has no id to be unknown. A keep in a workspace
+    with no milestone at all is a warning, not a refusal (declared degradation; T-015 is where the
+    missing milestone is flagged).
+  - **Naming**: the record's field is `milestoneDecision` and the CSV column
+    `milestone_decision`, because `decision` already means keep/reject on both, and two meanings for
+    one column is how a ledger becomes unreadable.
 - **Acceptance criteria**:
   - [check: `npm test`] — the three refusals, each naming the id; a keep with a valid decision
     records both fields; a retry with `precondition` is accepted and the precondition is recorded;
