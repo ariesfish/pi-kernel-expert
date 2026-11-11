@@ -1,0 +1,23 @@
+{
+  "name": "log_goal",
+  "params": {
+    "commit": "0cdd4fc",
+    "metric": 20,
+    "status": "keep",
+    "description": "test(protocol): commit hook must block completion",
+    "asi": {
+      "hypothesis": "Verify Git settlement completes before iteration advancement",
+      "synthetic_metric": true
+    }
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "❌ Keep not logged: Git workspace settlement failed.\n⚠️ Git commit failed (exit 1): injected commit failure\nCandidate changes and the measured run are preserved. Fix Git and retry log_goal before another run."
+      }
+    ],
+    "details": {},
+    "isError": false
+  }
+}

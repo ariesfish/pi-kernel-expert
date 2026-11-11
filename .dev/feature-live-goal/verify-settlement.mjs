@@ -1,0 +1,55 @@
+// Scripted runtime regression: Git failure must leave the iteration awaiting
+// log_goal. These deterministic metric values test protocol behavior only.
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { repo, textOf, withRuntime } from "./runtime.mjs";
+
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-kernel-settlement-"));
+const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+git("init", "-q"); git("config", "user.name", "Settlement regression"); git("config", "user.email", "settlement@example.invalid");
+fs.mkdirSync(path.join(root, "src"));
+fs.writeFileSync(path.join(root, "src/value"), "10\n");
+fs.writeFileSync(path.join(root, "goal.md"), "# Deterministic settlement protocol regression\nMetric: throughput, higher is better. No performance claim.\n");
+fs.writeFileSync(path.join(root, "goal.sh"), "#!/usr/bin/env bash\nset -euo pipefail\nprintf 'METRIC throughput=%s\\n' \"$(cat src/value)\"\n");
+fs.writeFileSync(path.join(root, ".gitignore"), ".goal/\nruns/\n");
+git("add", ".gitignore", "src", "goal.md", "goal.sh"); git("commit", "-q", "-m", "test(protocol): establish the deterministic baseline");
+const originalHead = git("rev-parse", "HEAD");
+await withRuntime(root, async ({ call }) => {
+  await call("init_goal", { name: "Settlement protocol regression", metric_name: "throughput", metric_unit: "", direction: "higher" });
+  const log = (metric, description) => call("log_goal", { commit: git("rev-parse", "--short=7", "HEAD"), metric, status: "keep", description, asi: { hypothesis: "Verify Git settlement completes before iteration advancement", synthetic_metric: true } }, { allowRefusal: true });
+  const baseline = await call("run_goal", { command: "bash goal.sh", timeout_seconds: 10 });
+  assert.equal(baseline.details.parsedPrimary, 10);
+  assert.ok((await log(10, "test(protocol): record baseline")).details.runResult);
+  fs.writeFileSync(path.join(root, "src/value"), "20\n");
+  const hook = path.join(root, ".git/hooks/pre-commit");
+  fs.writeFileSync(hook, "#!/bin/sh\necho 'injected commit failure' >&2\nexit 1\n"); fs.chmodSync(hook, 0o755);
+  const measured = await call("run_goal", { command: "bash goal.sh", timeout_seconds: 10 });
+  assert.equal(measured.details.parsedPrimary, 20);
+  const rejected = await log(20, "test(protocol): commit hook must block completion");
+  assert.match(textOf(rejected), /Keep not logged: Git workspace settlement failed/);
+  assert.equal(rejected.details.runResult, undefined);
+  assert.equal(git("rev-parse", "HEAD"), originalHead);
+  assert.equal(fs.readFileSync(path.join(root, "src/value"), "utf8"), "20\n");
+  const journal = path.join(root, ".goal/researches/default/goal.jsonl");
+  const runs = () => fs.readFileSync(journal, "utf8").trim().split("\n").map(JSON.parse).filter((row) => typeof row.run === "number");
+  assert.equal(runs().length, 1, "a failed commit must not become a kept Run Result");
+  const blocked = await call("run_goal", { command: "bash goal.sh", timeout_seconds: 10 }, { allowRefusal: true });
+  assert.match(textOf(blocked), /log_goal/);
+  assert.equal(blocked.details.parsedPrimary, undefined);
+  fs.unlinkSync(hook);
+  const retry = await log(20, "test(protocol): commit the measured change after fixing Git");
+  assert.ok(retry.details.runResult, textOf(retry));
+  assert.equal(runs().length, 2);
+  assert.notEqual(git("rev-parse", "HEAD"), originalHead);
+  assert.equal(git("show", "HEAD:src/value"), "20");
+  assert.equal(git("status", "--porcelain"), "");
+});
+const audit = path.join(repo, ".dev/audit/live-goal/settlement-followup");
+fs.mkdirSync(audit, { recursive: true });
+fs.cpSync(path.join(root, "runs"), path.join(audit, "runs"), { recursive: true });
+fs.copyFileSync(path.join(root, ".goal/researches/default/goal.jsonl"), path.join(audit, "goal.jsonl"));
+fs.writeFileSync(path.join(audit, "result.json"), `${JSON.stringify({ workspace: root, commitFailureBlocked: true, nextRunBlocked: true, sameRunRetryCommitted: true, worktreeClean: true, head: git("rev-parse", "HEAD") }, null, 2)}\n`);
+console.log("Settlement regression passed: commit failure blocks keep and the next run; retry commits the same measured change; workspace is clean.");

@@ -265,3 +265,19 @@ the default timeout; every observed check finished below the intended 180-second
 limit. ncu 2025.3.1 lacks the timeline helper's timed_warp_samples API, so timelines
 remain unavailable. No Blackwell run, milestone attribution or knowledge
 publication was exercised in this task.
+
+### Settlement follow-up — failed commits cannot finish an iteration
+
+Fixed in pi-goal commit `4ba015e`. A failed Git add or commit now blocks
+log_goal before recording a keep or updating the baseline, preserving the
+candidate and leaving the runtime awaiting log. A new run is refused until the
+same measured run is settled. Baseline logging with no code changes remains
+valid.
+
+Verified through the real SDK runtime by injecting a failing pre-commit hook:
+no false keep was appended, the next run was blocked, and retrying log_goal
+after removing the hook committed the unchanged measured candidate and left
+the workspace clean. Evidence: `.dev/audit/live-goal/settlement-followup/`;
+repro: `node --experimental-strip-types .dev/feature-live-goal/verify-settlement.mjs`.
+The peer's full suite passes 224 tests; typecheck passes. This closes the
+fail-closed settlement gap documented in the preceding entry.

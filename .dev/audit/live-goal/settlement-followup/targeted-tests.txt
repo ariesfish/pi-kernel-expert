@@ -1,0 +1,21 @@
+✔ run logging records a kept Run Result, commits workspace, and appends journal (2.563208ms)
+✔ run logging blocks keep when checks failed before mutating state (0.8495ms)
+✔ run logging journals and restores a rejected Run Result while preserving ASI (1.927833ms)
+✔ run logging rejects missing known secondary metrics before side effects (0.8035ms)
+✔ run logging blocks state mutation when journal append fails (0.8545ms)
+✔ run logging blocks a keep when git add fails (2.12825ms)
+✔ run logging blocks a keep when git commit fails (2.405417ms)
+✔ a journal failure after a kept Run Result committed reports the landed commit (0.987458ms)
+✔ dirty tree check separates research state from user changes (1.10675ms)
+✔ keep commits candidate changes while excluding ignored research state (188.78325ms)
+✔ keep commits candidate changes while excluding unignored research state (172.38725ms)
+✔ keep commits candidate changes while excluding nested research state (174.723167ms)
+✔ keep commits candidate changes while excluding a state path that is a file research state (154.157375ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 761.172041

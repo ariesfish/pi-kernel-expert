@@ -38,3 +38,19 @@ No Blackwell run, autonomous skill-routing evaluation, milestone attribution or 
 The task generator, CUDA fixtures and runtime driver are under `.dev/feature-live-goal/`. The pilot used `prepare`, then the human-approved `run`; `resume`, `repair`, and `finish` retained the same task and journal while debugging the driver and peer issues. The acceptance contract was frozen once. Synthetic timeout conversion tests use a disposable workspace and no GPU.
 
 The temporary driver first asserted a nonexistent `details.ok` field; that assertion was corrected to inspect `details.record`. The profile helper then needed CUDA's bin directory on PATH; analysis resumed from the same report. These driver failures did not alter archived measurements.
+
+## Settlement follow-up — closed
+
+The fail-closed settlement defect above is fixed in pi-goal commit `4ba015e`.
+Git add/commit failure now returns a blocked log result before appending a kept
+Run Result or changing the run baseline. The runtime stays awaiting log; the
+next run is blocked. Candidate files and the measured run remain available for
+a retry after Git is repaired. The exact `.goal` path and nested research-state
+paths also remain excluded from commits.
+
+`settlement-followup/` records a real SDK run with a deliberately failing
+pre-commit hook: the keep was refused, the journal retained only the baseline,
+a subsequent run was blocked, and retrying the original log after removing the
+hook committed the candidate and left the task workspace clean. The metrics in
+this regression are deterministic protocol controls, not GPU performance data.
+The peer suite now has 224 passing tests and a clean typecheck.

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "init_goal",
+    "id": "integration/1",
+    "parent": "integration"
+  },
+  {
+    "name": "run_goal",
+    "id": "integration/2",
+    "parent": "integration"
+  },
+  {
+    "name": "log_goal",
+    "id": "integration/3",
+    "parent": "integration"
+  },
+  {
+    "name": "run_goal",
+    "id": "integration/4",
+    "parent": "integration"
+  },
+  {
+    "name": "log_goal",
+    "id": "integration/5",
+    "parent": "integration"
+  },
+  {
+    "name": "run_goal",
+    "id": "integration/6",
+    "parent": "integration"
+  },
+  {
+    "name": "log_goal",
+    "id": "integration/7",
+    "parent": "integration"
+  }
+]

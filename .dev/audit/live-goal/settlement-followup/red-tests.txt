@@ -1,0 +1,52 @@
+✔ run logging records a kept Run Result, commits workspace, and appends journal (2.372667ms)
+✔ run logging blocks keep when checks failed before mutating state (0.814708ms)
+✔ run logging journals and restores a rejected Run Result while preserving ASI (1.595292ms)
+✔ run logging rejects missing known secondary metrics before side effects (1.633416ms)
+✔ run logging blocks state mutation when journal append fails (0.961625ms)
+✖ run logging blocks a keep when git add fails (1.250167ms)
+✖ run logging blocks a keep when git commit fails (0.980166ms)
+✔ a journal failure after a kept Run Result committed reports the landed commit (1.047542ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 6
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 653.570625
+
+✖ failing tests:
+
+test at tests/workflows/run-logging.test.mjs:199:3
+✖ run logging blocks a keep when git add fails (1.250167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/ariesfish/.pi/agent/git/github.com/ariesfish/pi-goal/tests/workflows/run-logging.test.mjs:225:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/workflows/run-logging.test.mjs:199:3
+✖ run logging blocks a keep when git commit fails (0.980166ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/ariesfish/.pi/agent/git/github.com/ariesfish/pi-goal/tests/workflows/run-logging.test.mjs:225:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

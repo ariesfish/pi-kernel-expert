@@ -1,0 +1,60 @@
+{
+  "name": "init_goal",
+  "params": {
+    "name": "Settlement protocol regression",
+    "metric_name": "throughput",
+    "metric_unit": "",
+    "direction": "higher"
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "✅ Research initialized: \"Settlement protocol regression\"\nMetric: throughput (unitless, higher is better)\nConfig written to goal.jsonl. Now run the baseline with run_goal."
+      }
+    ],
+    "details": {
+      "state": {
+        "contract": {
+          "version": 1,
+          "objective": "Legacy metric loop on throughput",
+          "criteria": [
+            {
+              "id": "M1",
+              "statement": "throughput improves (higher is better)",
+              "kind": "metric",
+              "blocking": true,
+              "metric": {
+                "name": "throughput",
+                "direction": "higher"
+              }
+            }
+          ],
+          "testGlobs": [],
+          "scopeGlobs": [],
+          "allowTestEdits": false,
+          "frozenAt": 0,
+          "hash": "sha256:180d7f8bfe679446433286807df5a5e6019fc49e92fdcd41ec7867f6d309fa77"
+        },
+        "directions": [],
+        "probes": [],
+        "gates": [],
+        "reviews": [],
+        "attempts": [],
+        "results": [],
+        "baselineMetric": null,
+        "bestDirection": "higher",
+        "metricName": "throughput",
+        "metricUnit": "",
+        "secondaryMetrics": [],
+        "name": "Settlement protocol regression",
+        "currentExperimentIndex": 0,
+        "runLimit": null,
+        "confidence": null,
+        "testEditsAllowed": false,
+        "benchmarkEditsAllowed": false
+      }
+    },
+    "isError": false
+  }
+}

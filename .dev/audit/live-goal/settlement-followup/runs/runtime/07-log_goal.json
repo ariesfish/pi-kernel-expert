@@ -1,0 +1,148 @@
+{
+  "name": "log_goal",
+  "params": {
+    "commit": "0cdd4fc",
+    "metric": 20,
+    "status": "keep",
+    "description": "test(protocol): commit the measured change after fixing Git",
+    "asi": {
+      "hypothesis": "Verify Git settlement completes before iteration advancement",
+      "synthetic_metric": true
+    }
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Gate pass: 1/1 criteria pass (sha256:180d7f8bfe679446433286807df5a5e6019fc49e92fdcd41ec7867f6d309fa77).\nLogged #2: keep — test(protocol): commit the measured change after fixing Git\nBaseline throughput: 10 | this: 20 (+100.0%)\n📋 ASI: hypothesis: Verify Git settlement completes before iteration advancement | synthetic_metric: true\n(2 runs in current experiment)\n📝 Git: committed — [main c681b5b] test(protocol): commit the measured change after fixing Git"
+      }
+    ],
+    "details": {
+      "runResult": {
+        "commit": "c681b5b",
+        "metric": 20,
+        "metrics": {},
+        "status": "keep",
+        "description": "test(protocol): commit the measured change after fixing Git",
+        "timestamp": 1794388263722,
+        "experimentIndex": 0,
+        "confidence": null,
+        "asi": {
+          "hypothesis": "Verify Git settlement completes before iteration advancement",
+          "synthetic_metric": true
+        }
+      },
+      "state": {
+        "contract": {
+          "version": 1,
+          "objective": "Legacy metric loop on throughput",
+          "criteria": [
+            {
+              "id": "M1",
+              "statement": "throughput improves (higher is better)",
+              "kind": "metric",
+              "blocking": true,
+              "metric": {
+                "name": "throughput",
+                "direction": "higher"
+              }
+            }
+          ],
+          "testGlobs": [],
+          "scopeGlobs": [],
+          "allowTestEdits": false,
+          "frozenAt": 0,
+          "hash": "sha256:180d7f8bfe679446433286807df5a5e6019fc49e92fdcd41ec7867f6d309fa77"
+        },
+        "directions": [],
+        "probes": [],
+        "gates": [
+          {
+            "verdict": "pass",
+            "contractHash": "sha256:180d7f8bfe679446433286807df5a5e6019fc49e92fdcd41ec7867f6d309fa77",
+            "checkedAt": 1794388261130,
+            "criteria": [
+              {
+                "criterionId": "M1",
+                "pass": true,
+                "blocking": true,
+                "detail": "baseline run — no prior metric to compare"
+              }
+            ]
+          },
+          {
+            "verdict": "pass",
+            "contractHash": "sha256:180d7f8bfe679446433286807df5a5e6019fc49e92fdcd41ec7867f6d309fa77",
+            "checkedAt": 1794388261177,
+            "criteria": [
+              {
+                "criterionId": "M1",
+                "pass": true,
+                "blocking": true,
+                "detail": "throughput improved 100.00% (baseline 10 -> 20)"
+              }
+            ]
+          },
+          {
+            "verdict": "pass",
+            "contractHash": "sha256:180d7f8bfe679446433286807df5a5e6019fc49e92fdcd41ec7867f6d309fa77",
+            "checkedAt": 1794388263721,
+            "criteria": [
+              {
+                "criterionId": "M1",
+                "pass": true,
+                "blocking": true,
+                "detail": "throughput improved 100.00% (baseline 10 -> 20)"
+              }
+            ]
+          }
+        ],
+        "reviews": [],
+        "attempts": [],
+        "results": [
+          {
+            "commit": "0cdd4fc",
+            "metric": 10,
+            "metrics": {},
+            "status": "keep",
+            "description": "test(protocol): record baseline",
+            "timestamp": 1794388261130,
+            "experimentIndex": 0,
+            "confidence": null,
+            "asi": {
+              "hypothesis": "Verify Git settlement completes before iteration advancement",
+              "synthetic_metric": true
+            }
+          },
+          {
+            "commit": "c681b5b",
+            "metric": 20,
+            "metrics": {},
+            "status": "keep",
+            "description": "test(protocol): commit the measured change after fixing Git",
+            "timestamp": 1794388263722,
+            "experimentIndex": 0,
+            "confidence": null,
+            "asi": {
+              "hypothesis": "Verify Git settlement completes before iteration advancement",
+              "synthetic_metric": true
+            }
+          }
+        ],
+        "baselineMetric": 10,
+        "bestDirection": "higher",
+        "metricName": "throughput",
+        "metricUnit": "",
+        "secondaryMetrics": [],
+        "name": "Settlement protocol regression",
+        "currentExperimentIndex": 0,
+        "runLimit": null,
+        "confidence": null,
+        "testEditsAllowed": false,
+        "benchmarkEditsAllowed": false
+      },
+      "wallClockSeconds": 0.006
+    },
+    "isError": false
+  }
+}

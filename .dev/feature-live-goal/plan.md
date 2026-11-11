@@ -18,6 +18,8 @@ T-028..T-030 complete: the repaired keep landed in the temporary task repository
 
 Separate follow-up: failed Git settlement must not append a keep Run Result or allow the next iteration. The original failed-settlement entries remain archived; they are not counted as committed keeps.
 
+T-031 complete: pi-goal commit `4ba015e` blocks a keep on Git settlement failure and keeps the next run blocked until the measured run is logged successfully. `verify-settlement.mjs` proves this with a real failing Git hook and retry. Evidence: `.dev/audit/live-goal/settlement-followup/`. Both source fixes and verification checkpoints are committed before ending the work round.
+
 No GPU clock changes or global installs. All automatic commits and resets happen in a new temporary git repository. The GPU task uses new files in a dedicated remote directory.
 
 Live execution exposed a peer bug: `commitKeptRunResult` fails to stage when `.goal/` is ignored because of its explicit directory exclusion. The fix and real-git regressions live in the local pi-goal checkout, rather than being copied into this package. The original no-peer-edit plan was revised for this reproduced blocker; no pi-goal version or published package was changed.

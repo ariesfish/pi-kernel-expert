@@ -1,0 +1,35 @@
+{
+  "name": "run_goal",
+  "params": {
+    "command": "bash goal.sh",
+    "timeout_seconds": 10
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "✅ PASSED in 0.0s\n📊 Current best throughput: 10\n\n📐 Parsed metrics: ★ throughput=20\nUse these values directly in log_goal (metric: 20, metrics: {})\n\nMETRIC throughput=20\n"
+      }
+    ],
+    "details": {
+      "command": "bash goal.sh",
+      "exitCode": 0,
+      "durationSeconds": 0.006,
+      "passed": true,
+      "crashed": false,
+      "timedOut": false,
+      "tailOutput": "METRIC throughput=20\n",
+      "checksPass": null,
+      "checksTimedOut": false,
+      "checksOutput": "",
+      "checksDuration": 0,
+      "parsedMetrics": {
+        "throughput": 20
+      },
+      "parsedPrimary": 20,
+      "metricName": "throughput",
+      "metricUnit": ""
+    },
+    "isError": false
+  }
+}

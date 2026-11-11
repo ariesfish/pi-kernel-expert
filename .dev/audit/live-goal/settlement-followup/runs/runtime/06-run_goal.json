@@ -1,0 +1,17 @@
+{
+  "name": "run_goal",
+  "params": {
+    "command": "bash goal.sh",
+    "timeout_seconds": 10
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "❌ Previous run_goal has not been logged.\nCall log_goal first before starting another run_goal.\nSuggested next action: log_goal({ status: \"discard\", metric: 20, metrics: {}, asi: { \"hypothesis\": \"...\" } })"
+      }
+    ],
+    "details": {},
+    "isError": false
+  }
+}
