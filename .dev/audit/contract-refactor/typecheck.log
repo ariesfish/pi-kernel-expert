@@ -1,0 +1,3 @@
+
+> @ariesfish/pi-kernel-expert@0.4.0 typecheck
+> tsc --noEmit

@@ -1,0 +1,307 @@
+[
+  {
+    "name": "defaults and grouped cells",
+    "input": {
+      "objective": "reduce kernel latency",
+      "checkCommand": "bash check.sh",
+      "benchmarkCommand": "bash bench.sh",
+      "cells": [
+        {
+          "id": "tile.128",
+          "dtype": "bf16",
+          "vars": {
+            "m": "128",
+            "N": "256"
+          },
+          "groups": [
+            {
+              "name": "typical",
+              "intent": "random inputs"
+            },
+            {
+              "name": "zero_block",
+              "intent": "a fully masked block",
+              "seed": 0
+            },
+            {
+              "name": "tail-1",
+              "intent": "the kernel's unaligned tail, including padding",
+              "seed": -7
+            }
+          ]
+        },
+        {
+          "id": "boundary-1",
+          "dtype": "fp32",
+          "boundary": true
+        }
+      ],
+      "tolerance": {
+        "rtol": 0.01,
+        "atol": 0.001
+      }
+    },
+    "hashes": {
+      "contract": "636dace46940bd4445f93aea98ceadd4a854bb492bd3dc71effeddbbc1e457dd",
+      "benchmark": "1a01305be9572fa1410121af86bd8cc25e4310ac53095fe0befb82d82b8e85aa",
+      "checks": "a47fae8e28efed73cc88cee43b239af1f053086775776c6883b2c5e0d9c7b94e",
+      "freeze": "13f327d100acafb97327f957a508bc3f1fc0f7988fbd088f39d1af8ab0a94b17"
+    }
+  },
+  {
+    "name": "higher throughput with custom guards",
+    "input": {
+      "objective": "reduce kernel latency",
+      "checkCommand": "bash check.sh",
+      "benchmarkCommand": "bash bench.sh",
+      "cells": [
+        {
+          "id": "tile.128",
+          "dtype": "bf16",
+          "vars": {
+            "m": "128",
+            "N": "256"
+          },
+          "groups": [
+            {
+              "name": "typical",
+              "intent": "random inputs"
+            },
+            {
+              "name": "zero_block",
+              "intent": "a fully masked block",
+              "seed": 0
+            },
+            {
+              "name": "tail-1",
+              "intent": "the kernel's unaligned tail, including padding",
+              "seed": -7
+            }
+          ]
+        },
+        {
+          "id": "boundary-1",
+          "dtype": "fp32",
+          "boundary": true
+        }
+      ],
+      "tolerance": {
+        "rtol": 0.01,
+        "atol": 0.001
+      },
+      "direction": "higher",
+      "metricName": "throughput",
+      "repeats": 7,
+      "warmup": 0,
+      "guardPct": 3,
+      "noiseFloorPct": 1,
+      "checksTimeoutSeconds": 120,
+      "scopeGlobs": [
+        "kernel/**"
+      ],
+      "testGlobs": [
+        "tests/**"
+      ],
+      "harnessGlobs": [
+        "./goal.sh",
+        "eval/**/*.py"
+      ]
+    },
+    "hashes": {
+      "contract": "324c329bfb600aa7ed5d33b47f323d6d26af90e4ea117eef2090c26d55d4a953",
+      "benchmark": "fd8087c84dcb19ecb6cce550573a1aedd3b7dc43185629c9da734a5203e5871e",
+      "checks": "b34e8343d2bfb8ef4fc74096a814b23c20d9f889b26c0f9663b87d2f398b9898",
+      "freeze": "4581b4c54f0643c4a295f3d54e4baa3435a3840287ab58af58f80f09d8ab8f02"
+    }
+  },
+  {
+    "name": "paired reference and clock lock",
+    "input": {
+      "objective": "reduce kernel latency",
+      "checkCommand": "bash check.sh",
+      "benchmarkCommand": "bash bench.sh",
+      "cells": [
+        {
+          "id": "tile.128",
+          "dtype": "bf16",
+          "vars": {
+            "m": "128",
+            "N": "256"
+          },
+          "groups": [
+            {
+              "name": "typical",
+              "intent": "random inputs"
+            },
+            {
+              "name": "zero_block",
+              "intent": "a fully masked block",
+              "seed": 0
+            },
+            {
+              "name": "tail-1",
+              "intent": "the kernel's unaligned tail, including padding",
+              "seed": -7
+            }
+          ]
+        },
+        {
+          "id": "boundary-1",
+          "dtype": "fp32",
+          "boundary": true
+        }
+      ],
+      "tolerance": {
+        "rtol": 0.01,
+        "atol": 0.001
+      },
+      "referenceCommand": "bash reference.sh",
+      "burnInMs": 0,
+      "clockLock": {
+        "sm": 1500,
+        "mem": 5000
+      }
+    },
+    "hashes": {
+      "contract": "baa32e7008e33fb386905e6b828e4b6bbbc543a2b48e7570720111dab508e0d8",
+      "benchmark": "16f06623fa277962503325ca5a9b545297bbc96d934eda388e602cd780134f2c",
+      "checks": "84b0b76b441f3a33029871446f30792d4997ad29c3d99dd57beab9b633444c2b",
+      "freeze": "ad0395e65f143187874690ca248b1d0da8771cc74c90f564eacd5b7954c43cd5"
+    }
+  },
+  {
+    "name": "end-to-end timing and calibration",
+    "input": {
+      "objective": "reduce kernel latency",
+      "checkCommand": "bash check.sh",
+      "benchmarkCommand": "bash bench.sh",
+      "cells": [
+        {
+          "id": "tile.128",
+          "dtype": "bf16",
+          "vars": {
+            "m": "128",
+            "N": "256"
+          },
+          "groups": [
+            {
+              "name": "typical",
+              "intent": "random inputs"
+            },
+            {
+              "name": "zero_block",
+              "intent": "a fully masked block",
+              "seed": 0
+            },
+            {
+              "name": "tail-1",
+              "intent": "the kernel's unaligned tail, including padding",
+              "seed": -7
+            }
+          ]
+        },
+        {
+          "id": "boundary-1",
+          "dtype": "fp32",
+          "boundary": true
+        }
+      ],
+      "tolerance": {
+        "rtol": 0.01,
+        "atol": 0.001
+      },
+      "basis": "e2e",
+      "calibrateCommand": "bash calibrate.sh",
+      "clockLock": {
+        "sm": 1800
+      }
+    },
+    "hashes": {
+      "contract": "e29753f0a1e5af01dce772005536cabc866457ce077a8d55d07ac944b99c8eca",
+      "benchmark": "154a9e4b8c3af184c462f11c58977308d40786c854c54445bc8c8295fd2a3c5e",
+      "checks": "ceaccd1d249eec7c36b48cb93a0f19e7552fe1d41e3e64b7c20f9454be85f190",
+      "freeze": "d1f85327a665570088aa5a4bd0e448d5aeb48b11f8503ae77e4b9fbd332be482"
+    }
+  },
+  {
+    "name": "shell quoting",
+    "input": {
+      "objective": "reduce kernel latency",
+      "checkCommand": "python 'check kernel.py' --label 'kernel's output'",
+      "benchmarkCommand": "printf '%s\\n' 12.5",
+      "cells": [
+        {
+          "id": "tile.128",
+          "dtype": "bf16",
+          "vars": {
+            "m": "128",
+            "N": "256"
+          },
+          "groups": [
+            {
+              "name": "typical",
+              "intent": "random inputs"
+            },
+            {
+              "name": "zero_block",
+              "intent": "a fully masked block",
+              "seed": 0
+            },
+            {
+              "name": "tail-1",
+              "intent": "the kernel's unaligned tail, including padding",
+              "seed": -7
+            }
+          ]
+        },
+        {
+          "id": "boundary-1",
+          "dtype": "fp32",
+          "boundary": true
+        }
+      ],
+      "tolerance": {
+        "rtol": 0.01,
+        "atol": 0.001
+      },
+      "referenceCommand": "printf '%s\\n' 25",
+      "generator": "compatibility-fixture"
+    },
+    "hashes": {
+      "contract": "2c0a931bd7d218407c6b1e824a01fca8648d0a72d49672dcedc3ea5e9640ec14",
+      "benchmark": "b68668e971eb7b77796f6491c8e92bc6173b99fc34de964bb4e25a56211f861e",
+      "checks": "0520c9841fe640baecc6a4a8ea47634e87494a97ba23a67e97a2ae222526c0bf",
+      "freeze": "72340659fe5faaeb667cc4c98f2e83923c575ebfb1be35b41190118519741d35"
+    }
+  },
+  {
+    "name": "boundary-only matrix",
+    "input": {
+      "objective": "reduce kernel latency",
+      "checkCommand": "bash check.sh",
+      "benchmarkCommand": "bash bench.sh",
+      "cells": [
+        {
+          "id": "edge",
+          "dtype": "fp8_e4m3",
+          "boundary": true,
+          "vars": {
+            "M": "1"
+          }
+        }
+      ],
+      "tolerance": {
+        "rtol": 0.01,
+        "atol": 0.001
+      },
+      "repeats": 1,
+      "warmup": 0
+    },
+    "hashes": {
+      "contract": "24b6ac41b4995758e6c4266659e124a015a1bdc20e456a989f45275f32427647",
+      "benchmark": "81a5a45ba68517a59559c222af30f246cd6c647021dbb47427fc1c83ac7bafe4",
+      "checks": "eb8416c01769e4ad636ecbb2491cb1660fe79f5a9a9ad27a593369f18dd122d2",
+      "freeze": "302e5402d32a19147ea735497771140932073b9d63ddb5e84a86975b286e4f33"
+    }
+  }
+]

@@ -2,7 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { bool, num, obj, opt, str, type Static } from "@earendil-works/pi-schema";
 import * as path from "node:path";
 
-import { isSafeRunId, readContract } from "../kernel/candidates.ts";
+import { isSafeRunId } from "../kernel/candidates.ts";
+import { readContract } from "../kernel/contract.ts";
 import { diffFingerprint } from "../kernel/diff.ts";
 import { formatProfileOutcome, runProfile } from "../kernel/profile.ts";
 import { packageRootFrom } from "../support/paths.ts";

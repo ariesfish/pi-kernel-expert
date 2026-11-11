@@ -1,0 +1,9 @@
+{
+  "baseline": "e770065",
+  "validContractComparisons": 72,
+  "invalidContractComparisons": 20,
+  "harnessWarningComparisons": 21,
+  "preservedTypeDeclarations": 12,
+  "runtimeExportsPreserved": true,
+  "generatedArtifactsEqual": true
+}

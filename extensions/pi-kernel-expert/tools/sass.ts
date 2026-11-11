@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { readContract } from "../kernel/candidates.ts";
+import { readContract } from "../kernel/contract.ts";
 import {
   type SassView,
   cannotSee,

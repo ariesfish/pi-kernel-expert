@@ -1,15 +1,9 @@
-import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { HostExec } from "../support/exec.ts";
 import { workspacePaths } from "../workspace/layout.ts";
-import {
-  CONTRACT_SCHEMA_VERSION,
-  DEFAULT_GROUP,
-  type Basis,
-  type KernelContract,
-} from "./contract.ts";
+import { DEFAULT_GROUP, readContract, type Basis } from "./contract.ts";
 import { diffFingerprint, sha256File, type DiffFingerprint } from "./diff.ts";
 import { checkMilestoneBinding, readMilestoneSnapshot } from "./milestone-binding.ts";
 import {
@@ -41,6 +35,9 @@ import {
   type Refusal,
   type RuleId,
 } from "./refusals.ts";
+
+// Retained for callers that loaded contracts through the candidate recorder.
+export { readContract, type ContractOutcome } from "./contract.ts";
 
 /**
  * Whether a same-job reference rode this run, re-exported from the reading so a
@@ -157,49 +154,6 @@ export type CandidateOutcome =
       /** The structured refusals, so a caller can assert without matching prose. */
       refusals: Refusal[];
     };
-
-export type ContractOutcome =
-  | { ok: true; contract: KernelContract; sha: string }
-  | { ok: false; reason: string };
-
-export function readContract(workspace: string): ContractOutcome {
-  const paths = workspacePaths(workspace);
-  if (!fs.existsSync(paths.contract)) {
-    return { ok: false, reason: `no kernel.contract.json at ${paths.contract}; run kernel_contract first` };
-  }
-  const text = fs.readFileSync(paths.contract, "utf8");
-  let parsed: KernelContract;
-  try {
-    parsed = JSON.parse(text) as KernelContract;
-  } catch (error) {
-    return { ok: false, reason: `kernel.contract.json is not valid JSON: ${error instanceof Error ? error.message : String(error)}` };
-  }
-
-  const schemaVersion = (parsed as { schemaVersion?: unknown }).schemaVersion;
-  if (schemaVersion !== CONTRACT_SCHEMA_VERSION) {
-    return { ok: false, reason: schemaRefusal(schemaVersion) };
-  }
-  // A v2 file can still be hand-written; refuse the fields the evidence rules
-  // read rather than failing later on an undefined basis.
-  if (parsed.basis !== "device" && parsed.basis !== "e2e") {
-    return {
-      ok: false,
-      reason: `kernel.contract.json has no valid basis (got ${JSON.stringify(parsed.basis ?? null)}); regenerate with kernel_contract`,
-    };
-  }
-  if (!Array.isArray(parsed.harnessGlobs)) {
-    return { ok: false, reason: "kernel.contract.json has no harnessGlobs; regenerate with kernel_contract" };
-  }
-
-  return { ok: true, contract: parsed, sha: createHash("sha256").update(text).digest("hex") };
-}
-
-function schemaRefusal(schemaVersion: unknown): string {
-  if (schemaVersion === undefined || schemaVersion === 1) {
-    return "kernel.contract.json is schema v1 (or unversioned); regenerate with kernel_contract";
-  }
-  return `kernel.contract.json is schema v${String(schemaVersion)}; this build reads v${CONTRACT_SCHEMA_VERSION}; regenerate with kernel_contract`;
-}
 
 /** Run ids become directory names; keep them boring. */
 export function isSafeRunId(value: string): boolean {

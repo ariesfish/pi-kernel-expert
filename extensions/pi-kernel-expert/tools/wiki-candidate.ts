@@ -3,7 +3,7 @@ import { arr, obj, oneOf, opt, str, type Static } from "@earendil-works/pi-schem
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { readContract } from "../kernel/candidates.ts";
+import { readContract } from "../kernel/contract.ts";
 import {
   CONFIDENCE_VALUES,
   ENTRY_TYPES,

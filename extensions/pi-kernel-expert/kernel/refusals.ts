@@ -23,6 +23,7 @@
  * Absent evidence is a refusal, never a pass: `unmeasured` fires `host-bound`
  * exactly like `host_bound` does, with a different fix.
  */
+import { matchesGlob } from "../support/glob.ts";
 import { BASIS_VALUES, cellMetricName, DEFAULT_GROUP, type KernelContract } from "./contract.ts";
 import { formatPrecisionValue, type PrecisionComparison } from "./precision.ts";
 
@@ -449,38 +450,7 @@ function capped(values: string[]): string {
   return `${shown} and ${values.length - PAIR_CAP} more`;
 }
 
-/**
- * Enough glob for harness paths: `*`, `?`, and `**`. `contract.ts` has the same
- * matcher but keeps it private; a harness path that matched one and not the
- * other would be worse than the duplication.
- */
+/** Normalize changed paths once; contract command tokens are normalized by their own reader. */
 export function harnessGlobMatches(glob: string, relativePath: string): boolean {
-  return globToRegExp(glob.replace(/^\.\//, "")).test(relativePath.replace(/^\.\//, ""));
-}
-
-function globToRegExp(glob: string): RegExp {
-  let source = "";
-  for (let index = 0; index < glob.length; index += 1) {
-    const char = glob[index];
-    if (char === "*") {
-      if (glob[index + 1] === "*") {
-        index += 1;
-        if (glob[index + 1] === "/") {
-          index += 1;
-          source += "(?:.*/)?";
-        } else {
-          source += ".*";
-        }
-      } else {
-        source += "[^/]*";
-      }
-      continue;
-    }
-    if (char === "?") {
-      source += "[^/]";
-      continue;
-    }
-    source += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-  }
-  return new RegExp(`^${source}$`);
+  return matchesGlob(glob, relativePath.replace(/^\.\//, ""));
 }
