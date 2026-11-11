@@ -1,0 +1,7 @@
+Installing git:github.com/ariesfish/pi-goal...
+Installed git:github.com/ariesfish/pi-goal
+Installing git:github.com/ariesfish/pi-kernel-expert...
+Installed git:github.com/ariesfish/pi-kernel-expert
+PI_KERNEL_STACK_READY
+Git installation verified. Run /reload in an existing pi session.
+If kernel-wiki is not cached, run kernel_bootstrap, then /reload again.

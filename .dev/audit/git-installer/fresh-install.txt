@@ -1,0 +1,13 @@
+Installing git:github.com/ariesfish/pi-goal...
+Cloning into '/tmp/pi-kernel-installer-fresh.BSrMqp/agent/git/github.com/ariesfish/pi-goal'...
+
+up to date in 240ms
+Installed git:github.com/ariesfish/pi-goal
+Installing git:github.com/ariesfish/pi-kernel-expert...
+Cloning into '/tmp/pi-kernel-installer-fresh.BSrMqp/agent/git/github.com/ariesfish/pi-kernel-expert'...
+
+added 1 package in 136ms
+Installed git:github.com/ariesfish/pi-kernel-expert
+PI_KERNEL_STACK_READY
+Git installation verified. Run /reload in an existing pi session.
+If kernel-wiki is not cached, run kernel_bootstrap, then /reload again.

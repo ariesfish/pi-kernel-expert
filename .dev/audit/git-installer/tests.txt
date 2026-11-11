@@ -1,0 +1,14 @@
+✔ the Git installer installs the peer first and checks both packages through pi (1443.914375ms)
+✔ an installation failure stops before any later step: INSTALL_TEST_GOAL_EXIT (494.555583ms)
+✔ an installation failure stops before any later step: INSTALL_TEST_KERNEL_EXIT (319.409083ms)
+✔ a successful install is refused when required tool run_goal does not load (645.859125ms)
+✔ a successful install is refused when required tool kernel_contract does not load (381.914458ms)
+✔ pi exiting zero without a successful registry check is not reported as ready (1083.732125ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4405.235333

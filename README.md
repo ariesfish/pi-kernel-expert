@@ -27,12 +27,29 @@ This package connects them. Kernel rules ride in data pi-goal already accepts â€
 | CUDA toolkit + Nsight Compute | 13.2 + 2026.3.1 documented target | profiling |
 | NVIDIA GPU | sm_90 verified in v1 | measuring anything |
 
-Install the loop engine separately â€” pi does not hydrate peer packages:
+Install both Git packages with the joint installer from this checkout:
 
 ```bash
-pi install npm:@ariesfish/pi-goal
-pi install npm:@ariesfish/pi-kernel-expert
+bash scripts/install-git.sh
 ```
+
+The script installs `pi-goal` first, then `pi-kernel-expert`, as separate global
+pi packages. It stops if either installation fails, then starts a fresh pi
+process to check both packages' required tools. This check runs a slash command
+and makes no model request. A missing or disabled extension fails verification.
+The script can be rerun to reconcile the same Git package sources. In an
+existing pi session, run `/reload` after installation.
+
+The packages remain peers: `peerDependencies` declares compatibility, while
+pi's settings register the extensions. To install manually:
+
+```bash
+pi install git:github.com/ariesfish/pi-goal
+pi install git:github.com/ariesfish/pi-kernel-expert
+```
+
+The installer leaves the kernel-wiki download to `kernel_bootstrap`, as described
+below. It does not require a GPU for installation or the tool-registry check.
 
 ## Start here
 
