@@ -1,0 +1,51 @@
+{
+  "baseline": {
+    "latency_us_saxpy_typical": 696.288643,
+    "latency_us_saxpy_zero_block": 694.202576,
+    "latency_us_saxpy_tail": 692.844963,
+    "latency_us_saxpy": 694.4439502,
+    "paired_speedup": 0.08817609138,
+    "geomean_speedup": 1
+  },
+  "candidate": {
+    "latency_us_saxpy_typical": 61.364,
+    "latency_us_saxpy_zero_block": 61.335361,
+    "latency_us_saxpy_tail": 61.0976005,
+    "latency_us_saxpy": 61.26553737,
+    "paired_speedup": 0.9996227887,
+    "geomean_speedup": 11.33498505
+  },
+  "broken": {
+    "latency_us_saxpy_typical": 81.075201,
+    "latency_us_saxpy_zero_block": 75.724318,
+    "latency_us_saxpy_tail": 80.924959,
+    "latency_us_saxpy": 79.20184482,
+    "paired_speedup": 0.7733484847,
+    "geomean_speedup": 8.768027459
+  },
+  "keptHead": "cefe1c4e6a5814c4a5433f7a322ad1d1e1a673f6",
+  "candidates": [
+    {
+      "id": "C1",
+      "decision": "keep",
+      "verdict": "measured",
+      "pairing": "mirrored"
+    },
+    {
+      "id": "C2",
+      "decision": "keep",
+      "verdict": "measured",
+      "pairing": "mirrored"
+    },
+    {
+      "id": "C3",
+      "decision": "reject",
+      "verdict": "measured",
+      "pairing": "mirrored"
+    }
+  ],
+  "attempts": [
+    "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/.goal/researches/default/attempts/4.patch"
+  ],
+  "restoredChecksPassed": true
+}

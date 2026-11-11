@@ -1,0 +1,21 @@
+Registered runtime tools: read, bash, powershell, edit, write, grep, find, ls, validate_goal, init_goal, start_goal, frame_goal, probe_goal, freeze_criteria, check_goal, review_goal, run_goal, log_goal, kernel_bootstrap, kernel_wiki, kernel_wiki_candidate, kernel_init, kernel_contract, kernel_profile, kernel_candidate, kernel_milestone, kernel_sass, kernel_kb, integration_driver
+Loaded extension tools: /Users/ariesfish/.pi/agent/git/github.com/ariesfish/pi-goal/extensions/pi-goal/index.ts: validate_goal, init_goal, start_goal, frame_goal, probe_goal, freeze_criteria, check_goal, review_goal, run_goal, log_goal; /Users/ariesfish/Projects/github/dev-skills/pi-kernel-expert/extensions/pi-kernel-expert/index.ts: kernel_bootstrap, kernel_wiki, kernel_wiki_candidate, kernel_init, kernel_contract, kernel_profile, kernel_candidate, kernel_milestone, kernel_sass, kernel_kb; <inline:1>: integration_driver
+Traceback (most recent call last):
+  File "/root/pkex/live-goal-TeiuDf/helpers/plot_timeline.py", line 191, in <module>
+    main()
+  File "/root/pkex/live-goal-TeiuDf/helpers/plot_timeline.py", line 173, in main
+    warp_states = plot_warp_states(action, args.rows, args.cols, args.stall_reasons) \
+  File "/root/pkex/live-goal-TeiuDf/helpers/plot_timeline.py", line 122, in plot_warp_states
+    result = warp_state_timeline(action, cols)
+  File "/root/pkex/live-goal-TeiuDf/helpers/ncu_utils.py", line 483, in warp_state_timeline
+    samples = action.timed_warp_samples()
+AttributeError: 'IAction' object has no attribute 'timed_warp_samples'
+kernel_profile: profile run saxpy_coalesced_recovery (tag full) |   kernel      saxpy_candidate(int, float, const float *, float *) |   gpu         NVIDIA H200 (sm clock 345, mem clock 3201)
+kernel_candidate: recorded C2 (keep) — parent C1 |   diff d14aab6e572d  contract e39739dcc958 |   geomean_speedup 11.33498505
+log_goal: Gate pass: 4/4 criteria pass (sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52). | Logged #3: keep — perf(saxpy): coalesce candidate memory accesses | Baseline geomean_speedup: 1x | this: 11.33x (+1033.5%)
+run_goal: ✅ Benchmark PASSED in 100.0s | 💥 CHECKS FAILED (goal.checks.sh) in 6.6s | Log this as 'checks_failed' — the benchmark metric is valid but correctness checks did not pass.
+kernel_candidate: Candidate not recorded — 1 refusal(s), all printed: | - precision-regression (charged to the candidate): dtype fp32: e_cand 1.000e+0 > threshold 7.629e-6 = 3 * e_ref 0 + floor 7.629e-6 (max(ulp(fp32), 2^-17)) (worst group(s) saxpy/zero_block). The reference's own error is the ruler: past this threshold the candidate is not the same algorithm at a different speed. Fix: bring max_diff back under 3x the reference's by computing the way the reference does — accumulate in fp32, keep its upcast, drop a lossy fast path — then re-run goal.checks.sh; a candidate that is 4x the reference's error is a different result, not a faster one
+kernel_candidate: recorded C3 (reject) — parent C2 |   diff 9107055e1193  contract e39739dcc958 |   geomean_speedup 8.768027459
+log_goal: Logged #4: checks_failed — test(integration): reject the incorrect zero-block fast path | Baseline geomean_speedup: 1x | Secondary: latency_us_saxpy_typical: 81.08 (-88.4%)  latency_us_saxpy_zero_block: 75.72 (-89.1%)  latency_us_saxpy_tail: 80.92 (-88.3%)  latency_us_saxpy: 79.20 (-88.6%)  paired_speedup: 0.77 (+777.1%)
+bash: checks ok: 1 cell(s), 2 passes each, 3 cell x group pair(s) | precision: one max_diff row per cell x group in .kernel/precision.tsv (n/a where the check printed none) | 
+LIVE LOOP VERIFIED: /var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf

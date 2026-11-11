@@ -1,0 +1,11 @@
+diff --git a/src/kernel.cuh b/src/kernel.cuh
+index a790b49..668b400 100644
+--- a/src/kernel.cuh
++++ b/src/kernel.cuh
+@@ -2,5 +2,5 @@
+ 
+ __global__ void saxpy_candidate(int n, float a, const float *x, float *y) {
+   const int i = blockIdx.x * blockDim.x + threadIdx.x;
+-  if (i < n) y[i] = a * x[i] + y[i];
++  if (i < n) y[i] = (i + 1 < n && x[i] == 0.0f && x[i + 1] == 0.0f) ? 0.0f : a * x[i] + y[i];
+ }

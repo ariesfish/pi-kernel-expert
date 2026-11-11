@@ -224,3 +224,44 @@ Replay evidence is under `.dev/audit/wiki-pin-update/`.
 - Registered tools ran through the test host backed by real child processes,
   not an interactive pi session. No GPU, compiler, ncu, or upstream evidence
   recapture is claimed by this pin verification.
+
+
+## 2026-11-11 — live pi-goal / H200 integration
+
+The SDK loaded both real extensions and exercised their registered tools through
+pi's nested tool pipeline. Host: macOS / Node 24.21.0, pi CLI 1.5.2, SDK 1.5.0.
+GPU commands ran on `builder` / h200-7, NVIDIA H200 card 3, driver 580.178.04,
+CUDA 13.0.88, ncu 2025.3.1. Clocks stayed unlocked: the loaded SM sample was
+1980 MHz, memory 3201 MHz, with zero foreign GPU allocations at the recorded
+start/end samples. No global install or GPU clock change was performed.
+
+| Check | Result |
+| --- | --- |
+| Framing / probes / freeze | Two measured directions; one human-approved contract; exact approval artifact archived |
+| Correctness and precision | One fp32 cell, three input groups, two passes each; reference calibration max_diff 0 |
+| Baseline / candidate reading | CUDA-event timing over 100 launches; five samples in each of two candidate windows per group; mirrored same-job pairing; GPU and host-enqueue provenance recorded |
+| Real profile | Full ncu report with source, 105 present key metrics, three absent metrics listed, and four source-line stall entries; attached through kernel_profile and bound to the candidate diff |
+| Keep settlement | Gate 4/4 passed; C2 recorded; log_goal committed cefe1c4 in the isolated task with Gate and Criteria trailers |
+| Negative control | Incorrect zero-input path: zero_block max_diff 1; precision-regression refused the keep; C3 recorded rejection |
+| Rollback | log_goal(checks_failed) saved attempts/4.patch and restored the accepted commit; rebuilt source passes all three groups again |
+| Kernel package checks | 372 tests pass; typecheck passes |
+| Peer checks | 221 pi-goal tests pass; typecheck passes; ignored/unignored .goal real-git regression passes |
+
+Archive: `.dev/audit/live-goal/README.md`, with the report, summary, raw readings,
+Candidate ledger, goal journal, commit read-back and rejected patch. The strided
+baseline is an intentionally inefficient protocol control; no production
+performance improvement is claimed.
+
+The run exposed and fixed the generated timeout field (`timeout_seconds`, kernel
+commit 4e9aa74) and a Git staging error for ignored research state (pi-goal commit
+28f319a). The original journal entries where Git settlement failed are preserved;
+they are not evidence of a committed keep. A separate fail-closed settlement fix
+is still needed so that a commit error cannot be logged as a successful keep or
+unblock the next iteration.
+
+Limits: this was scripted SDK tool orchestration, not model-directed tool use or
+a TUI run. The approved live artifact predates the timeout fix and its gate used
+the default timeout; every observed check finished below the intended 180-second
+limit. ncu 2025.3.1 lacks the timeline helper's timed_warp_samples API, so timelines
+remain unavailable. No Blackwell run, milestone attribution or knowledge
+publication was exercised in this task.

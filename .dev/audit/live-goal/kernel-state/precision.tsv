@@ -1,0 +1,4 @@
+# cell	group	max_diff
+saxpy	typical	0
+saxpy	zero_block	0
+saxpy	tail	0

@@ -1,0 +1,94 @@
+{
+  "name": "kernel_candidate",
+  "params": {
+    "decision": "keep",
+    "description": "Map neighboring lanes to neighboring elements",
+    "metrics": {
+      "latency_us_saxpy_typical": 61.336799,
+      "latency_us_saxpy_zero_block": 61.303041,
+      "latency_us_saxpy_tail": 61.121919,
+      "latency_us_saxpy": 61.25384695,
+      "paired_speedup": 1.000188227,
+      "geomean_speedup": 11.33714836
+    },
+    "reading": "runs/coalesced.stdout",
+    "wiki": {
+      "none": true
+    }
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "recorded C1 (keep) — parent baseline\n  diff d14aab6e572d  contract e39739dcc958\n  geomean_speedup 11.33714836\n  reading: basis device, hostBoundRatio 0.0301786201599, verdict measured, pairing mirrored\n  precision: fp32 e_cand 0 vs e_ref 0, threshold 7.629e-6\n  wiki: none (this keep proved no transferable mechanism)\nledger: candidates.jsonl\nbenchmark.csv refreshed (1 row(s), derived — never edit it)\nNext: pi-goal's log_goal decides the keep; this record is the lineage and evidence.\n\nwarning(s):\n- no docs/milestone.md in this workspace, so this candidate names no decision: the plan is the attribution, and a workspace without one records lineage only."
+      }
+    ],
+    "details": {
+      "record": {
+        "id": "C1",
+        "parent": "baseline",
+        "at": "2026-11-11T08:35:32.504Z",
+        "decision": "keep",
+        "description": "Map neighboring lanes to neighboring elements",
+        "commit": null,
+        "contractSha": "e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a",
+        "diffHash": "d14aab6e572d74b869d1c010c95bc37900d0fbaca358fbfd9671047fc35b8336",
+        "metrics": {
+          "latency_us_saxpy_typical": 61.336799,
+          "latency_us_saxpy_zero_block": 61.303041,
+          "latency_us_saxpy_tail": 61.121919,
+          "latency_us_saxpy": 61.25384695,
+          "paired_speedup": 1.000188227,
+          "geomean_speedup": 11.33714836
+        },
+        "profile": null,
+        "bottleneck": null,
+        "reason": null,
+        "reading": {
+          "contractSha": "e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a",
+          "basis": "device",
+          "hostBoundRatio": 0.0301786201599,
+          "hostBoundVerdict": "ok",
+          "pairing": "mirrored",
+          "verdict": "measured",
+          "cells": [
+            {
+              "id": "saxpy",
+              "group": "typical",
+              "median": 61.336799,
+              "spreadPct": 0.297894580381
+            },
+            {
+              "id": "saxpy",
+              "group": "zero_block",
+              "median": 61.303041,
+              "spreadPct": 0.313723425238
+            },
+            {
+              "id": "saxpy",
+              "group": "tail",
+              "median": 61.121919,
+              "spreadPct": 0.296850954565
+            }
+          ],
+          "startedAt": "2026-11-11T08:33:47Z",
+          "warnings": []
+        },
+        "pairing": "mirrored",
+        "verdict": "measured",
+        "forced": false,
+        "forcedReason": null,
+        "forcedRules": [],
+        "wiki": {
+          "state": "none"
+        },
+        "milestoneDecision": null,
+        "milestoneSha": null,
+        "precondition": null
+      },
+      "benchmarkCsv": "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/benchmark.csv",
+      "refusals": []
+    },
+    "isError": false
+  }
+}

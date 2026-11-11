@@ -1,0 +1,15 @@
+commit cefe1c4e6a5814c4a5433f7a322ad1d1e1a673f6
+Author: Integration verification <integration@example.invalid>
+Commit: Integration verification <integration@example.invalid>
+
+    perf(saxpy): coalesce candidate memory accesses
+    
+    Result: {"status":"keep","geomean_speedup":11.33498505,"latency_us_saxpy_typical":61.364,"latency_us_saxpy_zero_block":61.335361,"latency_us_saxpy_tail":61.0976005,"latency_us_saxpy":61.26553737,"paired_speedup":0.9996227887}
+    Gate: sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52
+    Criteria: M1,C1,L2-tests,L2-scope
+
+commit 60ac81cf58e37b181b4c6f7f226af136e3226769
+Author: Integration verification <integration@example.invalid>
+Commit: Integration verification <integration@example.invalid>
+
+    test(integration): prepare the frozen SAXPY harness

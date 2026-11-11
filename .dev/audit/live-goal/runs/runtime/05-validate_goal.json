@@ -1,0 +1,22 @@
+{
+  "name": "validate_goal",
+  "params": {
+    "dry_run": false
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "✅ Research is valid\nWorking directory: /var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf\nPrimary metric: geomean_speedup"
+      }
+    ],
+    "details": {
+      "workDir": "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf",
+      "metricName": "geomean_speedup",
+      "issues": [],
+      "parsedMetrics": null,
+      "ok": true
+    },
+    "isError": false
+  }
+}

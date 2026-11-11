@@ -1,0 +1,4 @@
+candidate,parent,at,decision,milestone_decision,description,geomean_speedup,latency_us_saxpy,latency_us_saxpy_tail,latency_us_saxpy_typical,latency_us_saxpy_zero_block,paired_speedup,profile_run,bottleneck_metric,reason,forced,pairing,verdict,forced_rules,wiki
+C1,baseline,2026-11-11T08:35:32.504Z,keep,,Map neighboring lanes to neighboring elements,11.33714836,61.25384695,61.121919,61.336799,61.303041,1.000188227,,,,,mirrored,measured,,none
+C2,C1,2026-11-11T08:54:21.988Z,keep,,Map neighboring lanes to neighboring elements,11.33498505,61.26553737,61.0976005,61.364,61.335361,0.9996227887,saxpy_coalesced_recovery,,,,mirrored,measured,,none
+C3,C2,2026-11-11T08:56:20.285Z,reject,,Incorrect zero-block fast path,8.768027459,79.20184482,80.924959,81.075201,75.724318,0.7733484847,,,The zero_block input group fails the fixed reference comparison and precision gate,,mirrored,measured,,

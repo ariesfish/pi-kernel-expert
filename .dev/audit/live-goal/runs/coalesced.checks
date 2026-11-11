@@ -1,0 +1,2 @@
+checks ok: 1 cell(s), 2 passes each, 3 cell x group pair(s)
+precision: one max_diff row per cell x group in .kernel/precision.tsv (n/a where the check printed none)

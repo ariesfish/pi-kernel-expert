@@ -1,0 +1,99 @@
+{
+  "name": "kernel_candidate",
+  "params": {
+    "decision": "keep",
+    "description": "Map neighboring lanes to neighboring elements",
+    "metrics": {
+      "latency_us_saxpy_typical": 61.364,
+      "latency_us_saxpy_zero_block": 61.335361,
+      "latency_us_saxpy_tail": 61.0976005,
+      "latency_us_saxpy": 61.26553737,
+      "paired_speedup": 0.9996227887,
+      "geomean_speedup": 11.33498505
+    },
+    "reading": "runs/coalesced-recovery.stdout",
+    "profile_run": "saxpy_coalesced_recovery",
+    "wiki": {
+      "none": true
+    }
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "recorded C2 (keep) — parent C1\n  diff d14aab6e572d  contract e39739dcc958\n  geomean_speedup 11.33498505\n  profile saxpy_coalesced_recovery (1ef9d1ef93ba)\n  reading: basis device, hostBoundRatio 0.0303954926899, verdict measured, pairing mirrored\n  precision: fp32 e_cand 0 vs e_ref 0, threshold 7.629e-6\n  wiki: none (this keep proved no transferable mechanism)\nledger: candidates.jsonl\nbenchmark.csv refreshed (2 row(s), derived — never edit it)\nNext: pi-goal's log_goal decides the keep; this record is the lineage and evidence.\n\nwarning(s):\n- no docs/milestone.md in this workspace, so this candidate names no decision: the plan is the attribution, and a workspace without one records lineage only."
+      }
+    ],
+    "details": {
+      "record": {
+        "id": "C2",
+        "parent": "C1",
+        "at": "2026-11-11T08:54:21.988Z",
+        "decision": "keep",
+        "description": "Map neighboring lanes to neighboring elements",
+        "commit": null,
+        "contractSha": "e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a",
+        "diffHash": "d14aab6e572d74b869d1c010c95bc37900d0fbaca358fbfd9671047fc35b8336",
+        "metrics": {
+          "latency_us_saxpy_typical": 61.364,
+          "latency_us_saxpy_zero_block": 61.335361,
+          "latency_us_saxpy_tail": 61.0976005,
+          "latency_us_saxpy": 61.26553737,
+          "paired_speedup": 0.9996227887,
+          "geomean_speedup": 11.33498505
+        },
+        "profile": {
+          "runId": "saxpy_coalesced_recovery",
+          "path": "profile/saxpy_coalesced_recovery/summary.json",
+          "sha256": "1ef9d1ef93ba2b17e3cac08ccbde61e897143fb618cde2f7cc8200fc96cd6ac4"
+        },
+        "bottleneck": null,
+        "reason": null,
+        "reading": {
+          "contractSha": "e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a",
+          "basis": "device",
+          "hostBoundRatio": 0.0303954926899,
+          "hostBoundVerdict": "ok",
+          "pairing": "mirrored",
+          "verdict": "measured",
+          "cells": [
+            {
+              "id": "saxpy",
+              "group": "typical",
+              "median": 61.364,
+              "spreadPct": 0.326445472916
+            },
+            {
+              "id": "saxpy",
+              "group": "zero_block",
+              "median": 61.335361,
+              "spreadPct": 0.299993343155
+            },
+            {
+              "id": "saxpy",
+              "group": "tail",
+              "median": 61.0976005,
+              "spreadPct": 0.281251634424
+            }
+          ],
+          "startedAt": "2026-11-11T08:47:16Z",
+          "warnings": []
+        },
+        "pairing": "mirrored",
+        "verdict": "measured",
+        "forced": false,
+        "forcedReason": null,
+        "forcedRules": [],
+        "wiki": {
+          "state": "none"
+        },
+        "milestoneDecision": null,
+        "milestoneSha": null,
+        "precondition": null
+      },
+      "benchmarkCsv": "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/benchmark.csv",
+      "refusals": []
+    },
+    "isError": false
+  }
+}

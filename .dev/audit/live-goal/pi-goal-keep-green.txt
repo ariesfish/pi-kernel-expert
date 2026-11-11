@@ -1,0 +1,11 @@
+✔ dirty tree check separates research state from user changes (0.898334ms)
+✔ keep commits candidate changes while excluding ignored research state (158.499625ms)
+✔ keep commits candidate changes while excluding unignored research state (142.682625ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 368.270834

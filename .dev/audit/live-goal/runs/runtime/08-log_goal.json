@@ -1,0 +1,237 @@
+{
+  "name": "log_goal",
+  "params": {
+    "commit": "60ac81c",
+    "metric": 1,
+    "status": "keep",
+    "description": "test(integration): record the measured SAXPY baseline",
+    "metrics": {
+      "latency_us_saxpy_typical": 696.288643,
+      "latency_us_saxpy_zero_block": 694.202576,
+      "latency_us_saxpy_tail": 692.844963,
+      "latency_us_saxpy": 694.4439502,
+      "paired_speedup": 0.08817609138
+    },
+    "asi": {
+      "hypothesis": "Establish the unchanged strided kernel under the frozen contract",
+      "gpu": 3,
+      "clocks": "unlocked",
+      "scope": "integration acceptance"
+    }
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Gate pass: 4/4 criteria pass (sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52).\nLogged #1: keep — test(integration): record the measured SAXPY baseline\nBaseline geomean_speedup: 1x\nSecondary: latency_us_saxpy_typical: 696.29  latency_us_saxpy_zero_block: 694.20  latency_us_saxpy_tail: 692.84  latency_us_saxpy: 694.44  paired_speedup: 0.09\n📋 ASI: hypothesis: Establish the unchanged strided kernel under the frozen contract | gpu: 3 | clocks: unlocked | scope: integration acceptance\n(1 runs in current experiment / 4 max)\n⚠️ Git commit error: git add failed (exit 1): The following paths are ignored by one of your .gitignore files:\n.goal\nhint: Use -f if you really want to add them.\nhint: Disable this message with \"git config set advice.addIgnoredFile false\""
+      }
+    ],
+    "details": {
+      "runResult": {
+        "commit": "60ac81c",
+        "metric": 1,
+        "metrics": {
+          "latency_us_saxpy_typical": 696.288643,
+          "latency_us_saxpy_zero_block": 694.202576,
+          "latency_us_saxpy_tail": 692.844963,
+          "latency_us_saxpy": 694.4439502,
+          "paired_speedup": 0.08817609138
+        },
+        "status": "keep",
+        "description": "test(integration): record the measured SAXPY baseline",
+        "timestamp": 1794386023459,
+        "experimentIndex": 0,
+        "confidence": null,
+        "asi": {
+          "hypothesis": "Establish the unchanged strided kernel under the frozen contract",
+          "gpu": 3,
+          "clocks": "unlocked",
+          "scope": "integration acceptance"
+        }
+      },
+      "state": {
+        "contract": {
+          "version": 1,
+          "objective": "Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback",
+          "criteria": [
+            {
+              "id": "M1",
+              "statement": "geomean speedup over the recorded baseline across 1 matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; 3 group(s) in the matrix)",
+              "kind": "metric",
+              "blocking": true,
+              "metric": {
+                "name": "geomean_speedup",
+                "direction": "higher",
+                "unit": "x"
+              }
+            },
+            {
+              "id": "C1",
+              "statement": "every matrix cell matches the reference on every input group, on two consecutive passes",
+              "kind": "command",
+              "blocking": true,
+              "check": {
+                "command": "bash goal.checks.sh",
+                "expect": "exit0"
+              }
+            }
+          ],
+          "testGlobs": [
+            "harness/**"
+          ],
+          "scopeGlobs": [
+            "src/**"
+          ],
+          "allowTestEdits": false,
+          "frozenAt": 1794385898800,
+          "hash": "sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52"
+        },
+        "directions": [
+          {
+            "id": "D1",
+            "title": "Coalesced memory mapping",
+            "mechanism": "Map adjacent lanes to adjacent elements",
+            "proxyMetric": "latency_us",
+            "cost": "one compiled reference run",
+            "risk": "Incorrect bounds at the tail",
+            "killIf": "Reference is not materially faster than the strided baseline",
+            "status": "kept",
+            "evidence": {
+              "command": "bash harness/remote.sh reference",
+              "value": 61.34656,
+              "outputHash": "sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770",
+              "at": 1794385365496
+            }
+          },
+          {
+            "id": "D2",
+            "title": "Launch geometry",
+            "mechanism": "Use 128 threads per block to change occupancy and grid geometry",
+            "proxyMetric": "latency_us",
+            "cost": "one baseline run",
+            "risk": "More blocks may increase scheduling cost",
+            "killIf": "Deferred once the coalesced direction satisfies this acceptance task",
+            "status": "killed",
+            "evidence": {
+              "command": "bash harness/remote.sh bench 128",
+              "value": 697.854691,
+              "outputHash": "sha256:01862d0a0546c40696d767c246c83759d965b4cc1c9645e064b5681780db85f9",
+              "at": 1794385366909
+            }
+          }
+        ],
+        "probes": [
+          {
+            "directionId": "D1",
+            "command": "bash harness/remote.sh reference",
+            "value": 61.34656,
+            "evidenceHash": "sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770",
+            "decision": "keep",
+            "at": 1794385365496
+          },
+          {
+            "directionId": "D2",
+            "command": "bash harness/remote.sh bench 128",
+            "value": 697.854691,
+            "evidenceHash": "sha256:01862d0a0546c40696d767c246c83759d965b4cc1c9645e064b5681780db85f9",
+            "decision": "kill",
+            "at": 1794385366909
+          }
+        ],
+        "gates": [
+          {
+            "verdict": "pass",
+            "contractHash": "sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52",
+            "checkedAt": 1794386023459,
+            "criteria": [
+              {
+                "criterionId": "M1",
+                "pass": true,
+                "blocking": true,
+                "detail": "baseline run — no prior metric to compare"
+              },
+              {
+                "criterionId": "C1",
+                "pass": true,
+                "blocking": true,
+                "detail": "bash goal.checks.sh passed"
+              },
+              {
+                "criterionId": "L2-tests",
+                "pass": true,
+                "blocking": true,
+                "detail": "no protected test files changed"
+              },
+              {
+                "criterionId": "L2-scope",
+                "pass": true,
+                "blocking": true,
+                "detail": "all changed paths are inside the contract scope"
+              }
+            ]
+          }
+        ],
+        "reviews": [],
+        "attempts": [],
+        "results": [
+          {
+            "commit": "60ac81c",
+            "metric": 1,
+            "metrics": {
+              "latency_us_saxpy_typical": 696.288643,
+              "latency_us_saxpy_zero_block": 694.202576,
+              "latency_us_saxpy_tail": 692.844963,
+              "latency_us_saxpy": 694.4439502,
+              "paired_speedup": 0.08817609138
+            },
+            "status": "keep",
+            "description": "test(integration): record the measured SAXPY baseline",
+            "timestamp": 1794386023459,
+            "experimentIndex": 0,
+            "confidence": null,
+            "asi": {
+              "hypothesis": "Establish the unchanged strided kernel under the frozen contract",
+              "gpu": 3,
+              "clocks": "unlocked",
+              "scope": "integration acceptance"
+            }
+          }
+        ],
+        "baselineMetric": 1,
+        "bestDirection": "higher",
+        "metricName": "geomean_speedup",
+        "metricUnit": "x",
+        "secondaryMetrics": [
+          {
+            "name": "latency_us_saxpy_typical",
+            "unit": ""
+          },
+          {
+            "name": "latency_us_saxpy_zero_block",
+            "unit": ""
+          },
+          {
+            "name": "latency_us_saxpy_tail",
+            "unit": ""
+          },
+          {
+            "name": "latency_us_saxpy",
+            "unit": ""
+          },
+          {
+            "name": "paired_speedup",
+            "unit": ""
+          }
+        ],
+        "name": "Research",
+        "currentExperimentIndex": 0,
+        "runLimit": 4,
+        "confidence": null,
+        "testEditsAllowed": false,
+        "benchmarkEditsAllowed": false
+      },
+      "wallClockSeconds": 106.954
+    },
+    "isError": false
+  }
+}

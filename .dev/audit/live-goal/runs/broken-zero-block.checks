@@ -1,0 +1,3 @@
+FAIL cell saxpy group zero_block pass 1:
+elements=16777216 group=zero_block implementation=candidate max_diff=1
+checks failed: 1 cell/group pair(s); a pair that passes once and fails twice may be order-dependent

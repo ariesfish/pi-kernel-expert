@@ -1,0 +1,367 @@
+{
+  "name": "log_goal",
+  "params": {
+    "commit": "cefe1c4",
+    "metric": 8.768027459,
+    "status": "checks_failed",
+    "description": "test(integration): reject the incorrect zero-block fast path",
+    "metrics": {
+      "latency_us_saxpy_typical": 81.075201,
+      "latency_us_saxpy_zero_block": 75.724318,
+      "latency_us_saxpy_tail": 80.924959,
+      "latency_us_saxpy": 79.20184482,
+      "paired_speedup": 0.7733484847
+    },
+    "asi": {
+      "hypothesis": "Exercise rejection despite a measurable device timing",
+      "rollback_reason": "zero_block fails correctness and precision",
+      "next_action_hint": "Restore the accepted coalesced kernel",
+      "kernel_candidate": "C3"
+    }
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Logged #4: checks_failed — test(integration): reject the incorrect zero-block fast path\nBaseline geomean_speedup: 1x\nSecondary: latency_us_saxpy_typical: 81.08 (-88.4%)  latency_us_saxpy_zero_block: 75.72 (-89.1%)  latency_us_saxpy_tail: 80.92 (-88.3%)  latency_us_saxpy: 79.20 (-88.6%)  paired_speedup: 0.77 (+777.1%)\n📋 ASI: hypothesis: Exercise rejection despite a measurable device timing | rollback_reason: zero_block fails correctness and precision | next_action_hint: Restore the accepted coalesced kernel | kernel_candidate: C3\n📊 Confidence: 8.0× noise floor — improvement is likely real\n(4 runs in current experiment / 4 max)\n📝 Git: reverted changes (checks_failed) to cefe1c4 — attempt diff kept at /var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/.goal/researches/default/attempts/4.patch\n\n🛑 Maximum runs reached (4) for the current experiment. STOP the research loop now."
+      }
+    ],
+    "details": {
+      "runResult": {
+        "commit": "cefe1c4",
+        "metric": 8.768027459,
+        "metrics": {
+          "latency_us_saxpy_typical": 81.075201,
+          "latency_us_saxpy_zero_block": 75.724318,
+          "latency_us_saxpy_tail": 80.924959,
+          "latency_us_saxpy": 79.20184482,
+          "paired_speedup": 0.7733484847
+        },
+        "status": "checks_failed",
+        "description": "test(integration): reject the incorrect zero-block fast path",
+        "timestamp": 1794387380295,
+        "experimentIndex": 0,
+        "confidence": 8.047226081089752,
+        "asi": {
+          "hypothesis": "Exercise rejection despite a measurable device timing",
+          "rollback_reason": "zero_block fails correctness and precision",
+          "next_action_hint": "Restore the accepted coalesced kernel",
+          "kernel_candidate": "C3"
+        }
+      },
+      "state": {
+        "contract": {
+          "version": 1,
+          "objective": "Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback",
+          "criteria": [
+            {
+              "id": "M1",
+              "statement": "geomean speedup over the recorded baseline across 1 matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; 3 group(s) in the matrix)",
+              "kind": "metric",
+              "blocking": true,
+              "metric": {
+                "name": "geomean_speedup",
+                "direction": "higher",
+                "unit": "x"
+              }
+            },
+            {
+              "id": "C1",
+              "statement": "every matrix cell matches the reference on every input group, on two consecutive passes",
+              "kind": "command",
+              "blocking": true,
+              "check": {
+                "command": "bash goal.checks.sh",
+                "expect": "exit0"
+              }
+            }
+          ],
+          "testGlobs": [
+            "harness/**"
+          ],
+          "scopeGlobs": [
+            "src/**"
+          ],
+          "allowTestEdits": false,
+          "frozenAt": 1794385898800,
+          "hash": "sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52"
+        },
+        "directions": [
+          {
+            "id": "D1",
+            "title": "Coalesced memory mapping",
+            "mechanism": "Map adjacent lanes to adjacent elements",
+            "proxyMetric": "latency_us",
+            "cost": "one compiled reference run",
+            "risk": "Incorrect bounds at the tail",
+            "killIf": "Reference is not materially faster than the strided baseline",
+            "status": "kept",
+            "evidence": {
+              "command": "bash harness/remote.sh reference",
+              "value": 61.34656,
+              "outputHash": "sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770",
+              "at": 1794385365496
+            }
+          },
+          {
+            "id": "D2",
+            "title": "Launch geometry",
+            "mechanism": "Use 128 threads per block to change occupancy and grid geometry",
+            "proxyMetric": "latency_us",
+            "cost": "one baseline run",
+            "risk": "More blocks may increase scheduling cost",
+            "killIf": "Deferred once the coalesced direction satisfies this acceptance task",
+            "status": "killed",
+            "evidence": {
+              "command": "bash harness/remote.sh bench 128",
+              "value": 697.854691,
+              "outputHash": "sha256:01862d0a0546c40696d767c246c83759d965b4cc1c9645e064b5681780db85f9",
+              "at": 1794385366909
+            }
+          }
+        ],
+        "probes": [
+          {
+            "directionId": "D1",
+            "command": "bash harness/remote.sh reference",
+            "value": 61.34656,
+            "evidenceHash": "sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770",
+            "decision": "keep",
+            "at": 1794385365496
+          },
+          {
+            "directionId": "D2",
+            "command": "bash harness/remote.sh bench 128",
+            "value": 697.854691,
+            "evidenceHash": "sha256:01862d0a0546c40696d767c246c83759d965b4cc1c9645e064b5681780db85f9",
+            "decision": "kill",
+            "at": 1794385366909
+          }
+        ],
+        "gates": [
+          {
+            "verdict": "pass",
+            "contractHash": "sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52",
+            "checkedAt": 1794386023459,
+            "criteria": [
+              {
+                "criterionId": "M1",
+                "pass": true,
+                "blocking": true,
+                "detail": "baseline run — no prior metric to compare"
+              },
+              {
+                "criterionId": "C1",
+                "pass": true,
+                "blocking": true,
+                "detail": "bash goal.checks.sh passed"
+              },
+              {
+                "criterionId": "L2-tests",
+                "pass": true,
+                "blocking": true,
+                "detail": "no protected test files changed"
+              },
+              {
+                "criterionId": "L2-scope",
+                "pass": true,
+                "blocking": true,
+                "detail": "all changed paths are inside the contract scope"
+              }
+            ]
+          },
+          {
+            "verdict": "pass",
+            "contractHash": "sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52",
+            "checkedAt": 1794386293021,
+            "criteria": [
+              {
+                "criterionId": "M1",
+                "pass": true,
+                "blocking": true,
+                "detail": "geomean_speedup improved 1033.71% (baseline 1 -> 11.33714836)"
+              },
+              {
+                "criterionId": "C1",
+                "pass": true,
+                "blocking": true,
+                "detail": "bash goal.checks.sh passed"
+              },
+              {
+                "criterionId": "L2-tests",
+                "pass": true,
+                "blocking": true,
+                "detail": "no protected test files changed"
+              },
+              {
+                "criterionId": "L2-scope",
+                "pass": true,
+                "blocking": true,
+                "detail": "all changed paths are inside the contract scope"
+              }
+            ]
+          },
+          {
+            "verdict": "pass",
+            "contractHash": "sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52",
+            "checkedAt": 1794387269849,
+            "criteria": [
+              {
+                "criterionId": "M1",
+                "pass": true,
+                "blocking": true,
+                "detail": "geomean_speedup improved 1033.50% (baseline 1 -> 11.33498505)"
+              },
+              {
+                "criterionId": "C1",
+                "pass": true,
+                "blocking": true,
+                "detail": "bash goal.checks.sh passed"
+              },
+              {
+                "criterionId": "L2-tests",
+                "pass": true,
+                "blocking": true,
+                "detail": "no protected test files changed"
+              },
+              {
+                "criterionId": "L2-scope",
+                "pass": true,
+                "blocking": true,
+                "detail": "all changed paths are inside the contract scope"
+              }
+            ]
+          }
+        ],
+        "reviews": [],
+        "attempts": [],
+        "results": [
+          {
+            "commit": "60ac81c",
+            "metric": 1,
+            "metrics": {
+              "latency_us_saxpy_typical": 696.288643,
+              "latency_us_saxpy_zero_block": 694.202576,
+              "latency_us_saxpy_tail": 692.844963,
+              "latency_us_saxpy": 694.4439502,
+              "paired_speedup": 0.08817609138
+            },
+            "status": "keep",
+            "description": "test(integration): record the measured SAXPY baseline",
+            "timestamp": 1794386023459,
+            "experimentIndex": 0,
+            "confidence": null,
+            "asi": {
+              "hypothesis": "Establish the unchanged strided kernel under the frozen contract",
+              "gpu": 3,
+              "clocks": "unlocked",
+              "scope": "integration acceptance"
+            }
+          },
+          {
+            "commit": "60ac81c",
+            "metric": 11.33714836,
+            "metrics": {
+              "latency_us_saxpy_typical": 61.336799,
+              "latency_us_saxpy_zero_block": 61.303041,
+              "latency_us_saxpy_tail": 61.121919,
+              "latency_us_saxpy": 61.25384695,
+              "paired_speedup": 1.000188227
+            },
+            "status": "keep",
+            "description": "perf(saxpy): coalesce candidate memory accesses",
+            "timestamp": 1794386293022,
+            "experimentIndex": 0,
+            "confidence": null,
+            "asi": {
+              "hypothesis": "Adjacent lanes access adjacent elements",
+              "gpu": 3,
+              "clocks": "unlocked",
+              "kernel_candidate": "C1",
+              "limitation": "No ncu limiter claim in this acceptance run"
+            }
+          },
+          {
+            "commit": "cefe1c4",
+            "metric": 11.33498505,
+            "metrics": {
+              "latency_us_saxpy_typical": 61.364,
+              "latency_us_saxpy_zero_block": 61.335361,
+              "latency_us_saxpy_tail": 61.0976005,
+              "latency_us_saxpy": 61.26553737,
+              "paired_speedup": 0.9996227887
+            },
+            "status": "keep",
+            "description": "perf(saxpy): coalesce candidate memory accesses",
+            "timestamp": 1794387269850,
+            "experimentIndex": 0,
+            "confidence": 4778.394386379576,
+            "asi": {
+              "hypothesis": "Adjacent lanes access adjacent elements",
+              "gpu": 3,
+              "clocks": "unlocked",
+              "kernel_candidate": "C2",
+              "limitation": "No ncu limiter claim in this acceptance run"
+            }
+          },
+          {
+            "commit": "cefe1c4",
+            "metric": 8.768027459,
+            "metrics": {
+              "latency_us_saxpy_typical": 81.075201,
+              "latency_us_saxpy_zero_block": 75.724318,
+              "latency_us_saxpy_tail": 80.924959,
+              "latency_us_saxpy": 79.20184482,
+              "paired_speedup": 0.7733484847
+            },
+            "status": "checks_failed",
+            "description": "test(integration): reject the incorrect zero-block fast path",
+            "timestamp": 1794387380295,
+            "experimentIndex": 0,
+            "confidence": 8.047226081089752,
+            "asi": {
+              "hypothesis": "Exercise rejection despite a measurable device timing",
+              "rollback_reason": "zero_block fails correctness and precision",
+              "next_action_hint": "Restore the accepted coalesced kernel",
+              "kernel_candidate": "C3"
+            }
+          }
+        ],
+        "baselineMetric": 1,
+        "bestDirection": "higher",
+        "metricName": "geomean_speedup",
+        "metricUnit": "x",
+        "secondaryMetrics": [
+          {
+            "name": "latency_us_saxpy_typical",
+            "unit": ""
+          },
+          {
+            "name": "latency_us_saxpy_zero_block",
+            "unit": ""
+          },
+          {
+            "name": "latency_us_saxpy_tail",
+            "unit": ""
+          },
+          {
+            "name": "latency_us_saxpy",
+            "unit": ""
+          },
+          {
+            "name": "paired_speedup",
+            "unit": ""
+          }
+        ],
+        "name": "Research",
+        "currentExperimentIndex": 0,
+        "runLimit": 4,
+        "confidence": 8.047226081089752,
+        "testEditsAllowed": false,
+        "benchmarkEditsAllowed": false
+      },
+      "wallClockSeconds": 100.02
+    },
+    "isError": false
+  }
+}

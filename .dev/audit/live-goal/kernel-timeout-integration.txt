@@ -1,0 +1,1 @@
+Installed pi-goal retains the requested 17-second timeout from the generated tool payload.

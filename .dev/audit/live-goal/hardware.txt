@@ -1,0 +1,13 @@
+h200-7
+ 16:22:44 up 55 days, 22:05,  1 user,  load average: 0.29, 0.34, 0.57
+192
+name, uuid, driver_version, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], memory.used [MiB]
+NVIDIA H200, GPU-6a3efd05-f136-d6ea-9a2b-69740d42387c, 580.178.04, 345 MHz, 3201 MHz, 0 %, 0 MiB
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Wed_Aug_20_01:58:59_PM_PDT_2025
+Cuda compilation tools, release 13.0, V13.0.88
+Build cuda_13.0.r13.0/compiler.36424714_0
+NVIDIA (R) Nsight Compute Command Line Profiler
+Copyright (c) 2018-2025 NVIDIA Corporation
+Version 2025.3.1.0 (build 36398880) (public-release)

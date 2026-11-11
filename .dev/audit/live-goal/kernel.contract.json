@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 2,
+  "objective": "Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback",
+  "checkCommand": "bash harness/remote.sh check",
+  "benchmarkCommand": "bash harness/remote.sh bench",
+  "cells": [
+    {
+      "id": "saxpy",
+      "dtype": "fp32",
+      "vars": {
+        "N": "16777216"
+      },
+      "boundary": false,
+      "groups": [
+        {
+          "name": "typical",
+          "intent": "deterministic signed fp32 inputs across all indices"
+        },
+        {
+          "name": "zero_block",
+          "intent": "a quarter of x is zero while y remains nonzero"
+        },
+        {
+          "name": "tail",
+          "intent": "37 extra elements exercise a partial final block"
+        }
+      ]
+    }
+  ],
+  "tolerance": {
+    "rtol": 0,
+    "atol": 0.000001
+  },
+  "metricName": "latency_us",
+  "direction": "lower",
+  "repeats": 5,
+  "warmup": 1,
+  "guardPct": 5,
+  "noiseFloorPct": 2,
+  "checksTimeoutSeconds": 180,
+  "scopeGlobs": [
+    "src/**"
+  ],
+  "testGlobs": [
+    "harness/**"
+  ],
+  "basis": "device",
+  "harnessGlobs": [
+    "goal.sh",
+    "goal.checks.sh",
+    "harness/**",
+    ".kernel/calibration.json",
+    ".kernel/precision.tsv",
+    ".kernel/baseline.tsv"
+  ],
+  "referenceCommand": "bash harness/remote.sh reference",
+  "calibrateCommand": "bash harness/remote.sh calibrate",
+  "burnInMs": 0,
+  "clockLock": null,
+  "generator": "pi-kernel-expert 0.4.0"
+}

@@ -1,0 +1,42 @@
+{
+  "name": "kernel_candidate",
+  "params": {
+    "decision": "keep",
+    "description": "Incorrect zero-block fast path",
+    "metrics": {
+      "latency_us_saxpy_typical": 81.075201,
+      "latency_us_saxpy_zero_block": 75.724318,
+      "latency_us_saxpy_tail": 80.924959,
+      "latency_us_saxpy": 79.20184482,
+      "paired_speedup": 0.7733484847,
+      "geomean_speedup": 8.768027459
+    },
+    "reading": "runs/broken-zero-block.stdout",
+    "wiki": {
+      "none": true
+    }
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Candidate not recorded — 1 refusal(s), all printed:\n- precision-regression (charged to the candidate): dtype fp32: e_cand 1.000e+0 > threshold 7.629e-6 = 3 * e_ref 0 + floor 7.629e-6 (max(ulp(fp32), 2^-17)) (worst group(s) saxpy/zero_block). The reference's own error is the ruler: past this threshold the candidate is not the same algorithm at a different speed. Fix: bring max_diff back under 3x the reference's by computing the way the reference does — accumulate in fp32, keep its upcast, drop a lossy fast path — then re-run goal.checks.sh; a candidate that is 4x the reference's error is a different result, not a faster one"
+      }
+    ],
+    "details": {
+      "errors": [
+        "precision-regression (charged to the candidate): dtype fp32: e_cand 1.000e+0 > threshold 7.629e-6 = 3 * e_ref 0 + floor 7.629e-6 (max(ulp(fp32), 2^-17)) (worst group(s) saxpy/zero_block). The reference's own error is the ruler: past this threshold the candidate is not the same algorithm at a different speed. Fix: bring max_diff back under 3x the reference's by computing the way the reference does — accumulate in fp32, keep its upcast, drop a lossy fast path — then re-run goal.checks.sh; a candidate that is 4x the reference's error is a different result, not a faster one"
+      ],
+      "refusals": [
+        {
+          "rule": "precision-regression",
+          "charged": "candidate",
+          "message": "precision-regression (charged to the candidate): dtype fp32: e_cand 1.000e+0 > threshold 7.629e-6 = 3 * e_ref 0 + floor 7.629e-6 (max(ulp(fp32), 2^-17)) (worst group(s) saxpy/zero_block). The reference's own error is the ruler: past this threshold the candidate is not the same algorithm at a different speed.",
+          "fix": "bring max_diff back under 3x the reference's by computing the way the reference does — accumulate in fp32, keep its upcast, drop a lossy fast path — then re-run goal.checks.sh; a candidate that is 4x the reference's error is a different result, not a faster one",
+          "forceable": false
+        }
+      ]
+    },
+    "isError": false
+  }
+}

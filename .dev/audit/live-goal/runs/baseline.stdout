@@ -1,0 +1,10 @@
+METRIC latency_us_saxpy_typical=696.288643
+METRIC latency_us_saxpy_zero_block=694.202576
+METRIC latency_us_saxpy_tail=692.844963
+METRIC latency_us_saxpy=694.4439502
+METRIC paired_speedup=0.08817609138
+METRIC geomean_speedup=1
+baseline recorded in .kernel/baseline.tsv
+=== KERNEL READING ===
+{"schemaVersion":1,"contractSha":"e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a","basis":"device","basisSource":"task-reported","gpu":{"available":true,"name":"NVIDIA H200","index":3,"visible":"3","start":{"clocksSmMhz":345,"clocksMemMhz":3201,"utilPct":0,"foreignProcessMiB":0,"clocksMaxSmMhz":1980},"loaded":{"clocksSmMhz":1980,"clocksMemMhz":3201,"utilPct":0,"foreignProcessMiB":0,"clocksMaxSmMhz":1980},"end":{"clocksSmMhz":420,"clocksMemMhz":3201,"utilPct":0,"foreignProcessMiB":0,"clocksMaxSmMhz":1980}},"cells":[{"id":"saxpy","group":"typical","metric":"latency_us_saxpy_typical","median":696.288643,"samples":10,"spreadPct":2.62897911434},{"id":"saxpy","group":"zero_block","metric":"latency_us_saxpy_zero_block","median":694.202576,"samples":10,"spreadPct":2.71505201099},{"id":"saxpy","group":"tail","metric":"latency_us_saxpy_tail","median":692.844963,"samples":10,"spreadPct":1.35717981686}],"shellMs":106869,"hostEnqueueMs":0.001897475,"deviceMs":0.6936164795,"hostBoundRatio":0.00273562560302,"hostBoundVerdict":"ok","pairing":"mirrored","pairRatios":[0.08757272065,0.08878361929],"pairSpreadPct":1.373240838,"startedAt":"2026-11-11T08:31:40Z","finishedAt":"2026-11-11T08:33:25Z","hostEnqueueSamples":30,"deviceSamples":30,"nvidiaSmi":"NVIDIA-SMI version  : 580.178.04","warnings":["baseline run: geomean_speedup is 1 by construction, not a comparison"]}
+=== END KERNEL READING ===

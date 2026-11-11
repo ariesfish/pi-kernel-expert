@@ -1,0 +1,31 @@
+✔ dirty tree check separates research state from user changes (0.687458ms)
+✖ keep commits candidate changes while excluding ignored research state (85.092875ms)
+✔ keep commits candidate changes while excluding unignored research state (143.578417ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 294.274208
+
+✖ failing tests:
+
+test at tests/workspace/research-workspace.test.mjs:28:3
+✖ keep commits candidate changes while excluding ignored research state (85.092875ms)
+  AssertionError [ERR_ASSERTION]: 
+  ⚠️ Git commit error: git add failed (exit 1): The following paths are ignored by one of your .gitignore files:
+  .goal
+  hint: Use -f if you really want to add them.
+  hint: Disable this message with "git config set advice.addIgnoredFile false"
+      at TestContext.<anonymous> (file:///Users/ariesfish/.pi/agent/git/github.com/ariesfish/pi-goal/tests/workspace/research-workspace.test.mjs:53:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

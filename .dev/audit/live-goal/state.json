@@ -1,0 +1,10 @@
+{
+  "root": "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf",
+  "remote": "/root/pkex/live-goal-TeiuDf",
+  "host": "builder",
+  "gpu": 3,
+  "preparedAt": "2026-11-11T08:22:38.984Z",
+  "kernelCommit": "dd3f07812b91a6d5b53bfeef33e714e1790c35ba",
+  "goalCommit": "92313ac9d1258c11ce81fec629c8d0b1c4e0d46f",
+  "approvalSha": "e60d35608a6ae75d24a12949b2844fa59a3fd36bcc01f6586907ab4aadc0d3a6"
+}

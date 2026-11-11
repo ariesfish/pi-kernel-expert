@@ -1,0 +1,123 @@
+{
+  "name": "kernel_contract",
+  "params": {
+    "objective": "Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback",
+    "check_command": "bash harness/remote.sh check",
+    "benchmark_command": "bash harness/remote.sh bench",
+    "calibrate_command": "bash harness/remote.sh calibrate",
+    "reference_command": "bash harness/remote.sh reference",
+    "cells": [
+      {
+        "id": "saxpy",
+        "dtype": "fp32",
+        "vars": {
+          "N": "16777216"
+        },
+        "groups": [
+          {
+            "name": "typical",
+            "intent": "deterministic signed fp32 inputs across all indices"
+          },
+          {
+            "name": "zero_block",
+            "intent": "a quarter of x is zero while y remains nonzero"
+          },
+          {
+            "name": "tail",
+            "intent": "37 extra elements exercise a partial final block"
+          }
+        ]
+      }
+    ],
+    "rtol": 0,
+    "atol": 0.000001,
+    "basis": "device",
+    "repeats": 5,
+    "warmup": 1,
+    "burn_in_ms": 0,
+    "guard_pct": 5,
+    "noise_floor_pct": 2,
+    "checks_timeout_seconds": 180,
+    "harness_globs": [
+      "goal.sh",
+      "goal.checks.sh",
+      "harness/**",
+      ".kernel/calibration.json",
+      ".kernel/precision.tsv",
+      ".kernel/baseline.tsv"
+    ],
+    "scope_globs": [
+      "src/**"
+    ],
+    "test_globs": [
+      "harness/**"
+    ]
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Contract frozen for 1 cell(s), 3 input group(s).\nkernel.contract.json sha256 e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a\ngroups saxpy=typical,zero_block,tail\nbasis device  harness goal.sh, goal.checks.sh, harness/**, .kernel/calibration.json, .kernel/precision.tsv, .kernel/baseline.tsv\nreference bash harness/remote.sh reference\ncalibration bash harness/remote.sh calibrate (run: bash goal.checks.sh --calibrate)\n\nwritten:\n- kernel.contract.json\n- goal.sh\n- goal.checks.sh\n- kernel-freeze.json\n\nwarnings:\n- no docs/milestone.md: the contract is frozen but the plan is not addressable, so keeps cannot name a decision. kernel_init writes the template; kernel_milestone validates it and freezes M0.\n\nNext:\n1. Pass kernel-freeze.json to freeze_criteria (one human confirmation).\n2. Use metric_name geomean_speedup with direction higher for init_goal/experiments.\n3. Run goal.sh once to record the baseline; it reports geomean_speedup=1 and writes .kernel/baseline.tsv.\n4. Later runs compare per cell, refuse a regression beyond the guard, and emit the geomean.\n\nfreeze_criteria payload:\n{\n  \"objective\": \"Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback\",\n  \"criteria\": [\n    {\n      \"id\": \"M1\",\n      \"statement\": \"geomean speedup over the recorded baseline across 1 matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; 3 group(s) in the matrix)\",\n      \"kind\": \"metric\",\n      \"blocking\": true,\n      \"metric\": {\n        \"name\": \"geomean_speedup\",\n        \"direction\": \"higher\",\n        \"unit\": \"x\"\n      }\n    },\n    {\n      \"id\": \"C1\",\n      \"statement\": \"every matrix cell matches the reference on every input group, on two consecutive passes\",\n      \"kind\": \"command\",\n      \"blocking\": true,\n      \"check\": {\n        \"command\": \"bash goal.checks.sh\",\n        \"expect\": \"exit0\",\n        \"timeoutSeconds\": 180\n      }\n    }\n  ],\n  \"test_globs\": [\n    \"harness/**\"\n  ],\n  \"scope_globs\": [\n    \"src/**\"\n  ],\n  \"basis\": \"device\",\n  \"harness_globs\": [\n    \"goal.sh\",\n    \"goal.checks.sh\",\n    \"harness/**\",\n    \".kernel/calibration.json\",\n    \".kernel/precision.tsv\",\n    \".kernel/baseline.tsv\"\n  ],\n  \"reference_command\": \"bash harness/remote.sh reference\",\n  \"burn_in_ms\": 0,\n  \"clock_lock\": null\n}"
+      }
+    ],
+    "details": {
+      "sha": "e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a",
+      "written": [
+        "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/kernel.contract.json",
+        "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/goal.sh",
+        "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/goal.checks.sh",
+        "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/kernel-freeze.json"
+      ],
+      "freeze": {
+        "objective": "Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback",
+        "criteria": [
+          {
+            "id": "M1",
+            "statement": "geomean speedup over the recorded baseline across 1 matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; 3 group(s) in the matrix)",
+            "kind": "metric",
+            "blocking": true,
+            "metric": {
+              "name": "geomean_speedup",
+              "direction": "higher",
+              "unit": "x"
+            }
+          },
+          {
+            "id": "C1",
+            "statement": "every matrix cell matches the reference on every input group, on two consecutive passes",
+            "kind": "command",
+            "blocking": true,
+            "check": {
+              "command": "bash goal.checks.sh",
+              "expect": "exit0",
+              "timeoutSeconds": 180
+            }
+          }
+        ],
+        "test_globs": [
+          "harness/**"
+        ],
+        "scope_globs": [
+          "src/**"
+        ],
+        "basis": "device",
+        "harness_globs": [
+          "goal.sh",
+          "goal.checks.sh",
+          "harness/**",
+          ".kernel/calibration.json",
+          ".kernel/precision.tsv",
+          ".kernel/baseline.tsv"
+        ],
+        "reference_command": "bash harness/remote.sh reference",
+        "burn_in_ms": 0,
+        "clock_lock": null
+      },
+      "warnings": [
+        "no docs/milestone.md: the contract is frozen but the plan is not addressable, so keeps cannot name a decision. kernel_init writes the template; kernel_milestone validates it and freezes M0."
+      ],
+      "groupCount": 3
+    },
+    "isError": false
+  }
+}

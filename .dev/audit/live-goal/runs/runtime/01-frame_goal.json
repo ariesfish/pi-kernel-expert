@@ -1,0 +1,77 @@
+{
+  "name": "frame_goal",
+  "params": {
+    "directions": [
+      {
+        "id": "D1",
+        "title": "Coalesced memory mapping",
+        "mechanism": "Map adjacent lanes to adjacent elements",
+        "proxyMetric": "latency_us",
+        "cost": "one compiled reference run",
+        "risk": "Incorrect bounds at the tail",
+        "killIf": "Reference is not materially faster than the strided baseline"
+      },
+      {
+        "id": "D2",
+        "title": "Launch geometry",
+        "mechanism": "Use 128 threads per block to change occupancy and grid geometry",
+        "proxyMetric": "latency_us",
+        "cost": "one baseline run",
+        "risk": "More blocks may increase scheduling cost",
+        "killIf": "Deferred once the coalesced direction satisfies this acceptance task"
+      }
+    ]
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "✅ 2 directions registered. Phase: probing.\n- D1: Coalesced memory mapping (proxy: latency_us)\n- D2: Launch geometry (proxy: latency_us)\nNext: call probe_goal for every open direction. Each probe must end kept or killed with an evidence pointer."
+      }
+    ],
+    "details": {
+      "state": {
+        "contract": null,
+        "directions": [
+          {
+            "id": "D1",
+            "title": "Coalesced memory mapping",
+            "mechanism": "Map adjacent lanes to adjacent elements",
+            "proxyMetric": "latency_us",
+            "cost": "one compiled reference run",
+            "risk": "Incorrect bounds at the tail",
+            "killIf": "Reference is not materially faster than the strided baseline",
+            "status": "open"
+          },
+          {
+            "id": "D2",
+            "title": "Launch geometry",
+            "mechanism": "Use 128 threads per block to change occupancy and grid geometry",
+            "proxyMetric": "latency_us",
+            "cost": "one baseline run",
+            "risk": "More blocks may increase scheduling cost",
+            "killIf": "Deferred once the coalesced direction satisfies this acceptance task",
+            "status": "open"
+          }
+        ],
+        "probes": [],
+        "gates": [],
+        "reviews": [],
+        "attempts": [],
+        "results": [],
+        "baselineMetric": null,
+        "bestDirection": "lower",
+        "metricName": "metric",
+        "metricUnit": "",
+        "secondaryMetrics": [],
+        "name": null,
+        "currentExperimentIndex": 0,
+        "runLimit": 4,
+        "confidence": null,
+        "testEditsAllowed": false,
+        "benchmarkEditsAllowed": false
+      }
+    },
+    "isError": false
+  }
+}

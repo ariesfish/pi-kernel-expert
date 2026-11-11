@@ -1,0 +1,41 @@
+{
+  "name": "run_goal",
+  "params": {
+    "command": "bash goal.sh",
+    "timeout_seconds": 180,
+    "checks_timeout_seconds": 180
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "✅ PASSED in 97.5s\n✅ Checks passed in 7.8s\n📊 Current best geomean_speedup: 1x\n\n📐 Parsed metrics: ★ geomean_speedup=11.34x latency_us_saxpy_typical=61.34 latency_us_saxpy_zero_block=61.30 latency_us_saxpy_tail=61.12 latency_us_saxpy=61.25 paired_speedup=1.00\nUse these values directly in log_goal (metric: 11.33714836, metrics: {\"latency_us_saxpy_typical\": 61.336799, \"latency_us_saxpy_zero_block\": 61.303041, \"latency_us_saxpy_tail\": 61.121919, \"latency_us_saxpy\": 61.25384695, \"paired_speedup\": 1.000188227})\n\nMETRIC latency_us_saxpy_typical=61.336799\nMETRIC latency_us_saxpy_zero_block=61.303041\nMETRIC latency_us_saxpy_tail=61.121919\nMETRIC latency_us_saxpy=61.25384695\nMETRIC paired_speedup=1.000188227\nMETRIC geomean_speedup=11.33714836\n=== KERNEL READING ===\n{\"schemaVersion\":1,\"contractSha\":\"e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a\",\"basis\":\"device\",\"basisSource\":\"task-reported\",\"gpu\":{\"available\":true,\"name\":\"NVIDIA H200\",\"index\":3,\"visible\":\"3\",\"start\":{\"clocksSmMhz\":345,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980},\"loaded\":{\"clocksSmMhz\":1980,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980},\"end\":{\"clocksSmMhz\":420,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980}},\"cells\":[{\"id\":\"saxpy\",\"group\":\"typical\",\"metric\":\"latency_us_saxpy_typical\",\"median\":61.336799,\"samples\":10,\"spreadPct\":0.297894580381},{\"id\":\"saxpy\",\"group\":\"zero_block\",\"metric\":\"latency_us_saxpy_zero_block\",\"median\":61.303041,\"samples\":10,\"spreadPct\":0.313723425238},{\"id\":\"saxpy\",\"group\":\"tail\",\"metric\":\"latency_us_saxpy_tail\",\"median\":61.121919,\"samples\":10,\"spreadPct\":0.296850954565}],\"shellMs\":97427,\"hostEnqueueMs\":0.00184951,\"deviceMs\":0.0612854395,\"hostBoundRatio\":0.0301786201599,\"hostBoundVerdict\":\"ok\",\"pairing\":\"mirrored\",\"pairRatios\":[0.99976804,1.00060859],\"pairSpreadPct\":0.08403917416,\"startedAt\":\"2026-11-11T08:33:47Z\",\"finishedAt\":\"2026-11-11T08:35:22Z\",\"hostEnqueueSamples\":30,\"deviceSamples\":30,\"nvidiaSmi\":\"NVIDIA-SMI version  : 580.178.04\",\"warnings\":[]}\n=== END KERNEL READING ===\n"
+      }
+    ],
+    "details": {
+      "command": "bash goal.sh",
+      "exitCode": 0,
+      "durationSeconds": 97.527,
+      "passed": true,
+      "crashed": false,
+      "timedOut": false,
+      "tailOutput": "METRIC latency_us_saxpy_typical=61.336799\nMETRIC latency_us_saxpy_zero_block=61.303041\nMETRIC latency_us_saxpy_tail=61.121919\nMETRIC latency_us_saxpy=61.25384695\nMETRIC paired_speedup=1.000188227\nMETRIC geomean_speedup=11.33714836\n=== KERNEL READING ===\n{\"schemaVersion\":1,\"contractSha\":\"e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a\",\"basis\":\"device\",\"basisSource\":\"task-reported\",\"gpu\":{\"available\":true,\"name\":\"NVIDIA H200\",\"index\":3,\"visible\":\"3\",\"start\":{\"clocksSmMhz\":345,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980},\"loaded\":{\"clocksSmMhz\":1980,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980},\"end\":{\"clocksSmMhz\":420,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980}},\"cells\":[{\"id\":\"saxpy\",\"group\":\"typical\",\"metric\":\"latency_us_saxpy_typical\",\"median\":61.336799,\"samples\":10,\"spreadPct\":0.297894580381},{\"id\":\"saxpy\",\"group\":\"zero_block\",\"metric\":\"latency_us_saxpy_zero_block\",\"median\":61.303041,\"samples\":10,\"spreadPct\":0.313723425238},{\"id\":\"saxpy\",\"group\":\"tail\",\"metric\":\"latency_us_saxpy_tail\",\"median\":61.121919,\"samples\":10,\"spreadPct\":0.296850954565}],\"shellMs\":97427,\"hostEnqueueMs\":0.00184951,\"deviceMs\":0.0612854395,\"hostBoundRatio\":0.0301786201599,\"hostBoundVerdict\":\"ok\",\"pairing\":\"mirrored\",\"pairRatios\":[0.99976804,1.00060859],\"pairSpreadPct\":0.08403917416,\"startedAt\":\"2026-11-11T08:33:47Z\",\"finishedAt\":\"2026-11-11T08:35:22Z\",\"hostEnqueueSamples\":30,\"deviceSamples\":30,\"nvidiaSmi\":\"NVIDIA-SMI version  : 580.178.04\",\"warnings\":[]}\n=== END KERNEL READING ===\n",
+      "checksPass": true,
+      "checksTimedOut": false,
+      "checksOutput": "checks ok: 1 cell(s), 2 passes each, 3 cell x group pair(s)\nprecision: one max_diff row per cell x group in .kernel/precision.tsv (n/a where the check printed none)",
+      "checksDuration": 7.794,
+      "parsedMetrics": {
+        "latency_us_saxpy_typical": 61.336799,
+        "latency_us_saxpy_zero_block": 61.303041,
+        "latency_us_saxpy_tail": 61.121919,
+        "latency_us_saxpy": 61.25384695,
+        "paired_speedup": 1.000188227,
+        "geomean_speedup": 11.33714836
+      },
+      "parsedPrimary": 11.33714836,
+      "metricName": "geomean_speedup",
+      "metricUnit": "x"
+    },
+    "isError": false
+  }
+}

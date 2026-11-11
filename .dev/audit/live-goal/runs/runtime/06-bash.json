@@ -1,0 +1,22 @@
+{
+  "name": "bash",
+  "params": {
+    "command": "bash goal.checks.sh --calibrate",
+    "timeout": 60
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "CALIBRATION dtype=fp32 max_diff=0\ncalibration recorded in .kernel/calibration.json for 1 dtype(s)\n"
+      }
+    ],
+    "structuredContent": {
+      "output": "CALIBRATION dtype=fp32 max_diff=0\ncalibration recorded in .kernel/calibration.json for 1 dtype(s)\n",
+      "truncated": false,
+      "exit_code": 0,
+      "wall_time_seconds": 1.9
+    },
+    "isError": false
+  }
+}

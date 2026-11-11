@@ -1,0 +1,58 @@
+{
+  "name": "freeze_criteria",
+  "params": {
+    "objective": "Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback",
+    "criteria": [
+      {
+        "id": "M1",
+        "statement": "geomean speedup over the recorded baseline across 1 matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; 3 group(s) in the matrix)",
+        "kind": "metric",
+        "blocking": true,
+        "metric": {
+          "name": "geomean_speedup",
+          "direction": "higher",
+          "unit": "x"
+        }
+      },
+      {
+        "id": "C1",
+        "statement": "every matrix cell matches the reference on every input group, on two consecutive passes",
+        "kind": "command",
+        "blocking": true,
+        "check": {
+          "command": "bash goal.checks.sh",
+          "expect": "exit0",
+          "timeoutSeconds": 180
+        }
+      }
+    ],
+    "test_globs": [
+      "harness/**"
+    ],
+    "scope_globs": [
+      "src/**"
+    ],
+    "basis": "device",
+    "harness_globs": [
+      "goal.sh",
+      "goal.checks.sh",
+      "harness/**",
+      ".kernel/calibration.json",
+      ".kernel/precision.tsv",
+      ".kernel/baseline.tsv"
+    ],
+    "reference_command": "bash harness/remote.sh reference",
+    "burn_in_ms": 0,
+    "clock_lock": null
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "❌ freeze_criteria needs one human confirmation. Run pi interactively, freeze the contract, then hand off the sealed loop."
+      }
+    ],
+    "details": {},
+    "isError": false
+  }
+}

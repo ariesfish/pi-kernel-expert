@@ -1,0 +1,55 @@
+===== NCU rules for full, highest estimated speedup first =====
+Kernel: saxpy_candidate(int, float, const float *, float *)
+speedup: est. % of the kernel's time (global) or of the part the rule is about (local)
+
+[OPT]  94.68% (local)  ComputeWorkloadAnalysis / HighPipeUtilization: Low Utilization
+    All compute pipelines are under-utilized. Either this workload is very small or it doesn't issue enough
+    warps per scheduler. Check the Launch Statistics and Scheduler Statistics sections for further details.
+
+[OPT]  38.19% (global)  MemoryWorkloadAnalysis_Chart / MemoryL2Compression: Low Compression Rate
+    Out of the 67136832.0 bytes sent to the L2 Compression unit only 0.00% were successfully compressed. To
+    increase this success rate, consider marking only those memory regions as compressible that contain the
+    most zero values and/or expose the most homogeneous values.
+
+[OPT]  33.17% (local)  SchedulerStats / IssueSlotUtilization
+    Every scheduler is capable of issuing one instruction per cycle, but for this workload each scheduler only
+    issues an instruction every 5.8 cycles. This might leave hardware resources underutilized and may lead to
+    less optimal performance. Out of the maximum of 16 warps per scheduler, this workload allocates an average
+    of 11.75 active warps per scheduler, but only an average of 0.22 warps were eligible per cycle. Eligible
+    warps are the subset of active warps that are ready to issue their next instruction. Every cycle with no
+    eligible warp results in no instruction being issued and the issue slot remains unused. To increase the
+    number of eligible warps, reduce the time the active warps are stalled by inspecting the top stall reasons
+    on the Warp State Statistics and Source Counters sections.
+
+[OPT]  33.17% (global)  WarpStateStats / CPIStall: Long Scoreboard Stalls
+    On average, each warp of this workload spends 56.9 cycles being stalled waiting for a scoreboard
+    dependency on a L1TEX (local, global, surface, texture) operation. Find the instruction producing the data
+    being waited upon to identify the culprit. To reduce the number of cycles waiting on L1TEX data accesses
+    verify the memory access patterns are optimal for the target architecture, attempt to increase cache hit
+    rates by increasing data locality (coalescing), or by changing the cache configuration. Consider moving
+    frequently used data to shared memory. This stall type represents about 83.7% of the total average of 68.0
+    cycles between issuing two instructions.
+
+[OPT]  25.79% (global)  Occupancy / AchievedOccupancy
+    The difference between calculated theoretical (100.0%) and measured achieved occupancy (74.2%) can be the
+    result of warp scheduling overheads or workload imbalances during the kernel execution. Load imbalances
+    can occur between warps within a block as well as across blocks of the same kernel. See the CUDA Best
+    Practices Guide (https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#occupancy) for more
+    details on optimizing occupancy.
+
+[OPT]      -  SpeedOfLight / SOLBottleneck: High Memory Throughput
+    Memory is more heavily utilized than Compute: Look at the Memory Workload Analysis section to identify the
+    DRAM bottleneck. Check memory replay (coalescing) metrics to make sure you're efficiently utilizing the
+    bytes transferred. Also consider whether it is possible to do more work per memory access (kernel fusion)
+    or whether there are values you can (re)compute.
+
+[OK]      -  WarpStateStats / CPIStall
+    Check the Warp Stall Sampling (All Samples) table for the top stall locations in your source based on
+    sampling data. The Profiling Guide (https://docs.nvidia.com/nsight-
+    compute/ProfilingGuide/index.html#metrics-reference) provides more details on each stall reason.
+
+[OK]      -  SpeedOfLight_RooflineChart / SOLFPRoofline: Roofline Analysis
+    The ratio of peak float (FP32) to double (FP64) performance on this device is 2:1. The workload achieved
+    close to 1% of this device's FP32 peak performance and 0% of its FP64 peak performance. See the Profiling
+    Guide (https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#roofline) for more details on
+    roofline analysis.

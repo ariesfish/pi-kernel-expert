@@ -1,0 +1,41 @@
+{
+  "name": "run_goal",
+  "params": {
+    "command": "bash goal.sh",
+    "timeout_seconds": 180,
+    "checks_timeout_seconds": 180
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "✅ Benchmark PASSED in 100.0s\n💥 CHECKS FAILED (goal.checks.sh) in 6.6s\nLog this as 'checks_failed' — the benchmark metric is valid but correctness checks did not pass.\n📊 Current best geomean_speedup: 11.34x\n\n📐 Parsed metrics: ★ geomean_speedup=8.77x latency_us_saxpy_typical=81.08 latency_us_saxpy_zero_block=75.72 latency_us_saxpy_tail=80.92 latency_us_saxpy=79.20 paired_speedup=0.77\nUse these values directly in log_goal (metric: 8.768027459, metrics: {\"latency_us_saxpy_typical\": 81.075201, \"latency_us_saxpy_zero_block\": 75.724318, \"latency_us_saxpy_tail\": 80.924959, \"latency_us_saxpy\": 79.20184482, \"paired_speedup\": 0.7733484847})\n\nMETRIC latency_us_saxpy_typical=81.075201\nMETRIC latency_us_saxpy_zero_block=75.724318\nMETRIC latency_us_saxpy_tail=80.924959\nMETRIC latency_us_saxpy=79.20184482\nMETRIC paired_speedup=0.7733484847\nMETRIC geomean_speedup=8.768027459\n=== KERNEL READING ===\n{\"schemaVersion\":1,\"contractSha\":\"e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a\",\"basis\":\"device\",\"basisSource\":\"task-reported\",\"gpu\":{\"available\":true,\"name\":\"NVIDIA H200\",\"index\":3,\"visible\":\"3\",\"start\":{\"clocksSmMhz\":345,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980},\"loaded\":{\"clocksSmMhz\":1980,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980},\"end\":{\"clocksSmMhz\":375,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980}},\"cells\":[{\"id\":\"saxpy\",\"group\":\"typical\",\"metric\":\"latency_us_saxpy_typical\",\"median\":81.075201,\"samples\":10,\"spreadPct\":0.182747619707},{\"id\":\"saxpy\",\"group\":\"zero_block\",\"metric\":\"latency_us_saxpy_zero_block\",\"median\":75.724318,\"samples\":10,\"spreadPct\":0.268763067632},{\"id\":\"saxpy\",\"group\":\"tail\",\"metric\":\"latency_us_saxpy_tail\",\"median\":80.924959,\"samples\":10,\"spreadPct\":0.201670784906}],\"shellMs\":99930,\"hostEnqueueMs\":0.001830965,\"deviceMs\":0.080924958,\"hostBoundRatio\":0.0226254674114,\"hostBoundVerdict\":\"ok\",\"pairing\":\"mirrored\",\"pairRatios\":[0.7733644998,0.77333247],\"pairSpreadPct\":0.004141703336,\"startedAt\":\"2026-11-11T08:54:33Z\",\"finishedAt\":\"2026-11-11T08:56:11Z\",\"hostEnqueueSamples\":30,\"deviceSamples\":30,\"nvidiaSmi\":\"NVIDIA-SMI version  : 580.178.04\",\"warnings\":[]}\n=== END KERNEL READING ===\n\n\n── Checks output (last 80 lines) ──\nFAIL cell saxpy group zero_block pass 1:\nelements=16777216 group=zero_block implementation=candidate max_diff=1\nchecks failed: 1 cell/group pair(s); a pair that passes once and fails twice may be order-dependent"
+      }
+    ],
+    "details": {
+      "command": "bash goal.sh",
+      "exitCode": 0,
+      "durationSeconds": 100.02,
+      "passed": false,
+      "crashed": true,
+      "timedOut": false,
+      "tailOutput": "METRIC latency_us_saxpy_typical=81.075201\nMETRIC latency_us_saxpy_zero_block=75.724318\nMETRIC latency_us_saxpy_tail=80.924959\nMETRIC latency_us_saxpy=79.20184482\nMETRIC paired_speedup=0.7733484847\nMETRIC geomean_speedup=8.768027459\n=== KERNEL READING ===\n{\"schemaVersion\":1,\"contractSha\":\"e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a\",\"basis\":\"device\",\"basisSource\":\"task-reported\",\"gpu\":{\"available\":true,\"name\":\"NVIDIA H200\",\"index\":3,\"visible\":\"3\",\"start\":{\"clocksSmMhz\":345,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980},\"loaded\":{\"clocksSmMhz\":1980,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980},\"end\":{\"clocksSmMhz\":375,\"clocksMemMhz\":3201,\"utilPct\":0,\"foreignProcessMiB\":0,\"clocksMaxSmMhz\":1980}},\"cells\":[{\"id\":\"saxpy\",\"group\":\"typical\",\"metric\":\"latency_us_saxpy_typical\",\"median\":81.075201,\"samples\":10,\"spreadPct\":0.182747619707},{\"id\":\"saxpy\",\"group\":\"zero_block\",\"metric\":\"latency_us_saxpy_zero_block\",\"median\":75.724318,\"samples\":10,\"spreadPct\":0.268763067632},{\"id\":\"saxpy\",\"group\":\"tail\",\"metric\":\"latency_us_saxpy_tail\",\"median\":80.924959,\"samples\":10,\"spreadPct\":0.201670784906}],\"shellMs\":99930,\"hostEnqueueMs\":0.001830965,\"deviceMs\":0.080924958,\"hostBoundRatio\":0.0226254674114,\"hostBoundVerdict\":\"ok\",\"pairing\":\"mirrored\",\"pairRatios\":[0.7733644998,0.77333247],\"pairSpreadPct\":0.004141703336,\"startedAt\":\"2026-11-11T08:54:33Z\",\"finishedAt\":\"2026-11-11T08:56:11Z\",\"hostEnqueueSamples\":30,\"deviceSamples\":30,\"nvidiaSmi\":\"NVIDIA-SMI version  : 580.178.04\",\"warnings\":[]}\n=== END KERNEL READING ===\n",
+      "checksPass": false,
+      "checksTimedOut": false,
+      "checksOutput": "FAIL cell saxpy group zero_block pass 1:\nelements=16777216 group=zero_block implementation=candidate max_diff=1\nchecks failed: 1 cell/group pair(s); a pair that passes once and fails twice may be order-dependent",
+      "checksDuration": 6.588,
+      "parsedMetrics": {
+        "latency_us_saxpy_typical": 81.075201,
+        "latency_us_saxpy_zero_block": 75.724318,
+        "latency_us_saxpy_tail": 80.924959,
+        "latency_us_saxpy": 79.20184482,
+        "paired_speedup": 0.7733484847,
+        "geomean_speedup": 8.768027459
+      },
+      "parsedPrimary": 8.768027459,
+      "metricName": "geomean_speedup",
+      "metricUnit": "x"
+    },
+    "isError": false
+  }
+}

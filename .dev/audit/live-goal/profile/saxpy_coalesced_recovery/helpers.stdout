@@ -1,0 +1,18 @@
+[full] full.ncu-rep: 2243 metrics, kernel saxpy_candidate
+  -> metrics_all_full.json (2243 metrics)
+  -> metrics_key_full.{json,txt}
+  -> rules_full.txt (8 results)
+[full] -> /root/pkex/live-goal-TeiuDf/profile/saxpy_coalesced_recovery/analysis/stall_hotspots_full.txt (4 distinct lines)
+
+OPTIONAL TIMELINE UNAVAILABLE:
+Traceback (most recent call last):
+  File "/root/pkex/live-goal-TeiuDf/helpers/plot_timeline.py", line 191, in <module>
+    main()
+  File "/root/pkex/live-goal-TeiuDf/helpers/plot_timeline.py", line 173, in main
+    warp_states = plot_warp_states(action, args.rows, args.cols, args.stall_reasons) \
+  File "/root/pkex/live-goal-TeiuDf/helpers/plot_timeline.py", line 122, in plot_warp_states
+    result = warp_state_timeline(action, cols)
+  File "/root/pkex/live-goal-TeiuDf/helpers/ncu_utils.py", line 483, in warp_state_timeline
+    samples = action.timed_warp_samples()
+AttributeError: 'IAction' object has no attribute 'timed_warp_samples'
+

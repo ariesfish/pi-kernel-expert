@@ -1,0 +1,90 @@
+{
+  "name": "kernel_candidate",
+  "params": {
+    "decision": "reject",
+    "description": "Incorrect zero-block fast path",
+    "reason": "The zero_block input group fails the fixed reference comparison and precision gate",
+    "metrics": {
+      "latency_us_saxpy_typical": 81.075201,
+      "latency_us_saxpy_zero_block": 75.724318,
+      "latency_us_saxpy_tail": 80.924959,
+      "latency_us_saxpy": 79.20184482,
+      "paired_speedup": 0.7733484847,
+      "geomean_speedup": 8.768027459
+    },
+    "reading": "runs/broken-zero-block.stdout"
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "recorded C3 (reject) — parent C2\n  diff 9107055e1193  contract e39739dcc958\n  geomean_speedup 8.768027459\n  reading: basis device, hostBoundRatio 0.0226254674114, verdict measured, pairing mirrored\n  reason: The zero_block input group fails the fixed reference comparison and precision gate\nledger: candidates.jsonl\nbenchmark.csv refreshed (3 row(s), derived — never edit it)"
+      }
+    ],
+    "details": {
+      "record": {
+        "id": "C3",
+        "parent": "C2",
+        "at": "2026-11-11T08:56:20.285Z",
+        "decision": "reject",
+        "description": "Incorrect zero-block fast path",
+        "commit": null,
+        "contractSha": "e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a",
+        "diffHash": "9107055e1193fd2d9c22b7ea55bc1294e235523ba09b8513b295b0971bede883",
+        "metrics": {
+          "latency_us_saxpy_typical": 81.075201,
+          "latency_us_saxpy_zero_block": 75.724318,
+          "latency_us_saxpy_tail": 80.924959,
+          "latency_us_saxpy": 79.20184482,
+          "paired_speedup": 0.7733484847,
+          "geomean_speedup": 8.768027459
+        },
+        "profile": null,
+        "bottleneck": null,
+        "reason": "The zero_block input group fails the fixed reference comparison and precision gate",
+        "reading": {
+          "contractSha": "e39739dcc9589d39d98d839ef22c1e352b23708f0507b9d8a8979b1fcbd81e7a",
+          "basis": "device",
+          "hostBoundRatio": 0.0226254674114,
+          "hostBoundVerdict": "ok",
+          "pairing": "mirrored",
+          "verdict": "measured",
+          "cells": [
+            {
+              "id": "saxpy",
+              "group": "typical",
+              "median": 81.075201,
+              "spreadPct": 0.182747619707
+            },
+            {
+              "id": "saxpy",
+              "group": "zero_block",
+              "median": 75.724318,
+              "spreadPct": 0.268763067632
+            },
+            {
+              "id": "saxpy",
+              "group": "tail",
+              "median": 80.924959,
+              "spreadPct": 0.201670784906
+            }
+          ],
+          "startedAt": "2026-11-11T08:54:33Z",
+          "warnings": []
+        },
+        "pairing": "mirrored",
+        "verdict": "measured",
+        "forced": false,
+        "forcedReason": null,
+        "forcedRules": [],
+        "wiki": null,
+        "milestoneDecision": null,
+        "milestoneSha": null,
+        "precondition": null
+      },
+      "benchmarkCsv": "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/benchmark.csv",
+      "refusals": []
+    },
+    "isError": false
+  }
+}

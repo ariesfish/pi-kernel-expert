@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=3; ncu 2025.3.1; --set full --import-source yes --clock-control none -k regex:saxpy_candidate -c 1; ./task check

@@ -1,0 +1,77 @@
+{
+  "name": "probe_goal",
+  "params": {
+    "direction_id": "D1",
+    "command": "bash harness/remote.sh reference",
+    "timeout_seconds": 30,
+    "decision": "keep",
+    "note": "Coalesced reference timing is a feasibility proxy; the candidate must still pass the full frozen matrix."
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "✅ D1: keep (latency_us = 61.34656).\nevidence: sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770\nnote: Coalesced reference timing is a feasibility proxy; the candidate must still pass the full frozen matrix.\nNext: probe the remaining open directions."
+      }
+    ],
+    "details": {
+      "state": {
+        "contract": null,
+        "directions": [
+          {
+            "id": "D1",
+            "title": "Coalesced memory mapping",
+            "mechanism": "Map adjacent lanes to adjacent elements",
+            "proxyMetric": "latency_us",
+            "cost": "one compiled reference run",
+            "risk": "Incorrect bounds at the tail",
+            "killIf": "Reference is not materially faster than the strided baseline",
+            "status": "kept",
+            "evidence": {
+              "command": "bash harness/remote.sh reference",
+              "value": 61.34656,
+              "outputHash": "sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770",
+              "at": 1794385365496
+            }
+          },
+          {
+            "id": "D2",
+            "title": "Launch geometry",
+            "mechanism": "Use 128 threads per block to change occupancy and grid geometry",
+            "proxyMetric": "latency_us",
+            "cost": "one baseline run",
+            "risk": "More blocks may increase scheduling cost",
+            "killIf": "Deferred once the coalesced direction satisfies this acceptance task",
+            "status": "open"
+          }
+        ],
+        "probes": [
+          {
+            "directionId": "D1",
+            "command": "bash harness/remote.sh reference",
+            "value": 61.34656,
+            "evidenceHash": "sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770",
+            "decision": "keep",
+            "at": 1794385365496
+          }
+        ],
+        "gates": [],
+        "reviews": [],
+        "attempts": [],
+        "results": [],
+        "baselineMetric": null,
+        "bestDirection": "lower",
+        "metricName": "metric",
+        "metricUnit": "",
+        "secondaryMetrics": [],
+        "name": null,
+        "currentExperimentIndex": 0,
+        "runLimit": 4,
+        "confidence": null,
+        "testEditsAllowed": false,
+        "benchmarkEditsAllowed": false
+      }
+    },
+    "isError": false
+  }
+}

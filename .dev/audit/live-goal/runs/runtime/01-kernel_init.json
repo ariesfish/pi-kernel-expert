@@ -1,0 +1,24 @@
+{
+  "name": "kernel_init",
+  "params": {},
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Kernel task workspace: /var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf\ncreated: docs/draft.md, docs/plan.md, docs/milestone.md, candidates.jsonl\nkept existing: none\ncontract will live at /var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf/kernel.contract.json\n\nDraft/plan sections still need real content before a contract can be frozen:\n- docs/draft.md › Baseline and validation: section still holds the generated placeholder\n- docs/draft.md › Risks and unknowns: section still holds the generated placeholder\n- docs/draft.md › Candidate directions: section still holds the generated placeholder\n- docs/draft.md › First steps: section still holds the generated placeholder\n- docs/draft.md › Validation and evaluation commands: section still holds the generated placeholder\n- docs/draft.md › Evidence required: section still holds the generated placeholder\n- docs/plan.md › Steps: section still holds the generated placeholder\n- docs/plan.md › Evidence per step: section still holds the generated placeholder\n- docs/plan.md › Stop conditions: section still holds the generated placeholder"
+      }
+    ],
+    "details": {
+      "root": "/var/folders/s1/fycz4h1s4cj63j43wgjhqj2r0000gn/T/pi-kernel-live-goal-TeiuDf",
+      "created": [
+        "docs/draft.md",
+        "docs/plan.md",
+        "docs/milestone.md",
+        "candidates.jsonl"
+      ],
+      "existing": [],
+      "workspaceReady": false
+    },
+    "isError": false
+  }
+}

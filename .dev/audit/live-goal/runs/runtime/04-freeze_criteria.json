@@ -1,0 +1,164 @@
+{
+  "name": "freeze_criteria",
+  "params": {
+    "objective": "Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback",
+    "criteria": [
+      {
+        "id": "M1",
+        "statement": "geomean speedup over the recorded baseline across 1 matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; 3 group(s) in the matrix)",
+        "kind": "metric",
+        "blocking": true,
+        "metric": {
+          "name": "geomean_speedup",
+          "direction": "higher",
+          "unit": "x"
+        }
+      },
+      {
+        "id": "C1",
+        "statement": "every matrix cell matches the reference on every input group, on two consecutive passes",
+        "kind": "command",
+        "blocking": true,
+        "check": {
+          "command": "bash goal.checks.sh",
+          "expect": "exit0",
+          "timeoutSeconds": 180
+        }
+      }
+    ],
+    "test_globs": [
+      "harness/**"
+    ],
+    "scope_globs": [
+      "src/**"
+    ],
+    "basis": "device",
+    "harness_globs": [
+      "goal.sh",
+      "goal.checks.sh",
+      "harness/**",
+      ".kernel/calibration.json",
+      ".kernel/precision.tsv",
+      ".kernel/baseline.tsv"
+    ],
+    "reference_command": "bash harness/remote.sh reference",
+    "burn_in_ms": 0,
+    "clock_lock": null
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "🔒 Contract frozen: sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52\nPrimary metric: geomean_speedup (higher is better).\n2 blocking criteria, 2 total.\nTest files protected: harness/**.\nNext: run the baseline with run_goal, then log_goal."
+      }
+    ],
+    "details": {
+      "state": {
+        "contract": {
+          "version": 1,
+          "objective": "Verify the live pi-goal loop on one H200 using a correct SAXPY baseline, a coalesced candidate and an incorrect candidate with rollback",
+          "criteria": [
+            {
+              "id": "M1",
+              "statement": "geomean speedup over the recorded baseline across 1 matrix cell(s) (each cell is the geomean of its input group(s), so one group's regression moves the cell; 3 group(s) in the matrix)",
+              "kind": "metric",
+              "blocking": true,
+              "metric": {
+                "name": "geomean_speedup",
+                "direction": "higher",
+                "unit": "x"
+              }
+            },
+            {
+              "id": "C1",
+              "statement": "every matrix cell matches the reference on every input group, on two consecutive passes",
+              "kind": "command",
+              "blocking": true,
+              "check": {
+                "command": "bash goal.checks.sh",
+                "expect": "exit0"
+              }
+            }
+          ],
+          "testGlobs": [
+            "harness/**"
+          ],
+          "scopeGlobs": [
+            "src/**"
+          ],
+          "allowTestEdits": false,
+          "frozenAt": 1794385898800,
+          "hash": "sha256:82ee1d39fdc02e714423387cd4bbe9786225d647fba243558634843476128c52"
+        },
+        "directions": [
+          {
+            "id": "D1",
+            "title": "Coalesced memory mapping",
+            "mechanism": "Map adjacent lanes to adjacent elements",
+            "proxyMetric": "latency_us",
+            "cost": "one compiled reference run",
+            "risk": "Incorrect bounds at the tail",
+            "killIf": "Reference is not materially faster than the strided baseline",
+            "status": "kept",
+            "evidence": {
+              "command": "bash harness/remote.sh reference",
+              "value": 61.34656,
+              "outputHash": "sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770",
+              "at": 1794385365496
+            }
+          },
+          {
+            "id": "D2",
+            "title": "Launch geometry",
+            "mechanism": "Use 128 threads per block to change occupancy and grid geometry",
+            "proxyMetric": "latency_us",
+            "cost": "one baseline run",
+            "risk": "More blocks may increase scheduling cost",
+            "killIf": "Deferred once the coalesced direction satisfies this acceptance task",
+            "status": "killed",
+            "evidence": {
+              "command": "bash harness/remote.sh bench 128",
+              "value": 697.854691,
+              "outputHash": "sha256:01862d0a0546c40696d767c246c83759d965b4cc1c9645e064b5681780db85f9",
+              "at": 1794385366909
+            }
+          }
+        ],
+        "probes": [
+          {
+            "directionId": "D1",
+            "command": "bash harness/remote.sh reference",
+            "value": 61.34656,
+            "evidenceHash": "sha256:0c1afc269efe9d16839134ccde38465e6c4fb6459764041963979e61e70b2770",
+            "decision": "keep",
+            "at": 1794385365496
+          },
+          {
+            "directionId": "D2",
+            "command": "bash harness/remote.sh bench 128",
+            "value": 697.854691,
+            "evidenceHash": "sha256:01862d0a0546c40696d767c246c83759d965b4cc1c9645e064b5681780db85f9",
+            "decision": "kill",
+            "at": 1794385366909
+          }
+        ],
+        "gates": [],
+        "reviews": [],
+        "attempts": [],
+        "results": [],
+        "baselineMetric": null,
+        "bestDirection": "higher",
+        "metricName": "geomean_speedup",
+        "metricUnit": "x",
+        "secondaryMetrics": [],
+        "name": "Research",
+        "currentExperimentIndex": 0,
+        "runLimit": 4,
+        "confidence": null,
+        "testEditsAllowed": false,
+        "benchmarkEditsAllowed": false
+      }
+    },
+    "isError": false
+  }
+}
