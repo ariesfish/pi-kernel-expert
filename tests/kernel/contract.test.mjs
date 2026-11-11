@@ -119,7 +119,7 @@ test("freeze payload has one blocking metric and one command criterion", () => {
   assert.equal(command.blocking, true);
   assert.equal(command.check.command, "bash goal.checks.sh");
   assert.equal(command.check.expect, "exit0");
-  assert.equal(command.check.timeoutSeconds, 900);
+  assert.equal(command.check.timeout_seconds, 900);
 });
 
 test("rendered scripts embed the cells, the hash, and the guard", () => {

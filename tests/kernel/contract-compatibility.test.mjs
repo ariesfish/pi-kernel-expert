@@ -28,6 +28,18 @@ function digest(text) {
   return createHash("sha256").update(text).digest("hex");
 }
 
+// Normalize the corrected pi-goal tool field back to its original spelling only
+// for these historical hashes. The receiver regression lives in freeze-compatibility.
+function historicalFreezeJson(payload) {
+  return `${JSON.stringify(payload, (key, value) => {
+    if (key === "check" && value?.timeout_seconds !== undefined) {
+      const { timeout_seconds, ...check } = value;
+      return { ...check, timeoutSeconds: timeout_seconds };
+    }
+    return value;
+  }, 2)}\n`;
+}
+
 for (const fixture of fixtures) {
   test(`contract artifacts remain compatible: ${fixture.name}`, (t) => {
     const result = normalizeContract(fixture.input);
@@ -41,7 +53,7 @@ for (const fixture of fixtures) {
         contract: sha,
         benchmark: digest(renderBenchmarkScript(result.contract, sha)),
         checks: digest(renderChecksScript(result.contract, sha)),
-        freeze: digest(`${JSON.stringify(freezePayload(result.contract), null, 2)}\n`),
+        freeze: digest(historicalFreezeJson(freezePayload(result.contract))),
       },
       fixture.hashes,
     );
@@ -56,7 +68,9 @@ for (const fixture of fixtures) {
       checks: "goal.checks.sh",
       freeze: "kernel-freeze.json",
     })) {
-      assert.equal(digest(fs.readFileSync(path.join(root, file), "utf8")), fixture.hashes[name], file);
+      const text = fs.readFileSync(path.join(root, file), "utf8");
+      const compatible = name === "freeze" ? historicalFreezeJson(JSON.parse(text)) : text;
+      assert.equal(digest(compatible), fixture.hashes[name], file);
     }
     assert.deepEqual(readContract(root), { ok: true, contract: result.contract, sha });
   });

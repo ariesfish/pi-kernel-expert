@@ -60,7 +60,7 @@ export interface FreezeCriterion {
   kind: "metric" | "command";
   blocking: boolean;
   metric?: { name: string; direction: "higher" | "lower"; unit?: string };
-  check?: { command: string; expect: "exit0"; timeoutSeconds?: number };
+  check?: { command: string; expect: "exit0"; timeout_seconds?: number };
 }
 
 export interface FreezePayload {
@@ -97,7 +97,7 @@ export function freezePayload(contract: KernelContract): FreezePayload {
         check: {
           command: "bash goal.checks.sh",
           expect: "exit0",
-          timeoutSeconds: contract.checksTimeoutSeconds,
+          timeout_seconds: contract.checksTimeoutSeconds,
         },
       },
     ],
